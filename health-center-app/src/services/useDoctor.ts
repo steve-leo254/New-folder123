@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { apiService } from '../services/api';
 import type { AxiosError } from 'axios';
-import { Doctor, DoctorCreateRequest, DoctorUpdateRequest } from '../types/doctor';
+import { Doctor, DoctorCreateRequest, DoctorUpdateRequest } from '../types/appointment';
 
 // Define PaginatedDoctorResponse type
 type PaginatedDoctorResponse = {

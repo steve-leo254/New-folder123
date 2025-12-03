@@ -4,13 +4,13 @@ import {
   Users, 
   Calendar, 
   Pill, 
-  FileText, 
+   
   Video, 
-  TrendingUp,
+
   DollarSign,
   Activity,
   AlertCircle,
-  CheckCircle,
+ 
   Clock,
   UserPlus,
   UserCheck,
@@ -18,27 +18,20 @@ import {
   Download,
   Filter,
   Search,
-  ChevronDown,
-  BarChart3,
-  PieChart,
-  MapPin,
   Star,
-  Shield,
-  Zap,
   Database,
   Bell,
   LogOut,
   Edit,
   Trash2,
   Eye,
-  MoreVertical
+
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import { 
-  BarChart, 
-  Bar, 
+  
   XAxis, 
   YAxis, 
   CartesianGrid, 

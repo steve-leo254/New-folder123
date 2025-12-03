@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Star, MapPin, Calendar, Video } from 'lucide-react';
+import { Search } from 'lucide-react';
 import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
 import DoctorCard from '../components/features/DoctorCard';
 import { Doctor } from '../types';
 
@@ -14,7 +13,7 @@ const DoctorsPage: React.FC = () => {
   const doctors: Doctor[] = [
     {
       id: '1',
-      firstName: 'Sarah',
+      firstName: 'Mumbi',
       lastName: 'Johnson',
       specialization: 'Cardiologist',
       experience: 10,
@@ -64,6 +63,38 @@ const DoctorsPage: React.FC = () => {
       id: '4',
       firstName: 'David',
       lastName: 'Kimani',
+      specialization: 'General Practitioner',
+      experience: 15,
+      rating: 4.6,
+      avatar: '/images/doctor1.jpg',
+      bio: 'Experienced family physician providing comprehensive healthcare for all ages',
+      availability: [
+        { day: 'Monday', startTime: '8:00 AM', endTime: '6:00 PM' },
+        { day: 'Tuesday', startTime: '8:00 AM', endTime: '6:00 PM' },
+        { day: 'Thursday', startTime: '8:00 AM', endTime: '6:00 PM' }
+      ],
+      consultationFee: 80
+    },
+    {
+      id: '5',
+      firstName: 'Mohamed',
+      lastName: 'MbaBuu',
+      specialization: 'General Practitioner',
+      experience: 15,
+      rating: 4.6,
+      avatar: '/images/doctor1.jpg',
+      bio: 'Experienced family physician providing comprehensive healthcare for all ages',
+      availability: [
+        { day: 'Monday', startTime: '8:00 AM', endTime: '6:00 PM' },
+        { day: 'Tuesday', startTime: '8:00 AM', endTime: '6:00 PM' },
+        { day: 'Thursday', startTime: '8:00 AM', endTime: '6:00 PM' }
+      ],
+      consultationFee: 80
+    },
+    {
+      id: '6',
+      firstName: 'Seco',
+      lastName: 'Kanyatta',
       specialization: 'General Practitioner',
       experience: 15,
       rating: 4.6,

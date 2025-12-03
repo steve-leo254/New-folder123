@@ -14,7 +14,7 @@ from sqlalchemy import (
     Boolean,
     Text,
     func,
-    
+
 )
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.dialects.mysql import JSON
@@ -98,7 +98,8 @@ class User(Base):
         back_populates="clinician",
         foreign_keys="Appointment.clinician_id",
     )
-    doctor_profile = relationship("Doctor", back_populates="user", uselist=False)
+    doctor_profile = relationship(
+        "Doctor", back_populates="user", uselist=False)
     payments = relationship("Payment", back_populates="user")
     medical_history = relationship("MedicalHistory", back_populates="patient")
     addresses = relationship("Address", back_populates="user")
@@ -109,7 +110,8 @@ class Doctor(Base):
     __tablename__ = "doctors"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"),
+                     unique=True, nullable=False, index=True)
     specialization = Column(String(120), nullable=False, index=True)
     bio = Column(Text, nullable=True)
     rating = Column(Numeric(precision=3, scale=2), default=0.0)
@@ -122,19 +124,21 @@ class Doctor(Base):
     # Relationships
     user = relationship("User", back_populates="doctor_profile")
 
- 
 
 class Appointment(Base):
     """Appointment model representing patient-clinician appointments."""
     __tablename__ = "appointments"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    clinician_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    patient_id = Column(Integer, ForeignKey(
+        "users.id"), nullable=False, index=True)
+    clinician_id = Column(Integer, ForeignKey(
+        "users.id"), nullable=False, index=True)
     visit_type = Column(String(80), nullable=True)
     specialization = Column(String(80), nullable=True, index=True)
     scheduled_at = Column(DateTime, nullable=False, index=True)
-    status = Column(Enum(AppointmentStatus), default=AppointmentStatus.SCHEDULED, index=True)
+    status = Column(Enum(AppointmentStatus),
+                    default=AppointmentStatus.SCHEDULED, index=True)
     triage_notes = Column(Text, nullable=True)
     cost = Column(Numeric(precision=10, scale=2), default=0.0)
     cancellation_reason = Column(Text, nullable=True)
@@ -142,10 +146,14 @@ class Appointment(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    patient = relationship("User", foreign_keys=[patient_id], back_populates="appointments")
-    clinician = relationship("User", foreign_keys=[clinician_id], back_populates="consults")
-    prescription = relationship("Prescription", back_populates="appointment", uselist=False)
-    payment = relationship("Payment", back_populates="appointment", uselist=False)
+    patient = relationship("User", foreign_keys=[
+                           patient_id], back_populates="appointments")
+    clinician = relationship("User", foreign_keys=[
+                             clinician_id], back_populates="consults")
+    prescription = relationship(
+        "Prescription", back_populates="appointment", uselist=False)
+    payment = relationship(
+        "Payment", back_populates="appointment", uselist=False)
 
 
 class Prescription(Base):
@@ -160,10 +168,12 @@ class Prescription(Base):
         nullable=False,
         index=True
     )
-    issued_by_doctor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    issued_by_doctor_id = Column(
+        Integer, ForeignKey("users.id"), nullable=True)
     pharmacy_name = Column(String(120), nullable=True)
     medications_json = Column(JSON, nullable=True)
-    status = Column(Enum(PrescriptionStatus), default=PrescriptionStatus.PENDING, index=True)
+    status = Column(Enum(PrescriptionStatus),
+                    default=PrescriptionStatus.PENDING, index=True)
     qr_code_path = Column(String(255), nullable=True)
     issued_date = Column(DateTime, default=func.now())
     expiry_date = Column(DateTime, nullable=True)
@@ -180,12 +190,17 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    appointment_id = Column(Integer, ForeignKey(
+        "appointments.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"),
+                     nullable=False, index=True)
     amount = Column(Numeric(precision=12, scale=2), nullable=False)
-    payment_method = Column(String(50), nullable=False)  # "card", "mpesa", "bank_transfer"
-    transaction_id = Column(String(100), unique=True, nullable=True, index=True)
-    status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING, index=True)
+    # "card", "mpesa", "bank_transfer"
+    payment_method = Column(String(50), nullable=False)
+    transaction_id = Column(String(100), unique=True,
+                            nullable=True, index=True)
+    status = Column(Enum(PaymentStatus),
+                    default=PaymentStatus.PENDING, index=True)
     reference_number = Column(String(100), nullable=True)
     payment_details = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=func.now())
@@ -209,7 +224,8 @@ class Address(Base):
     region = Column(String(100), nullable=True)
     city = Column(String(100), nullable=False)
     is_default = Column(Boolean, default=False, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"),
+                     nullable=False, index=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -222,8 +238,10 @@ class MedicalHistory(Base):
     __tablename__ = "medical_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True)
+    patient_id = Column(Integer, ForeignKey(
+        "users.id"), nullable=False, index=True)
+    appointment_id = Column(Integer, ForeignKey(
+        "appointments.id"), nullable=True)
     diagnosis = Column(Text, nullable=True)
     symptoms = Column(Text, nullable=True)
     treatment_plan = Column(Text, nullable=True)
@@ -234,4 +252,3 @@ class MedicalHistory(Base):
 
     # Relationships
     patient = relationship("User", back_populates="medical_history")
-
