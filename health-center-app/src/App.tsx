@@ -13,6 +13,7 @@ import DoctorsPage from './pages/DoctorsPage';
 import VideoChatPage from './pages/videoChatPage';
 import CheckoutPage from './pages/CheckoutPage';
 import MedicationPage from './pages/MedicationPage';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import NotFoundPage from './pages/NotFoundPage';
 import Signup from './pages/RegisterPage';
 import './styles/globals.css';
@@ -30,6 +31,7 @@ function App() {
               <Route path="/appointments" element={<AppointmentsPage />} />
               <Route path="/register" element={<Signup />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/superadmindashboard" element={<SuperAdminDashboard />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/prescriptions" element={<PrescriptionPage />} />
               <Route path="/profile" element={<ProfilePage />} />
