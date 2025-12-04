@@ -1,15 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { Search } from 'lucide-react';
-import Card from '../components/ui/Card';
-import DoctorCard from '../components/features/DoctorCard';
-import { Doctor } from '../types';
+import StaffMembers from '../components/features/StaffMembers';
+import { Doctor, StaffMember } from '../types';
 
 const DoctorsPage: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSpecialization, setSelectedSpecialization] = useState('all');
-  const [sortBy, setSortBy] = useState('rating');
-
   const doctors: Doctor[] = [
     {
       id: '1',
@@ -35,7 +29,7 @@ const DoctorsPage: React.FC = () => {
       experience: 8,
       rating: 4.9,
       avatar: '/images/doctor2.jpg',
-      bio: 'Specialized in child healthcare and development, passionate about pediatric medicine',
+      bio: 'Specialized in child healthcare and development, passione',
       availability: [
         { day: 'Tuesday', startTime: '8:00 AM', endTime: '4:00 PM' },
         { day: 'Thursday', startTime: '8:00 AM', endTime: '4:00 PM' },
@@ -109,23 +103,27 @@ const DoctorsPage: React.FC = () => {
     }
   ];
 
-  const specializations = ['all', 'Cardiologist', 'Pediatrician', 'Dermatologist', 'General Practitioner'];
+  // Convert Doctor objects to StaffMember format for the shared component
+  const staffMembers: StaffMember[] = doctors.map(doctor => ({
+    id: doctor.id,
+    firstName: doctor.firstName,
+    lastName: doctor.lastName,
+    role: 'Doctor',
+    specialization: doctor.specialization,
+    status: 'active' as const,
+    rating: doctor.rating,
+    avatar: doctor.avatar,
+    experience: doctor.experience,
+    consultationFee: doctor.consultationFee,
+    bio: doctor.bio,
+    availability: doctor.availability
+  }));
 
-  const filteredDoctors = doctors
-    .filter(doctor => {
-      const matchesSearch = doctor.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           doctor.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesSpecialization = selectedSpecialization === 'all' || 
-                                   doctor.specialization === selectedSpecialization;
-      return matchesSearch && matchesSpecialization;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'rating') return b.rating - a.rating;
-      if (sortBy === 'experience') return b.experience - a.experience;
-      if (sortBy === 'fee') return a.consultationFee - b.consultationFee;
-      return 0;
-    });
+  const handleBookAppointment = (member: StaffMember) => {
+    console.log('Book appointment for:', member);
+    // Navigate to appointment booking page with doctor ID
+    window.location.href = `/appointments?doctor=${member.id}`;
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -138,56 +136,18 @@ const DoctorsPage: React.FC = () => {
         <p className="text-gray-600">Find and book appointments with our expert medical professionals</p>
       </motion.div>
 
-      <Card className="p-6 mb-6">
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search doctors by name or specialization..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <select
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            value={selectedSpecialization}
-            onChange={(e) => setSelectedSpecialization(e.target.value)}
-          >
-            {specializations.map(spec => (
-              <option key={spec} value={spec}>
-                {spec === 'all' ? 'All Specializations' : spec}
-              </option>
-            ))}
-          </select>
-          <select
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          >
-            <option value="rating">Sort by Rating</option>
-            <option value="experience">Sort by Experience</option>
-            <option value="fee">Sort by Fee</option>
-          </select>
-        </div>
-      </Card>
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredDoctors.map((doctor) => (
-          <DoctorCard key={doctor.id} doctor={doctor} />
-        ))}
-      </div>
-
-      {filteredDoctors.length === 0 && (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Search className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No doctors found</h3>
-          <p className="text-gray-600">Try adjusting your search or filter criteria</p>
-        </div>
-      )}
+      <StaffMembers 
+        staff={staffMembers}
+        viewMode="cards"
+        showActions={false}
+        showFilters={true}
+        showSearch={true}
+        title=""
+        onStaffClick={(member) => console.log('View doctor:', member)}
+        onBookAppointment={handleBookAppointment}
+        onView={(member) => console.log('View profile:', member)}
+        className="space-y-6"
+      />
     </div>
   );
 };

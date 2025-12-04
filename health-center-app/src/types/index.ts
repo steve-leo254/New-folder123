@@ -72,3 +72,20 @@ export interface VideoCall {
   startTime?: string;
   endTime?: string;
 }
+
+export interface StaffMember {
+  id: string | number;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  role: string;
+  specialization?: string;
+  status?: 'active' | 'on-leave' | 'inactive';
+  rating?: number;
+  patients?: number;
+  avatar?: string;
+  experience?: number;
+  consultationFee?: number;
+  bio?: string;
+  availability?: TimeSlot[];
+}
