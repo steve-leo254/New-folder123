@@ -1,7 +1,6 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import axios from 'axios';
 
 interface JwtPayload {
   sub: string;
@@ -20,9 +19,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getStoredToken = () => localStorage.getItem('token') || localStorage.getItem('authToken');
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(getStoredToken());
+  const [isAuthenticated, setIsAuthenticated] = useState(!!getStoredToken());
   const [role, setRole] = useState<string | null>(null);
 
   // Decode token to get role
@@ -49,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sync with localStorage changes
   useEffect(() => {
     const handleStorageChange = () => {
-      const newToken = localStorage.getItem('token');
+      const newToken = getStoredToken();
       setToken(newToken);
     };
 
@@ -59,12 +60,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = (newToken: string) => {
     localStorage.setItem('token', newToken);
+    localStorage.setItem('authToken', newToken);
     localStorage.setItem('isLoggedIn', 'true');
     setToken(newToken);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('authToken');
     localStorage.removeItem('isLoggedIn');
     setToken(null);
     setRole(null);

@@ -3,37 +3,25 @@ import { Link, useNavigate } from 'react-router-dom';
 import Alert from '../components/ui/Alert';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import Input from '../components/ui/Input';
+import api from '../services/api';
+import { useAuth } from '../services/AuthContext';
 
-// Mock types since they're not defined
 interface LoginCredentials {
   email: string;
   password: string;
 }
 
-// Mock auth hook since it's not implemented
-const useAuth = () => ({
-  login: async (credentials: LoginCredentials) => {
-    console.log('Login attempt:', credentials);
-    // Mock successful login
-    return Promise.resolve();
-  },
-  error: null,
-  clearError: () => {},
-  loading: false
-});
-
-
-
-
-
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, error: authError, clearError, loading } = useAuth();
+  const { login: setTokenInContext } = useAuth();
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: '',
     password: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -65,17 +53,30 @@ export const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearError();
+    setAuthError(null);
 
     if (!validateForm()) {
       return;
     }
 
     try {
-      await login(credentials);
-      navigate('/dashboard'); // Redirect on successful login
-    } catch (err) {
-      // Error is handled by AuthContext
+      setLoading(true);
+      const response = await api.post('/auth/login', {
+        email: credentials.email,
+        password: credentials.password,
+      });
+
+      const { access_token } = response.data;
+      setTokenInContext(access_token);
+      navigate('/dashboard');
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        'Login failed. Please check your credentials and try again.';
+      setAuthError(message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,53 +101,35 @@ export const LoginPage: React.FC = () => {
           <Alert
             type="error"
             message={authError}
-            onClose={clearError}
+            onClose={() => setAuthError(null)}
           />
         )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
-            </label>
-            <input
-              type="email"
-              name="email"
-              placeholder="your@email.com"
-              value={credentials.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              autoComplete="email"
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                formErrors.email ? 'border-red-500' : 'border-gray-300'
-              }`}
-            />
-            {formErrors.email && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
-            )}
-          </div>
+          <Input
+            type="email"
+            name="email"
+            label="Email Address"
+            placeholder="your@email.com"
+            value={credentials.email}
+            onChange={(e) => handleInputChange('email', e.target.value)}
+            error={formErrors.email}
+            required
+          />
 
           {/* Password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              placeholder="••••••••"
-              value={credentials.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
-              autoComplete="current-password"
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                formErrors.password ? 'border-red-500' : 'border-gray-300'
-              }`}
-            />
-            {formErrors.password && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
-            )}
-          </div>
+          <Input
+            type="password"
+            name="password"
+            label="Password"
+            placeholder="••••••••"
+            value={credentials.password}
+            onChange={(e) => handleInputChange('password', e.target.value)}
+            error={formErrors.password}
+            required
+          />
 
           {/* Forgot Password Link */}
           <div className="flex items-center justify-between">

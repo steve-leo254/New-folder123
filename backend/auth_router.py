@@ -84,7 +84,16 @@ async def register_customer(db: db_dependency, create_user_request: CreateUserRe
     db.commit()
     db.refresh(create_user_model)
     logger.info(f"Customer {create_user_request.full_name} registered successfully")
-    return {"message": "Customer created successfully"}
+    return {
+        "message": "Customer created successfully",
+        "user": {
+            "id": create_user_model.id,
+            "full_name": create_user_model.full_name,
+            "email": create_user_model.email,
+            "phone": create_user_model.phone,
+            "role": create_user_model.role.value,
+        },
+    }
 
 @router.post("/register/admin", status_code=status.HTTP_201_CREATED)
 async def register_admin(db: db_dependency, create_user_request: CreateUserRequest):
@@ -116,7 +125,16 @@ async def register_admin(db: db_dependency, create_user_request: CreateUserReque
     db.commit()
     db.refresh(create_user_model)
     logger.info(f"Admin {create_user_request.full_name} registered successfully")
-    return {"message": "Admin created successfully"}
+    return {
+        "message": "Admin created successfully",
+        "user": {
+            "id": create_user_model.id,
+            "full_name": create_user_model.full_name,
+            "email": create_user_model.email,
+            "phone": create_user_model.phone,
+            "role": create_user_model.role.value,
+        },
+    }
 
 
 def authenticate_user(email: str, password: str, db: Session):

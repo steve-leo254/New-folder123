@@ -1,6 +1,12 @@
 import React, { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import '../styles/Register.css';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Alert from '../components/ui/Alert';
+import api from '../services/api';
+
+
 
 interface SignupFormData {
   firstName: string;
@@ -15,8 +21,6 @@ interface SignupFormData {
   termsAccepted: boolean;
   ageVerified: boolean;
 }
-
-// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const Signup: React.FC = () => {
   const navigate = useNavigate();
@@ -125,33 +129,28 @@ const Signup: React.FC = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/users`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          full_name: `${formData.firstName} ${formData.lastName}`,
-          email: formData.email,
-          password: formData.password,
-          role: 'patient', // Default role
-          phone: formData.phone,
-          date_of_birth: formData.dateOfBirth,
-          gender: formData.gender,
-        }),
+      const response = await api.post('/users', {
+        full_name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        password: formData.password,
+        role: 'patient',
+        phone: formData.phone,
+        date_of_birth: formData.dateOfBirth,
+        gender: formData.gender,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Registration failed');
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error('Registration failed');
       }
 
-      // Success - redirect to login
       alert('Registration successful! Please login.');
-      navigate('/signin');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during registration');
+      navigate('/');
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        (err instanceof Error ? err.message : 'An error occurred during registration');
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -170,107 +169,76 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <div className="signup-container">
-      <form className="form_container" onSubmit={handleSubmit}>
-        <div className="logo_container"></div>
-        
-        <div className="title_container">
-          <p className="title">Create your Account</p>
-          <span className="subtitle">
-            Get started with our website, just create an account and enjoy the experience.
-          </span>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="max-w-3xl w-full p-8 space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-xl">KH</span>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">Create your account</p>
+              <p className="text-sm text-gray-600">
+                Get started with Kiangombe Health. It only takes a minute.
+              </p>
+            </div>
+          </div>
+          <div className="text-sm text-gray-600">
+            Already have an account?{' '}
+            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+              Sign in
+            </Link>
+          </div>
         </div>
 
         {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
+          <Alert type="error" message={error} onClose={() => setError('')} />
         )}
 
-        {/* First Name and Last Name Row */}
-        <div className="row">
-          <div className="col-md-6">
-            <div className="input_container">
-              <label className="input_label" htmlFor="firstName">
-                First Name *
-              </label>
-              <input
-                placeholder="Enter First Name"
-                name="firstName"
-                type="text"
-                className="input_field"
-                id="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                required
-                autoComplete="given-name"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              name="firstName"
+              label="First Name"
+              placeholder="Enter first name"
+              value={formData.firstName}
+              onChange={handleInputChange}
+              required
+            />
+            <Input
+              name="lastName"
+              label="Last Name"
+              placeholder="Enter last name"
+              value={formData.lastName}
+              onChange={handleInputChange}
+              required
+            />
           </div>
-          <div className="col-md-6">
-            <div className="input_container">
-              <label className="input_label" htmlFor="lastName">
-                Last Name *
-              </label>
-              <input
-                placeholder="Enter Last Name"
-                name="lastName"
-                type="text"
-                className="input_field"
-                id="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                required
-                autoComplete="family-name"
-              />
-            </div>
-          </div>
-        </div>
 
-        {/* Email */}
-        <div className="input_container">
-          <label className="input_label" htmlFor="email">
-            Email ID *
-          </label>
-          <input
-            placeholder="name@mail.com"
+          <Input
             name="email"
             type="email"
-            className="input_field"
-            id="email"
+            label="Email"
+            placeholder="name@mail.com"
             value={formData.email}
             onChange={handleInputChange}
             required
-            autoComplete="email"
           />
-        </div>
 
-        {/* Info message about age and gender */}
-        <div className="alert alert-info" role="alert">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            fill="currentColor"
-            className="bi bi-info-circle"
-            viewBox="0 0 16 16"
-            style={{ marginRight: '8px' }}
-          >
-            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-            <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
-          </svg>
-          We ask for your age and gender to keep things safe, accurate, and tailored just for you.
-        </div>
+          <div className="rounded-lg bg-blue-50 border border-blue-100 p-4 text-sm text-blue-800 flex space-x-3">
+            <span className="mt-0.5">ℹ️</span>
+            <p>
+              We ask for your age and gender to keep things safe, accurate, and tailored just for you.
+            </p>
+          </div>
 
-        {/* Gender and Date of Birth Row */}
-        <div className="row">
-          <div className="col-md-6">
-            <div className="input_container">
-              <label className="input_label" htmlFor="gender">
-                Gender *
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Gender
               </label>
               <select
-                className="input_field"
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors border-gray-300"
                 id="gender"
                 name="gender"
                 value={formData.gender}
@@ -284,192 +252,145 @@ const Signup: React.FC = () => {
                 <option value="prefer_not_to_say">Prefer not to say</option>
               </select>
             </div>
+            <Input
+              name="dateOfBirth"
+              type="date"
+              label="Date of Birth"
+              value={formData.dateOfBirth}
+              onChange={handleInputChange}
+              required
+            />
           </div>
-          <div className="col-md-6">
-            <div className="input_container">
-              <label className="input_label" htmlFor="dateOfBirth">
-                Date of Birth *
-              </label>
-              <input
-                type="date"
-                className="input_field"
-                id="dateOfBirth"
-                name="dateOfBirth"
-                value={formData.dateOfBirth}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-          </div>
-        </div>
 
-        {/* Phone Number */}
-        <div className="input_container">
-          <label className="input_label" htmlFor="phone">
-            Phone Number *
-          </label>
-          <input
-            placeholder="+254 Enter your phone number"
+          <Input
             name="phone"
             type="tel"
-            className="input_field"
-            id="phone"
+            label="Phone Number"
+            placeholder="+254 Enter your phone number"
             value={formData.phone}
             onChange={handleInputChange}
             required
-            autoComplete="tel"
           />
-        </div>
 
-        {/* Password */}
-        <div className="input_container">
-          <label className="input_label" htmlFor="password">
-            Password *
-          </label>
-          <input
-            placeholder="Password (min 8 characters)"
-            name="password"
-            type="password"
-            className="input_field"
-            id="password"
-            value={formData.password}
-            onChange={handleInputChange}
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-          <small className="text-muted">Password must be at least 8 characters long</small>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Input
+                name="password"
+                type="password"
+                label="Password"
+                placeholder="Password (min 8 characters)"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Password must be at least 8 characters, with upper, lower, number and symbol.
+              </p>
+            </div>
 
-        {/* Confirm Password */}
-        <div className="input_container">
-          <label className="input_label" htmlFor="confirmPassword">
-            Confirm Password *
-          </label>
-          <input
-            placeholder="Confirm Password"
-            name="confirmPassword"
-            type="password"
-            className="input_field"
-            id="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleInputChange}
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-        </div>
-
-        {/* Checkboxes */}
-        <div style={{ marginTop: '20px' }}>
-          <div className="form-check" style={{ marginBottom: '10px' }}>
-            <input
-              className="form-check-input"
-              type="checkbox"
-              id="newsletter"
-              name="newsletter"
-              checked={formData.newsletter}
-              onChange={handleInputChange}
-            />
-            <label className="form-check-label" htmlFor="newsletter">
-              Get the latest updates on new products and offers from Kiangombe Health
-            </label>
-          </div>
-          <div className="form-check" style={{ marginBottom: '10px' }}>
-            <input
-              className="form-check-input"
-              type="checkbox"
-              id="termsAccepted"
-              name="termsAccepted"
-              checked={formData.termsAccepted}
+            <Input
+              name="confirmPassword"
+              type="password"
+              label="Confirm Password"
+              placeholder="Re-enter password"
+              value={formData.confirmPassword}
               onChange={handleInputChange}
               required
             />
-            <label className="form-check-label" htmlFor="termsAccepted">
-              I accept the{' '}
-              <a href="#" style={{ color: '#FF6B6B' }}>
-                Terms and conditions
-              </a>{' '}
-              and{' '}
-              <a href="#" style={{ color: '#FF6B6B' }}>
-                Privacy Policy
-              </a>{' '}
-              *
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-start space-x-3">
+              <input
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                type="checkbox"
+                id="newsletter"
+                name="newsletter"
+                checked={formData.newsletter}
+                onChange={handleInputChange}
+              />
+              <span className="text-sm text-gray-700">
+                Get the latest updates on new products and offers from Kiangombe Health.
+              </span>
+            </label>
+
+            <label className="flex items-start space-x-3">
+              <input
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                type="checkbox"
+                id="termsAccepted"
+                name="termsAccepted"
+                checked={formData.termsAccepted}
+                onChange={handleInputChange}
+                required
+              />
+              <span className="text-sm text-gray-700">
+                I accept the{' '}
+                <a href="#" className="text-blue-600 hover:text-blue-500 underline">
+                  Terms and Conditions
+                </a>{' '}
+                and{' '}
+                <a href="#" className="text-blue-600 hover:text-blue-500 underline">
+                  Privacy Policy
+                </a>{' '}
+                *
+              </span>
+            </label>
+
+            <label className="flex items-start space-x-3">
+              <input
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                type="checkbox"
+                id="ageVerified"
+                name="ageVerified"
+                checked={formData.ageVerified}
+                onChange={handleInputChange}
+                required
+              />
+              <span className="text-sm text-gray-700">I am over 18 years old *</span>
             </label>
           </div>
-          <div className="form-check">
-            <input
-              className="form-check-input"
-              type="checkbox"
-              id="ageVerified"
-              name="ageVerified"
-              checked={formData.ageVerified}
-              onChange={handleInputChange}
-              required
-            />
-            <label className="form-check-label" htmlFor="ageVerified">
-              I am over 18 years old *
-            </label>
-          </div>
-        </div>
 
-        <button
-          title="Sign Up"
-          type="submit"
-          className="sign-in_btn"
-          disabled={isLoading}
-        >
-          <span>{isLoading ? 'Creating Account...' : 'Sign Up'}</span>
-        </button>
-
-        <div>
-          Already have an account?{' '}
-          <Link to="/login" className="sign-in">
-            Sign In
-          </Link>
-        </div>
-
-        <div className="separator">
-          <hr className="line" />
-          <span>Or</span>
-          <hr className="line" />
-        </div>
-
-        <button
-          title="Sign Up with Google"
-          type="button"
-          className="sign-in_ggl"
-          onClick={handleGoogleSignup}
-        >
-          <span>
-            <img src="/img/google.svg" className="ggl_img" alt="Google" />
-          </span>
-          <span className="ggl_txt">Sign Up with Google</span>
-        </button>
-
-        <button
-          title="Sign Up with Facebook"
-          type="button"
-          className="sign-in_fb"
-          onClick={handleFacebookSignup}
-        >
-          <svg
-            style={{ color: 'blue' }}
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            fill="currentColor"
-            className="bi bi-facebook"
-            viewBox="0 0 16 16"
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isLoading}
+            loading={isLoading}
           >
-            <path
-              d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951z"
-              fill="blue"
-            />
-          </svg>
-          <span>Sign Up with Facebook</span>
-        </button>
-      </form>
+            Sign Up
+          </Button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Or continue with</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoogleSignup}
+              className="w-full"
+            >
+              <span className="mr-2">G</span>
+              Sign up with Google
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleFacebookSignup}
+              className="w-full"
+            >
+              <span className="mr-2">f</span>
+              Sign up with Facebook
+            </Button>
+          </div>
+        </form>
+      </Card>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-export { default as api } from './api';
+export { default as api, apiService } from './api';
 export * from './AuthContext';
-export * from '../hooks/useDoctor';
-export * from '../hooks/useAppointment';
+export * from './useDoctor';
+export * from './useDashboardSummary';

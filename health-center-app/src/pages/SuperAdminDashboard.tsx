@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -8,26 +8,28 @@ import {
   DollarSign,
   Activity,
   AlertCircle,
- 
   Clock,
   UserPlus,
   UserCheck,
   Settings,
   Download,
   Filter,
-  Search,
-  Star,
   Database,
   Bell,
   LogOut,
-  Edit,
-  Trash2,
-  Eye,
-
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import StaffMembers from '../components/features/StaffMembers';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { StaffMember } from '../types';
+import { useDoctors } from '../services/useDoctor';
+import { useDashboardSummary } from '../services/useDashboardSummary';
+import AddUserModal from '../components/modals/AddUserModal';
+import AddStaffModal from '../components/modals/AddStaffModal';
+import Alert from '../components/ui/Alert';
+import { apiService } from '../services/api';
 import { 
   
   XAxis, 
@@ -47,11 +49,13 @@ import {
 
 const SuperDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('month');
-  const [selectedRole, setSelectedRole] = useState('all');
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const { summary, loading: summaryLoading, error: summaryError, refreshSummary } = useDashboardSummary();
+  const { doctors, isLoading: doctorsLoading, fetchDoctors } = useDoctors();
 
-  // Mock data for dashboard
   const revenueData = [
     { name: 'Jan', revenue: 12500, appointments: 120, patients: 45 },
     { name: 'Feb', revenue: 15200, appointments: 145, patients: 52 },
@@ -96,14 +100,6 @@ const SuperDashboardPage: React.FC = () => {
     { id: 5, user: 'Grace Wanjiru', action: 'Ordered prescription medication', time: '3 hours ago', type: 'medication' },
   ];
 
-  const staffMembers = [
-    { id: 1, name: 'Dr. Sarah Johnson', role: 'Cardiologist', status: 'active', avatar: '/images/doctor1.jpg', rating: 4.8, patients: 156 },
-    { id: 2, name: 'Dr. Michael Chen', role: 'Pediatrician', status: 'active', avatar: '/images/doctor2.jpg', rating: 4.9, patients: 203 },
-    { id: 3, name: 'Dr. Emily Rodriguez', role: 'Dermatologist', status: 'on-leave', avatar: '/images/doctor3.jpg', rating: 4.7, patients: 142 },
-    { id: 4, name: 'Jane Smith', role: 'Nurse', status: 'active', avatar: '/images/doctor1.jpg', rating: 4.6, patients: 98 },
-    { id: 5, name: 'Robert Kimani', role: 'Lab Technician', status: 'active', avatar: '/images/doctor2.jpg', rating: 4.5, patients: 0 },
-  ];
-
   const topMedications = [
     { id: 1, name: 'Amoxicillin', category: 'Antibiotics', sales: 342, revenue: 8550, stock: 245 },
     { id: 2, name: 'Ibuprofen', category: 'Pain Relief', sales: 287, revenue: 4305, stock: 182 },
@@ -121,10 +117,68 @@ const SuperDashboardPage: React.FC = () => {
     { id: 6, role: 'Patient', count: 1250, permissions: ['Book Appointments', 'View Records', 'Order Medications'] },
   ];
 
-  const filteredStaff = staffMembers.filter(member => 
-    member.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-    (selectedRole === 'all' || member.role.toLowerCase().includes(selectedRole.toLowerCase()))
+  useEffect(() => {
+    refreshSummary();
+  }, [refreshSummary]);
+
+  useEffect(() => {
+    fetchDoctors();
+  }, [fetchDoctors]);
+
+  const staffMembers: StaffMember[] = useMemo(
+    () =>
+      doctors.map((doctor) => ({
+        id: doctor.id,
+        name: doctor.fullName,
+        role: 'Doctor',
+        specialization: doctor.specialization,
+        status: doctor.isAvailable ? 'active' : 'inactive',
+        rating: doctor.rating,
+        patients: doctor.patientsCount,
+        avatar: doctor.avatar || '/images/doctor1.jpg',
+        bio: doctor.bio,
+        consultationFee: doctor.consultationFee,
+      })),
+    [doctors]
   );
+
+  const overviewStats = [
+    {
+      label: 'Registered Users',
+      value: summary?.users ?? 0,
+      icon: Users,
+      color: 'bg-blue-100',
+      iconColor: 'text-blue-600',
+      helper: 'Total platform users',
+    },
+    {
+      label: 'Appointments',
+      value: summary?.appointments ?? 0,
+      icon: Calendar,
+      color: 'bg-purple-100',
+      iconColor: 'text-purple-600',
+      helper: 'All recorded appointments',
+    },
+    {
+      label: 'Prescriptions',
+      value: summary?.prescriptions ?? 0,
+      icon: Pill,
+      color: 'bg-green-100',
+      iconColor: 'text-green-600',
+      helper: 'Total prescriptions issued',
+    },
+    {
+      label: 'Upcoming Visits',
+      value: summary?.upcoming ?? 0,
+      icon: Clock,
+      color: 'bg-orange-100',
+      iconColor: 'text-orange-600',
+      helper: 'Scheduled appointments',
+    },
+  ];
+
+  const formatNumber = (value: number | null | undefined) =>
+    new Intl.NumberFormat().format(value ?? 0);
 
   const getActivityIcon = (type: string) => {
     switch(type) {
@@ -150,6 +204,15 @@ const SuperDashboardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {toast && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <Alert
+            type={toast.type === 'success' ? 'info' : 'error'}
+            message={toast.message}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -212,83 +275,47 @@ const SuperDashboardPage: React.FC = () => {
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-              >
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Total Revenue</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">$108,600</p>
-                      <p className="text-xs text-green-600 mt-1">+12% from last month</p>
-                    </div>
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <DollarSign className="w-6 h-6 text-green-600" />
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Total Patients</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">1,254</p>
-                      <p className="text-xs text-green-600 mt-1">+8% from last month</p>
-                    </div>
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Users className="w-6 h-6 text-blue-600" />
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Appointments</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">987</p>
-                      <p className="text-xs text-green-600 mt-1">+15% from last month</p>
-                    </div>
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Calendar className="w-6 h-6 text-purple-600" />
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Medications Sold</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">1,146</p>
-                      <p className="text-xs text-green-600 mt-1">+5% from last month</p>
-                    </div>
-                    <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <Pill className="w-6 h-6 text-orange-600" />
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            </div>
+            {summaryLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {overviewStats.map((stat, index) => {
+                  const Icon = stat.icon;
+                  return (
+                    <motion.div
+                      key={stat.label}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 * (index + 1) }}
+                    >
+                      <Card className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-600">{stat.label}</p>
+                            <p className="text-2xl font-bold text-gray-900 mt-1">
+                              {formatNumber(stat.value)}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">{stat.helper}</p>
+                          </div>
+                          <div
+                            className={`w-12 h-12 ${stat.color} rounded-lg flex items-center justify-center`}
+                          >
+                            <Icon className={`w-6 h-6 ${stat.iconColor}`} />
+                          </div>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+            {summaryError && (
+              <p className="text-sm text-red-600">
+                Unable to load live metrics: {summaryError}
+              </p>
+            )}
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -328,7 +355,7 @@ const SuperDashboardPage: React.FC = () => {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent = 0 }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -416,33 +443,10 @@ const SuperDashboardPage: React.FC = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">User Management</h2>
-              <div className="flex space-x-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Search users..."
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <select 
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                >
-                  <option value="all">All Roles</option>
-                  <option value="doctor">Doctor</option>
-                  <option value="nurse">Nurse</option>
-                  <option value="pharmacist">Pharmacist</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <Button>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Add User
-                </Button>
-              </div>
+              <Button onClick={() => setIsUserModalOpen(true)}>
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add User
+              </Button>
             </div>
 
             {/* User Roles Summary */}
@@ -451,7 +455,7 @@ const SuperDashboardPage: React.FC = () => {
                 <Card key={role.id} className="p-4">
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="font-medium text-gray-900">{role.role}</h3>
-                    <Badge variant="outline">{role.count}</Badge>
+                    <Badge variant="secondary">{role.count}</Badge>
                   </div>
                   <div className="space-y-1">
                     {role.permissions.slice(0, 2).map((permission, index) => (
@@ -465,68 +469,34 @@ const SuperDashboardPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Staff Table */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Staff Members</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rating</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patients</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredStaff.map((member) => (
-                      <tr key={member.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <img className="h-10 w-10 rounded-full" src={member.avatar} alt={member.name} />
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{member.name}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{member.role}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge variant={member.status === 'active' ? 'success' : 'warning'}>
-                            {member.status}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                            <span className="ml-1 text-sm text-gray-900">{member.rating}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {member.patients}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            <button className="text-indigo-600 hover:text-indigo-900">
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button className="text-indigo-600 hover:text-indigo-900">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button className="text-red-600 hover:text-red-900">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-900">Staff Members</h3>
+              <Button size="sm" onClick={() => setIsStaffModalOpen(true)}>
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add Staff
+              </Button>
+            </div>
+            {doctorsLoading ? (
+              <Card className="p-6 flex items-center justify-center">
+                <LoadingSpinner />
+              </Card>
+            ) : staffMembers.length ? (
+              <StaffMembers
+                staff={staffMembers}
+                viewMode="table"
+                showActions={false}
+                showFilters
+                showSearch
+                title=""
+                className="space-y-6"
+              />
+            ) : (
+              <Card className="p-6">
+                <p className="text-sm text-gray-500 text-center">
+                  No staff members available yet. Add a staff account to get started.
+                </p>
+              </Card>
+            )}
           </div>
         )}
 
@@ -605,7 +575,7 @@ const SuperDashboardPage: React.FC = () => {
                         <div className="text-sm text-gray-500">10:00 AM</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="outline">Video</Badge>
+                        <Badge variant="primary">Video</Badge>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant="success">Confirmed</Badge>
@@ -628,7 +598,7 @@ const SuperDashboardPage: React.FC = () => {
                         <div className="text-sm text-gray-500">2:00 PM</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="outline">In-Person</Badge>
+                        <Badge variant="default">In-Person</Badge>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant="warning">Pending</Badge>
@@ -964,6 +934,38 @@ const SuperDashboardPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <AddUserModal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        onSubmit={async (payload) => {
+          await apiService.createPatientUser(payload);
+          setToast({ type: 'success', message: 'User created successfully' });
+          refreshSummary();
+        }}
+      />
+      <AddStaffModal
+        isOpen={isStaffModalOpen}
+        onClose={() => setIsStaffModalOpen(false)}
+        onSubmit={async ({ account, profile }) => {
+          const response = await apiService.registerStaffAccount(account);
+          const userId = response?.user?.id;
+          if (!userId) {
+            throw new Error('User ID missing from server response');
+          }
+          await apiService.createDoctor({
+            user_id: userId,
+            specialization: profile.specialization,
+            bio: profile.bio,
+            consultation_fee: profile.consultation_fee,
+            license_number: profile.license_number,
+            is_available: profile.is_available,
+          });
+          setToast({ type: 'success', message: 'Staff member created successfully' });
+          fetchDoctors();
+          refreshSummary();
+        }}
+      />
     </div>
   );
 };

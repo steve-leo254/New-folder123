@@ -11,6 +11,9 @@ interface InputProps {
   label?: string;
   required?: boolean;
   name?: string;
+  min?: number | string;
+  max?: number | string;
+  step?: number | string;
 }
 
 const Input: React.FC<InputProps> = ({
@@ -23,7 +26,10 @@ const Input: React.FC<InputProps> = ({
   error,
   label,
   required = false,
-  name
+  name,
+  min,
+  max,
+  step
 }) => {
   return (
     <div className="w-full">
@@ -40,6 +46,9 @@ const Input: React.FC<InputProps> = ({
         onChange={onChange}
         disabled={disabled}
         name={name}
+        min={min}
+        max={max}
+        step={step}
         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
           error ? 'border-red-500' : 'border-gray-300'
         } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''} ${className}`}

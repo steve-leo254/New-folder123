@@ -86,6 +86,7 @@ class User(Base):
     role = Column(Enum(Role), nullable=False, default=Role.PATIENT)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    last_login = Column(DateTime, nullable=True)
 
     # Relationships
     appointments = relationship(
