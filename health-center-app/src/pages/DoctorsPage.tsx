@@ -1,128 +1,66 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import StaffMembers from '../components/features/StaffMembers';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import Card from '../components/ui/Card';
 import { Doctor, StaffMember } from '../types';
+import { useDoctors } from '../services/useDoctor';
 
 const DoctorsPage: React.FC = () => {
-  const doctors: Doctor[] = [
-    {
-      id: '1',
-      firstName: 'Mumbi',
-      lastName: 'Johnson',
-      specialization: 'Cardiologist',
-      experience: 10,
-      rating: 4.8,
-      avatar: '/images/doctor1.jpg',
-      bio: 'Expert in heart diseases and cardiovascular health with over 10 years of experience',
-      availability: [
-        { day: 'Monday', startTime: '9:00 AM', endTime: '5:00 PM' },
-        { day: 'Wednesday', startTime: '9:00 AM', endTime: '5:00 PM' },
-        { day: 'Friday', startTime: '9:00 AM', endTime: '5:00 PM' }
-      ],
-      consultationFee: 150
-    },
-    {
-      id: '2',
-      firstName: 'Michael',
-      lastName: 'Chen',
-      specialization: 'Pediatrician',
-      experience: 8,
-      rating: 4.9,
-      avatar: '/images/doctor2.jpg',
-      bio: 'Specialized in child healthcare and development, passione',
-      availability: [
-        { day: 'Tuesday', startTime: '8:00 AM', endTime: '4:00 PM' },
-        { day: 'Thursday', startTime: '8:00 AM', endTime: '4:00 PM' },
-        { day: 'Saturday', startTime: '9:00 AM', endTime: '1:00 PM' }
-      ],
-      consultationFee: 120
-    },
-    {
-      id: '3',
-      firstName: 'Emily',
-      lastName: 'Rodriguez',
-      specialization: 'Dermatologist',
-      experience: 12,
-      rating: 4.7,
-      avatar: '/images/doctor3.jpg',
-      bio: 'Skin care specialist and cosmetic dermatology expert with advanced training',
-      availability: [
-        { day: 'Monday', startTime: '10:00 AM', endTime: '6:00 PM' },
-        { day: 'Wednesday', startTime: '10:00 AM', endTime: '6:00 PM' },
-        { day: 'Friday', startTime: '10:00 AM', endTime: '6:00 PM' }
-      ],
-      consultationFee: 100
-    },
-    {
-      id: '4',
-      firstName: 'David',
-      lastName: 'Kimani',
-      specialization: 'General Practitioner',
-      experience: 15,
-      rating: 4.6,
-      avatar: '/images/doctor1.jpg',
-      bio: 'Experienced family physician providing comprehensive healthcare for all ages',
-      availability: [
-        { day: 'Monday', startTime: '8:00 AM', endTime: '6:00 PM' },
-        { day: 'Tuesday', startTime: '8:00 AM', endTime: '6:00 PM' },
-        { day: 'Thursday', startTime: '8:00 AM', endTime: '6:00 PM' }
-      ],
-      consultationFee: 80
-    },
-    {
-      id: '5',
-      firstName: 'Mohamed',
-      lastName: 'MbaBuu',
-      specialization: 'General Practitioner',
-      experience: 15,
-      rating: 4.6,
-      avatar: '/images/doctor1.jpg',
-      bio: 'Experienced family physician providing comprehensive healthcare for all ages',
-      availability: [
-        { day: 'Monday', startTime: '8:00 AM', endTime: '6:00 PM' },
-        { day: 'Tuesday', startTime: '8:00 AM', endTime: '6:00 PM' },
-        { day: 'Thursday', startTime: '8:00 AM', endTime: '6:00 PM' }
-      ],
-      consultationFee: 80
-    },
-    {
-      id: '6',
-      firstName: 'Seco',
-      lastName: 'Kanyatta',
-      specialization: 'General Practitioner',
-      experience: 15,
-      rating: 4.6,
-      avatar: '/images/doctor1.jpg',
-      bio: 'Experienced family physician providing comprehensive healthcare for all ages',
-      availability: [
-        { day: 'Monday', startTime: '8:00 AM', endTime: '6:00 PM' },
-        { day: 'Tuesday', startTime: '8:00 AM', endTime: '6:00 PM' },
-        { day: 'Thursday', startTime: '8:00 AM', endTime: '6:00 PM' }
-      ],
-      consultationFee: 80
-    }
-  ];
+  const navigate = useNavigate();
+  const { doctors, isLoading, fetchDoctors } = useDoctors();
+
+  // Load doctors on component mount
+  useEffect(() => {
+    fetchDoctors();
+  }, [fetchDoctors]);
+
+  // Convert backend doctors to Doctor type format
+  const formattedDoctors: Doctor[] = useMemo(
+    () =>
+      doctors.map((doctor) => {
+        const nameParts = doctor.fullName.split(' ');
+        return {
+          id: doctor.id.toString(),
+          firstName: nameParts[0] || 'Dr',
+          lastName: nameParts.slice(1).join(' ') || '',
+          specialization: doctor.specialization || 'General Practitioner',
+          experience: 0,
+          rating: doctor.rating || 0,
+          avatar: doctor.avatar || '/images/doctor-default.jpg',
+          bio: doctor.bio || 'Professional healthcare provider',
+          availability: [],
+          consultationFee: doctor.consultationFee || 0,
+        };
+      }),
+    [doctors]
+  );
 
   // Convert Doctor objects to StaffMember format for the shared component
-  const staffMembers: StaffMember[] = doctors.map(doctor => ({
-    id: doctor.id,
-    firstName: doctor.firstName,
-    lastName: doctor.lastName,
-    role: 'Doctor',
-    specialization: doctor.specialization,
-    status: 'active' as const,
-    rating: doctor.rating,
-    avatar: doctor.avatar,
-    experience: doctor.experience,
-    consultationFee: doctor.consultationFee,
-    bio: doctor.bio,
-    availability: doctor.availability
-  }));
+  const staffMembers: StaffMember[] = useMemo(
+    () =>
+      formattedDoctors.map(doctor => ({
+        id: doctor.id,
+        name: `${doctor.firstName} ${doctor.lastName}`,
+        firstName: doctor.firstName,
+        lastName: doctor.lastName,
+        role: 'Doctor',
+        specialization: doctor.specialization,
+        status: 'active' as const,
+        rating: doctor.rating,
+        avatar: doctor.avatar,
+        experience: doctor.experience,
+        consultationFee: doctor.consultationFee,
+        bio: doctor.bio,
+        availability: doctor.availability
+      })),
+    [formattedDoctors]
+  );
 
   const handleBookAppointment = (member: StaffMember) => {
-    console.log('Book appointment for:', member);
-    // Navigate to appointment booking page with doctor ID
-    window.location.href = `/appointments?doctor=${member.id}`;
+    // Navigate to appointments page with doctor pre-selected
+    navigate(`/appointments?doctor=${member.id}`);
   };
 
   return (
@@ -136,18 +74,24 @@ const DoctorsPage: React.FC = () => {
         <p className="text-gray-600">Find and book appointments with our expert medical professionals</p>
       </motion.div>
 
-      <StaffMembers 
-        staff={staffMembers}
-        viewMode="cards"
-        showActions={false}
-        showFilters={true}
-        showSearch={true}
-        title=""
-        onStaffClick={(member) => console.log('View doctor:', member)}
-        onBookAppointment={handleBookAppointment}
-        onView={(member) => console.log('View profile:', member)}
-        className="space-y-6"
-      />
+      {isLoading ? (
+        <Card className="p-12 flex items-center justify-center">
+          <LoadingSpinner />
+        </Card>
+      ) : (
+        <StaffMembers 
+          staff={staffMembers}
+          viewMode="cards"
+          showActions={false}
+          showFilters={true}
+          showSearch={true}
+          title=""
+          onStaffClick={(member) => console.log('View doctor:', member)}
+          onBookAppointment={handleBookAppointment}
+          onView={(member) => console.log('View profile:', member)}
+          className="space-y-6"
+        />
+      )}
     </div>
   );
 };

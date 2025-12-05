@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from starlette import status
 from database import db_dependency
-from models import User, Role
+from models import User, Role, Nurse, Receptionist, LabTechnician, Pharmacist, Doctor
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from pydantic_models import (
     CreateUserRequest,
+    CreateStaffRequest,
     Token,
     TokenVerifyRequest,
     LoginUserRequest,
@@ -127,6 +128,165 @@ async def register_admin(db: db_dependency, create_user_request: CreateUserReque
     logger.info(f"Admin {create_user_request.full_name} registered successfully")
     return {
         "message": "Admin created successfully",
+        "user": {
+            "id": create_user_model.id,
+            "full_name": create_user_model.full_name,
+            "email": create_user_model.email,
+            "phone": create_user_model.phone,
+            "role": create_user_model.role.value,
+        },
+    }
+
+
+@router.post("/register/doctor", status_code=status.HTTP_201_CREATED)
+async def register_doctor(db: db_dependency, create_user_request: CreateUserRequest):
+    logger.info(f"Doctor registration payload: {create_user_request}")
+    existing_user = db.query(User).filter(
+        User.email == create_user_request.email
+    ).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
+    # Convert date_of_birth string to datetime if provided
+    date_of_birth = None
+    if create_user_request.date_of_birth:
+        try:
+            date_of_birth = datetime.fromisoformat(create_user_request.date_of_birth)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    create_user_model = User(
+        full_name=create_user_request.full_name,
+        email=create_user_request.email,
+        password_hash=bcrypt_context.hash(create_user_request.password),
+        phone=create_user_request.phone,
+        gender=create_user_request.gender,
+        date_of_birth=date_of_birth,
+        role=Role.DOCTOR
+    )
+    db.add(create_user_model)
+    db.commit()
+    db.refresh(create_user_model)
+    logger.info(f"Doctor {create_user_request.full_name} registered successfully")
+    return {
+        "message": "Doctor created successfully",
+        "user": {
+            "id": create_user_model.id,
+            "full_name": create_user_model.full_name,
+            "email": create_user_model.email,
+            "phone": create_user_model.phone,
+            "role": create_user_model.role.value,
+        },
+    }
+
+
+@router.post("/register/staff", status_code=status.HTTP_201_CREATED)
+async def register_staff(db: db_dependency, create_staff_request: CreateStaffRequest):
+    logger.info(f"Staff registration payload: {create_staff_request}")
+    existing_user = db.query(User).filter(
+        User.email == create_staff_request.email
+    ).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
+    # Validate role
+    valid_staff_roles = ["doctor", "nurse", "receptionist", "lab_technician", "pharmacist"]
+    if create_staff_request.role not in valid_staff_roles:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid role. Must be one of: {', '.join(valid_staff_roles)}"
+        )
+    
+    # Convert date_of_birth string to datetime if provided
+    date_of_birth = None
+    if create_staff_request.date_of_birth:
+        try:
+            date_of_birth = datetime.fromisoformat(create_staff_request.date_of_birth)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    # Convert role string to Role enum
+    try:
+        role_mapping = {
+            "doctor": Role.DOCTOR,
+            "nurse": Role.NURSE,
+            "receptionist": Role.RECEPTIONIST,
+            "lab_technician": Role.LAB_TECHNICIAN,
+            "pharmacist": Role.PHARMACIST,
+        }
+        role_enum = role_mapping.get(create_staff_request.role.lower())
+        if not role_enum:
+            raise ValueError("Invalid role")
+    except (KeyError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid role: {create_staff_request.role}"
+        )
+    
+    create_user_model = User(
+        full_name=create_staff_request.full_name,
+        email=create_staff_request.email,
+        password_hash=bcrypt_context.hash(create_staff_request.password),
+        phone=create_staff_request.phone,
+        gender=create_staff_request.gender,
+        date_of_birth=date_of_birth,
+        role=role_enum
+    )
+    db.add(create_user_model)
+    db.commit()
+    db.refresh(create_user_model)
+    
+    # Create role-specific staff record
+    if create_staff_request.role == "doctor":
+        staff_profile = Doctor(
+            user_id=create_user_model.id,
+            specialization=getattr(create_staff_request, 'specialization', None),
+            bio=getattr(create_staff_request, 'bio', None),
+            license_number=getattr(create_staff_request, 'license_number', None),
+            is_available=getattr(create_staff_request, 'is_available', True),
+            consultation_fee=getattr(create_staff_request, 'consultation_fee', None),
+            rating=0.0
+        )
+        db.add(staff_profile)
+    elif create_staff_request.role == "nurse":
+        staff_profile = Nurse(
+            user_id=create_user_model.id,
+            specialization=getattr(create_staff_request, 'specialization', None),
+            bio=getattr(create_staff_request, 'bio', None),
+            license_number=getattr(create_staff_request, 'license_number', None),
+            is_available=getattr(create_staff_request, 'is_available', True)
+        )
+        db.add(staff_profile)
+    elif create_staff_request.role == "receptionist":
+        staff_profile = Receptionist(
+            user_id=create_user_model.id,
+            bio=getattr(create_staff_request, 'bio', None),
+            is_available=getattr(create_staff_request, 'is_available', True)
+        )
+        db.add(staff_profile)
+    elif create_staff_request.role == "lab_technician":
+        staff_profile = LabTechnician(
+            user_id=create_user_model.id,
+            specialization=getattr(create_staff_request, 'specialization', None),
+            bio=getattr(create_staff_request, 'bio', None),
+            license_number=getattr(create_staff_request, 'license_number', None),
+            is_available=getattr(create_staff_request, 'is_available', True)
+        )
+        db.add(staff_profile)
+    elif create_staff_request.role == "pharmacist":
+        staff_profile = Pharmacist(
+            user_id=create_user_model.id,
+            specialization=getattr(create_staff_request, 'specialization', None),
+            bio=getattr(create_staff_request, 'bio', None),
+            license_number=getattr(create_staff_request, 'license_number', None),
+            is_available=getattr(create_staff_request, 'is_available', True)
+        )
+        db.add(staff_profile)
+    
+    db.commit()
+    logger.info(f"Staff member {create_user_model.full_name} ({create_staff_request.role}) registered successfully")
+    return {
+        "message": "Staff member created successfully",
         "user": {
             "id": create_user_model.id,
             "full_name": create_user_model.full_name,

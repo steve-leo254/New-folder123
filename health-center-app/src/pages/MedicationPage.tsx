@@ -1,76 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, ShoppingCart, Star, Pill } from 'lucide-react';
+import { Search, Pill } from 'lucide-react';
 import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import MedicationCard from '../components/features/MedicationCard';
 import { Medication } from '../types';
+import { useMedications } from '../services/useMedication';
 
 const MedicationPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showPrescriptionOnly, setShowPrescriptionOnly] = useState(false);
 
-  const medications: Medication[] = [
-    {
-      id: '1',
-      name: 'Amoxicillin',
-      dosage: '500mg',
-      frequency: '3x daily',
-      duration: '7 days',
-      price: 25,
-      description: 'Broad-spectrum antibiotic used to treat bacterial infections',
-      category: 'Antibiotics',
-      inStock: true,
-      prescriptionRequired: true
-    },
-    {
-      id: '2',
-      name: 'Ibuprofen',
-      dosage: '200mg',
-      frequency: 'as needed',
-      duration: '30 days',
-      price: 15,
-      description: 'Nonsteroidal anti-inflammatory drug for pain relief',
-      category: 'Pain Relief',
-      inStock: true,
-      prescriptionRequired: false
-    },
-    {
-      id: '3',
-      name: 'Vitamin D3',
-      dosage: '1000 IU',
-      frequency: 'daily',
-      duration: '90 days',
-      price: 20,
-      description: 'Essential vitamin for bone health and immune function',
-      category: 'Vitamins',
-      inStock: true,
-      prescriptionRequired: false
-    },
-    {
-      id: '4',
-      name: 'Lisinopril',
-      dosage: '10mg',
-      frequency: 'once daily',
-      duration: '30 days',
-      price: 30,
-      description: 'ACE inhibitor used to treat high blood pressure',
-      category: 'Heart Health',
-      inStock: false,
-      prescriptionRequired: true
-    }
-  ];
+  // Fetch real medication data from backend
+  const { medications: backendMedications, isLoading, fetchMedications, error: medicationsError } = useMedications();
 
-  const categories = ['all', 'Antibiotics', 'Pain Relief', 'Vitamins', 'Heart Health'];
+  // Load medications on component mount
+  useEffect(() => {
+    fetchMedications();
+  }, [fetchMedications]);
 
-  const filteredMedications = medications.filter(med => {
-    const matchesSearch = med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         med.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || med.category === selectedCategory;
-    const matchesPrescription = !showPrescriptionOnly || med.prescriptionRequired;
-    return matchesSearch && matchesCategory && matchesPrescription;
-  });
+  // Convert backend medications to Medication type format
+  const medications: Medication[] = useMemo(
+    () =>
+      backendMedications.map((med) => ({
+        id: med.id.toString(),
+        name: med.name || 'Unknown Medication',
+        dosage: med.dosage || 'N/A',
+        frequency: 'As directed',
+        duration: '30 days',
+        price: med.price || 0,
+        description: med.description || 'Professional medication',
+        category: med.category || 'Other',
+        inStock: med.inStock !== false,
+        prescriptionRequired: med.prescriptionRequired || false,
+      })),
+    [backendMedications]
+  );
+
+  // Get unique categories from medications
+  const categories = useMemo(
+    () => ['all', ...new Set(medications.map(m => m.category))],
+    [medications]
+  );
+
+  // Filter medications based on search, category, and prescription requirement
+  const filteredMedications = useMemo(
+    () =>
+      medications.filter(med => {
+        const matchesSearch = med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             med.description.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = selectedCategory === 'all' || med.category === selectedCategory;
+        const matchesPrescription = !showPrescriptionOnly || med.prescriptionRequired;
+        return matchesSearch && matchesCategory && matchesPrescription;
+      }),
+    [medications, searchTerm, selectedCategory, showPrescriptionOnly]
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -118,17 +103,34 @@ const MedicationPage: React.FC = () => {
         </div>
       </Card>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredMedications.map((medication) => (
-          <MedicationCard key={medication.id} medication={medication} />
-        ))}
-      </div>
+      {medicationsError && (
+        <Card className="p-6 mb-6 bg-red-50 border border-red-200">
+          <p className="text-sm text-red-800">
+            <strong>Unable to load medications:</strong> {medicationsError}. 
+            {medicationsError.includes('404') && ' The medications service is currently unavailable. Please try again later.'}
+          </p>
+        </Card>
+      )}
 
-      {filteredMedications.length === 0 && (
+      {isLoading ? (
+        <Card className="p-12 flex items-center justify-center">
+          <LoadingSpinner />
+        </Card>
+      ) : filteredMedications.length > 0 ? (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredMedications.map((medication) => (
+            <MedicationCard key={medication.id} medication={medication} />
+          ))}
+        </div>
+      ) : (
         <div className="text-center py-12">
           <Pill className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No medications found</h3>
-          <p className="text-gray-600">Try adjusting your search or filter criteria</p>
+          <p className="text-gray-600">
+            {medicationsError 
+              ? 'The medications service is temporarily unavailable.' 
+              : 'Try adjusting your search or filter criteria'}
+          </p>
         </div>
       )}
     </div>

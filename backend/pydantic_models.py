@@ -18,6 +18,11 @@ class Role(str, Enum):
     """User roles."""
     SUPER_ADMIN = "super_admin"
     CLINICIAN_ADMIN = "clinician_admin"
+    DOCTOR = "doctor"
+    NURSE = "nurse"
+    RECEPTIONIST = "receptionist"
+    LAB_TECHNICIAN = "lab_technician"
+    PHARMACIST = "pharmacist"
     PATIENT = "patient"
 
 
@@ -37,6 +42,14 @@ class PaymentStatus(str, Enum):
     FAILED = "failed"
 
 
+class PrescriptionStatus(str, Enum):
+    """Prescription statuses."""
+    PENDING = "pending"
+    FILLED = "filled"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
 # ============================================================================
 # Authentication
 # ============================================================================
@@ -49,6 +62,22 @@ class CreateUserRequest(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     gender: Optional[str] = Field(None, description="Gender: male, female, other, prefer_not_to_say")
     date_of_birth: Optional[str] = Field(None, description="Date of birth in ISO format (YYYY-MM-DD)")
+
+
+class CreateStaffRequest(BaseModel):
+    """Staff registration request with role."""
+    full_name: str = Field(..., min_length=2, max_length=120)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=72, description="Password must be 8-72 characters (bcrypt limit)")
+    phone: Optional[str] = Field(None, max_length=20)
+    gender: Optional[str] = Field(None, description="Gender: male, female, other, prefer_not_to_say")
+    date_of_birth: Optional[str] = Field(None, description="Date of birth in ISO format (YYYY-MM-DD)")
+    role: str = Field(..., description="Staff role: doctor, nurse, receptionist, lab_technician, pharmacist")
+    specialization: Optional[str] = Field(None, max_length=120)
+    bio: Optional[str] = None
+    license_number: Optional[str] = None
+    consultation_fee: Optional[Decimal] = None
+    is_available: bool = True
 
 
 class LoginUserRequest(BaseModel):
@@ -131,16 +160,38 @@ class AppointmentCancelRequest(BaseModel):
 
 
 # ============================================================================
+# Prescriptions
+# ============================================================================
+
+class PrescriptionCreateRequest(BaseModel):
+    """Create prescription request."""
+    appointment_id: int
+    pharmacy_name: Optional[str] = None
+    medications_json: Optional[str] = None
+    status: Optional[str] = None
+    qr_code_path: Optional[str] = None
+
+
+class PrescriptionUpdateRequest(BaseModel):
+    """Update prescription request."""
+    pharmacy_name: Optional[str] = None
+    medications_json: Optional[str] = None
+    status: Optional[str] = None
+    qr_code_path: Optional[str] = None
+
+
+# ============================================================================
 # Doctors
 # ============================================================================
 
 class DoctorCreateRequest(BaseModel):
     """Create doctor profile request."""
     user_id: int
-    specialization: str = Field(..., max_length=120)
+    specialization: Optional[str] = Field(None, max_length=120)
     bio: Optional[str] = None
     license_number: Optional[str] = None
     consultation_fee: Optional[Decimal] = None
+    rating: Optional[Decimal] = None
     is_available: bool = True
 
 
@@ -152,6 +203,24 @@ class DoctorUpdateRequest(BaseModel):
     consultation_fee: Optional[Decimal] = None
     is_available: Optional[bool] = None
     rating: Optional[Decimal] = None
+
+
+class DoctorResponse(BaseModel):
+    """Doctor profile response."""
+    id: int
+    user_id: int
+    fullName: str
+    email: str
+    phone: Optional[str] = None
+    specialization: Optional[str] = None
+    bio: Optional[str] = None
+    isAvailable: bool
+    rating: Decimal
+    consultationFee: Optional[Decimal] = None
+    patientsCount: int
+    avatar: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -175,6 +244,58 @@ class PaymentResponse(BaseModel):
     status: str
     amount: Decimal
     message: str
+
+
+# ============================================================================
+# Medications
+# ============================================================================
+
+class MedicationCreateRequest(BaseModel):
+    """Create medication request."""
+    name: str = Field(..., min_length=1, max_length=150)
+    category: str = Field(..., min_length=1, max_length=100)
+    dosage: Optional[str] = Field(None, max_length=100)
+    price: Decimal = Field(..., gt=0)
+    stock: int = Field(default=0, ge=0)
+    description: Optional[str] = None
+    prescription_required: bool = False
+    expiry_date: Optional[datetime] = None
+    batch_number: Optional[str] = Field(None, max_length=100)
+    supplier: Optional[str] = Field(None, max_length=150)
+
+
+class MedicationUpdateRequest(BaseModel):
+    """Update medication request."""
+    name: Optional[str] = Field(None, min_length=1, max_length=150)
+    category: Optional[str] = Field(None, min_length=1, max_length=100)
+    dosage: Optional[str] = Field(None, max_length=100)
+    price: Optional[Decimal] = Field(None, gt=0)
+    stock: Optional[int] = Field(None, ge=0)
+    description: Optional[str] = None
+    prescription_required: Optional[bool] = None
+    expiry_date: Optional[datetime] = None
+    batch_number: Optional[str] = Field(None, max_length=100)
+    supplier: Optional[str] = Field(None, max_length=150)
+
+
+class MedicationResponse(BaseModel):
+    """Medication response."""
+    id: int
+    name: str
+    category: str
+    dosage: Optional[str] = None
+    price: Decimal
+    stock: int
+    description: Optional[str] = None
+    prescription_required: bool
+    expiry_date: Optional[datetime] = None
+    batch_number: Optional[str] = None
+    supplier: Optional[str] = None
+    in_stock: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================

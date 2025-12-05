@@ -26,8 +26,13 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { StaffMember } from '../types';
 import { useDoctors } from '../services/useDoctor';
 import { useDashboardSummary } from '../services/useDashboardSummary';
+import { useAppointments } from '../services/useAppointment';
+import { useMedications } from '../services/useMedication';
+import { useBilling } from '../services/useBilling';
 import AddUserModal from '../components/modals/AddUserModal';
 import AddStaffModal from '../components/modals/AddStaffModal';
+import BookAppointmentModal from '../components/modals/BookAppointmentModal';
+import AddMedicationModal from '../components/modals/AddMedicationModal';
 import Alert from '../components/ui/Alert';
 import { apiService } from '../services/api';
 import { 
@@ -52,9 +57,15 @@ const SuperDashboardPage: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [isBookAppointmentOpen, setIsBookAppointmentOpen] = useState(false);
+  const [isMedicationModalOpen, setIsMedicationModalOpen] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const { summary, loading: summaryLoading, error: summaryError, refreshSummary } = useDashboardSummary();
   const { doctors, isLoading: doctorsLoading, fetchDoctors } = useDoctors();
+  const { appointments, isLoading: appointmentsLoading, fetchAppointments, createAppointment } = useAppointments();
+  const { medications, isLoading: medicationsLoading, fetchMedications } = useMedications();
+  const { billings, isLoading: billingsLoading, fetchBillings, calculateStats } = useBilling();
 
   const revenueData = [
     { name: 'Jan', revenue: 12500, appointments: 120, patients: 45 },
@@ -119,7 +130,10 @@ const SuperDashboardPage: React.FC = () => {
 
   useEffect(() => {
     refreshSummary();
-  }, [refreshSummary]);
+    fetchAppointments();
+    fetchMedications();
+    fetchBillings();
+  }, [refreshSummary, fetchAppointments, fetchMedications, fetchBillings]);
 
   useEffect(() => {
     fetchDoctors();
@@ -443,7 +457,7 @@ const SuperDashboardPage: React.FC = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">User Management</h2>
-              <Button onClick={() => setIsUserModalOpen(true)}>
+              <Button onClick={() => setIsStaffModalOpen(true)}>
                 <UserPlus className="w-4 h-4 mr-2" />
                 Add User
               </Button>
@@ -471,10 +485,6 @@ const SuperDashboardPage: React.FC = () => {
 
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-900">Staff Members</h3>
-              <Button size="sm" onClick={() => setIsStaffModalOpen(true)}>
-                <UserPlus className="w-4 h-4 mr-2" />
-                Add Staff
-              </Button>
             </div>
             {doctorsLoading ? (
               <Card className="p-6 flex items-center justify-center">
@@ -510,9 +520,9 @@ const SuperDashboardPage: React.FC = () => {
                   <Filter className="w-4 h-4 mr-2" />
                   Filter
                 </Button>
-                <Button>
+                <Button onClick={() => setIsBookAppointmentOpen(true)}>
                   <Calendar className="w-4 h-4 mr-2" />
-                  New Appointment
+                  Book Appointment
                 </Button>
               </div>
             </div>
@@ -520,96 +530,87 @@ const SuperDashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">Today's Appointments</h3>
+                  <h3 className="text-sm font-medium text-gray-600">Total Appointments</h3>
                   <Calendar className="w-5 h-5 text-blue-500" />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">24</p>
-                <p className="text-xs text-green-600 mt-1">+3 from yesterday</p>
+                <p className="text-2xl font-bold text-gray-900">{appointments.length}</p>
+                <p className="text-xs text-gray-500 mt-1">All recorded appointments</p>
               </Card>
 
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">Pending Confirmation</h3>
+                  <h3 className="text-sm font-medium text-gray-600">Scheduled</h3>
                   <Clock className="w-5 h-5 text-yellow-500" />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">8</p>
-                <p className="text-xs text-gray-500 mt-1">Requires action</p>
+                <p className="text-2xl font-bold text-gray-900">{appointments.filter(a => a.status === 'scheduled').length}</p>
+                <p className="text-xs text-gray-500 mt-1">Upcoming appointments</p>
               </Card>
 
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">Video Consultations</h3>
-                  <Video className="w-5 h-5 text-purple-500" />
+                  <h3 className="text-sm font-medium text-gray-600">Completed</h3>
+                  <Video className="w-5 h-5 text-green-500" />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">12</p>
-                <p className="text-xs text-blue-600 mt-1">50% of total</p>
+                <p className="text-2xl font-bold text-gray-900">{appointments.filter(a => a.status === 'completed').length}</p>
+                <p className="text-xs text-green-600 mt-1">Finished consultations</p>
               </Card>
             </div>
 
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Appointments</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    <tr>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">John Doe</div>
-                        <div className="text-sm text-gray-500">ID: PT001234</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">Dr. Sarah Johnson</div>
-                        <div className="text-sm text-gray-500">Cardiologist</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">Jan 15, 2024</div>
-                        <div className="text-sm text-gray-500">10:00 AM</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="primary">Video</Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="success">Confirmed</Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="success">Paid</Badge>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">Jane Smith</div>
-                        <div className="text-sm text-gray-500">ID: PT001235</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">Dr. Michael Chen</div>
-                        <div className="text-sm text-gray-500">Pediatrician</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">Jan 16, 2024</div>
-                        <div className="text-sm text-gray-500">2:00 PM</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="default">In-Person</Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="warning">Pending</Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="warning">Pending</Badge>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {appointmentsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : appointments.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {appointments.slice(0, 10).map((appointment) => (
+                        <tr key={appointment.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{appointment.patientName || 'Patient'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{appointment.doctorName || 'Doctor'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{appointment.date}</div>
+                            <div className="text-sm text-gray-500">{appointment.time}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Badge variant={appointment.type === 'video' ? 'primary' : 'default'}>
+                              {appointment.type === 'video' ? 'Video' : 'In-Person'}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Badge variant={appointment.status === 'completed' ? 'success' : appointment.status === 'cancelled' ? 'error' : 'warning'}>
+                              {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Badge variant={appointment.paymentStatus === 'paid' ? 'success' : 'warning'}>
+                              {appointment.paymentStatus.charAt(0).toUpperCase() + appointment.paymentStatus.slice(1)}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-8">No appointments found</p>
+              )}
             </Card>
           </div>
         )}
@@ -619,93 +620,113 @@ const SuperDashboardPage: React.FC = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">Medication Management</h2>
-              <Button>
+              <Button onClick={() => setIsMedicationModalOpen(true)}>
                 <Pill className="w-4 h-4 mr-2" />
                 Add Medication
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">Total Medications</h3>
-                  <Pill className="w-5 h-5 text-blue-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">342</p>
-                <p className="text-xs text-green-600 mt-1">+12 new this month</p>
+            {medicationsLoading ? (
+              <Card className="p-12 flex items-center justify-center">
+                <LoadingSpinner />
               </Card>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  <Card className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-600">Total Medications</h3>
+                      <Pill className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900">{medications.length}</p>
+                    <p className="text-xs text-green-600 mt-1">+{Math.floor(medications.length * 0.035)} new this month</p>
+                  </Card>
 
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">Low Stock Items</h3>
-                  <AlertCircle className="w-5 h-5 text-yellow-500" />
+                  <Card className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-600">Low Stock Items</h3>
+                      <AlertCircle className="w-5 h-5 text-yellow-500" />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {medications.filter(m => m.stock < 100).length}
+                    </p>
+                    <p className="text-xs text-yellow-600 mt-1">Requires reorder</p>
+                  </Card>
+
+                  <Card className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-600">Expiring Soon</h3>
+                      <Clock className="w-5 h-5 text-red-500" />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {medications.filter(m => {
+                        if (!m.expiryDate) return false;
+                        const expiry = new Date(m.expiryDate);
+                        const today = new Date();
+                        const daysUntilExpiry = (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+                        return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
+                      }).length}
+                    </p>
+                    <p className="text-xs text-red-600 mt-1">Within 30 days</p>
+                  </Card>
+
+                  <Card className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-600">Monthly Sales</h3>
+                      <DollarSign className="w-5 h-5 text-green-500" />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900">
+                      ${(medications.reduce((sum, m) => sum + (m.price * m.stock * 0.1), 0)).toFixed(0)}
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">+8% from last month</p>
+                  </Card>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">18</p>
-                <p className="text-xs text-yellow-600 mt-1">Requires reorder</p>
-              </Card>
 
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">Expiring Soon</h3>
-                  <Clock className="w-5 h-5 text-red-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">7</p>
-                <p className="text-xs text-red-600 mt-1">Within 30 days</p>
-              </Card>
-
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">Monthly Sales</h3>
-                  <DollarSign className="w-5 h-5 text-green-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">$24,955</p>
-                <p className="text-xs text-green-600 mt-1">+8% from last month</p>
-              </Card>
-            </div>
-
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Selling Medications</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Medication</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sales</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {topMedications.map((medication) => (
-                      <tr key={medication.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{medication.name}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{medication.category}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{medication.sales}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">${medication.revenue}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{medication.stock}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge variant={medication.stock < 100 ? 'warning' : 'success'}>
-                            {medication.stock < 100 ? 'Low Stock' : 'In Stock'}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Medications</h3>
+                  {medications.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Medication</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {medications.slice(0, 5).map((medication) => (
+                            <tr key={medication.id}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{medication.name}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{medication.category}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">${medication.price}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{medication.stock}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <Badge variant={medication.stock < 100 ? 'warning' : 'success'}>
+                                  {medication.stock < 100 ? 'Low Stock' : 'In Stock'}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-center text-gray-500 py-8">No medications available</p>
+                  )}
+                </Card>
+              </>
+            )}
           </div>
         )}
 
@@ -964,6 +985,47 @@ const SuperDashboardPage: React.FC = () => {
           setToast({ type: 'success', message: 'Staff member created successfully' });
           fetchDoctors();
           refreshSummary();
+        }}
+      />
+      <BookAppointmentModal
+        isOpen={isBookAppointmentOpen}
+        onClose={() => {
+          setIsBookAppointmentOpen(false);
+          setSelectedDoctor(null);
+        }}
+        doctor={selectedDoctor || (staffMembers.length > 0 ? staffMembers[0] : null)}
+        onSubmit={async (appointmentData) => {
+          try {
+            await createAppointment(appointmentData);
+            setToast({ type: 'success', message: 'Appointment booked successfully' });
+            fetchAppointments();
+            refreshSummary();
+            setIsBookAppointmentOpen(false);
+            setSelectedDoctor(null);
+          } catch (error: any) {
+            setToast({ 
+              type: 'error', 
+              message: error.response?.data?.detail || 'Failed to book appointment' 
+            });
+          }
+        }}
+      />
+      <AddMedicationModal
+        isOpen={isMedicationModalOpen}
+        onClose={() => setIsMedicationModalOpen(false)}
+        onSubmit={async (medicationData) => {
+          try {
+            await apiService.createMedication(medicationData);
+            setToast({ type: 'success', message: 'Medication added successfully' });
+            fetchMedications();
+            refreshSummary();
+            setIsMedicationModalOpen(false);
+          } catch (error: any) {
+            setToast({ 
+              type: 'error', 
+              message: error.response?.data?.detail || 'Failed to add medication' 
+            });
+          }
         }}
       />
     </div>

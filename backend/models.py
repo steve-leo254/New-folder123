@@ -38,6 +38,11 @@ class Role(enum.Enum):
     """User role enumeration."""
     SUPER_ADMIN = "super_admin"
     CLINICIAN_ADMIN = "clinician_admin"
+    DOCTOR = "doctor"
+    NURSE = "nurse"
+    RECEPTIONIST = "receptionist"
+    LAB_TECHNICIAN = "lab_technician"
+    PHARMACIST = "pharmacist"
     PATIENT = "patient"
 
 
@@ -100,6 +105,10 @@ class User(Base):
         foreign_keys="Appointment.clinician_id",
     )
     doctor_profile = relationship("Doctor", back_populates="user", uselist=False)
+    nurse_profile = relationship("Nurse", back_populates="user", uselist=False)
+    receptionist_profile = relationship("Receptionist", back_populates="user", uselist=False)
+    lab_technician_profile = relationship("LabTechnician", back_populates="user", uselist=False)
+    pharmacist_profile = relationship("Pharmacist", back_populates="user", uselist=False)
     payments = relationship("Payment", back_populates="user")
     medical_history = relationship("MedicalHistory", back_populates="patient")
     addresses = relationship("Address", back_populates="user")
@@ -111,7 +120,7 @@ class Doctor(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
-    specialization = Column(String(120), nullable=False, index=True)
+    specialization = Column(String(120), nullable=True, index=True)
     bio = Column(Text, nullable=True)
     rating = Column(Numeric(precision=3, scale=2), default=0.0)
     license_number = Column(String(50), unique=True, nullable=True)
@@ -122,6 +131,72 @@ class Doctor(Base):
 
     # Relationships
     user = relationship("User", back_populates="doctor_profile")
+
+
+class Nurse(Base):
+    """Nurse model representing nursing staff."""
+    __tablename__ = "nurses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    specialization = Column(String(120), nullable=True)
+    bio = Column(Text, nullable=True)
+    license_number = Column(String(50), unique=True, nullable=True)
+    is_available = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="nurse_profile")
+
+
+class Receptionist(Base):
+    """Receptionist model representing reception staff."""
+    __tablename__ = "receptionists"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    bio = Column(Text, nullable=True)
+    is_available = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="receptionist_profile")
+
+
+class LabTechnician(Base):
+    """Lab Technician model representing laboratory staff."""
+    __tablename__ = "lab_technicians"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    specialization = Column(String(120), nullable=True)
+    bio = Column(Text, nullable=True)
+    license_number = Column(String(50), unique=True, nullable=True)
+    is_available = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="lab_technician_profile")
+
+
+class Pharmacist(Base):
+    """Pharmacist model representing pharmacy staff."""
+    __tablename__ = "pharmacists"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    specialization = Column(String(120), nullable=True)
+    bio = Column(Text, nullable=True)
+    license_number = Column(String(50), unique=True, nullable=True)
+    is_available = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="pharmacist_profile")
 
  
 
@@ -216,6 +291,26 @@ class Address(Base):
 
     # Relationships
     user = relationship("User", back_populates="addresses")
+
+
+class Medication(Base):
+    """Medication model for pharmacy inventory management."""
+    __tablename__ = "medications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), nullable=False, index=True)
+    category = Column(String(100), nullable=False, index=True)
+    dosage = Column(String(100), nullable=True)
+    price = Column(Numeric(precision=10, scale=2), nullable=False)
+    stock = Column(Integer, default=0, nullable=False)
+    description = Column(Text, nullable=True)
+    prescription_required = Column(Boolean, default=False)
+    expiry_date = Column(DateTime, nullable=True)
+    batch_number = Column(String(100), nullable=True, index=True)
+    supplier = Column(String(150), nullable=True)
+    in_stock = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
 
 class MedicalHistory(Base):

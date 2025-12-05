@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, User, Search, Filter } from 'lucide-react';
+import { Calendar, Clock, User, Search } from 'lucide-react';
 import AppointmentForm from '../components/features/AppointmentForm';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { Doctor, Appointment } from '../types';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { Doctor } from '../types';
+import { useDoctors } from '../services/useDoctor';
+import { useAppointments } from '../services/useAppointment';
 
 const AppointmentsPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
@@ -12,76 +15,66 @@ const AppointmentsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSpecialization, setFilterSpecialization] = useState('all');
 
-  const doctors: Doctor[] = [
-    {
-      id: '1',
-      firstName: 'Sarah',
-      lastName: 'Johnson',
-      specialization: 'Cardiologist',
-      experience: 10,
-      rating: 4.8,
-      avatar: '/images/doctor1.jpg',
-      bio: 'Expert in heart diseases and cardiovascular health',
-      availability: [],
-      consultationFee: 150
-    },
-    {
-      id: '2',
-      firstName: 'Michael',
-      lastName: 'Chen',
-      specialization: 'Pediatrician',
-      experience: 8,
-      rating: 4.9,
-      avatar: '/images/doctor2.jpg',
-      bio: 'Specialized in child healthcare and development',
-      availability: [],
-      consultationFee: 120
-    },
-    {
-      id: '3',
-      firstName: 'Emily',
-      lastName: 'Rodriguez',
-      specialization: 'Dermatologist',
-      experience: 12,
-      rating: 4.7,
-      avatar: '/images/doctor3.jpg',
-      bio: 'Skin care specialist and cosmetic dermatology expert',
-      availability: [],
-      consultationFee: 100
-    }
-  ];
+  // Fetch real data from hooks
+  const { doctors, isLoading: doctorsLoading, fetchDoctors } = useDoctors();
+  const { appointments, isLoading: appointmentsLoading, fetchAppointments, error: appointmentsError } = useAppointments();
 
-  const upcomingAppointments: Appointment[] = [
-    {
-      id: '1',
-      patientId: '1',
-      doctorId: '1',
-      date: '2024-01-15',
-      time: '10:00 AM',
-      status: 'scheduled',
-      type: 'video',
-      paymentStatus: 'paid'
-    },
-    {
-      id: '2',
-      patientId: '1',
-      doctorId: '2',
-      date: '2024-01-20',
-      time: '2:00 PM',
-      status: 'scheduled',
-      type: 'in-person',
-      paymentStatus: 'pending'
-    }
-  ];
+  // Load data on component mount
+  useEffect(() => {
+    fetchDoctors();
+    fetchAppointments();
+  }, [fetchDoctors, fetchAppointments]);
 
-  const filteredDoctors = doctors.filter(doctor => {
-    const matchesSearch = doctor.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doctor.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSpecialization = filterSpecialization === 'all' || 
-                                 doctor.specialization === filterSpecialization;
-    return matchesSearch && matchesSpecialization;
-  });
+  // Convert doctors to Doctor type format
+  const formattedDoctors: Doctor[] = useMemo(
+    () =>
+      doctors.map((doctor) => {
+        const nameParts = doctor.fullName.split(' ');
+        return {
+          id: doctor.id.toString(),
+          firstName: nameParts[0] || 'Dr',
+          lastName: nameParts.slice(1).join(' ') || '',
+          specialization: doctor.specialization || 'General Practitioner',
+          experience: 0,
+          rating: doctor.rating || 0,
+          avatar: doctor.avatar || '/images/doctor-default.jpg',
+          bio: doctor.bio || 'Professional healthcare provider',
+          availability: [],
+          consultationFee: doctor.consultationFee || 0,
+        };
+      }),
+    [doctors]
+  );
+
+  // Get unique specializations for filter dropdown
+  const specializations = useMemo(
+    () => ['all', ...new Set(formattedDoctors.map(d => d.specialization))],
+    [formattedDoctors]
+  );
+
+  // Filter doctors based on search and specialization
+  const filteredDoctors = useMemo(
+    () =>
+      formattedDoctors.filter(doctor => {
+        const matchesSearch = doctor.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             doctor.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSpecialization = filterSpecialization === 'all' || 
+                                     doctor.specialization === filterSpecialization;
+        return matchesSearch && matchesSpecialization;
+      }),
+    [formattedDoctors, searchTerm, filterSpecialization]
+  );
+
+  // Get upcoming appointments (scheduled status)
+  const upcomingAppointments = useMemo(
+    () =>
+      appointments
+        .filter(apt => apt.status === 'scheduled')
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 5),
+    [appointments]
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -124,87 +117,114 @@ const AppointmentsPage: React.FC = () => {
                 onChange={(e) => setFilterSpecialization(e.target.value)}
               >
                 <option value="all">All Specializations</option>
-                <option value="Cardiologist">Cardiologist</option>
-                <option value="Pediatrician">Pediatrician</option>
-                <option value="Dermatologist">Dermatologist</option>
+                {specializations.map(specialization => (
+                  <option key={specialization} value={specialization}>{specialization}</option>
+                ))}
               </select>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              {filteredDoctors.map((doctor) => (
-                <motion.div
-                  key={doctor.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow"
-                >
-                  <div className="flex items-start space-x-4">
-                    <img
-                      src={doctor.avatar}
-                      alt={doctor.firstName}
-                      className="w-16 h-16 rounded-full object-cover"
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">
-                        Dr. {doctor.firstName} {doctor.lastName}
-                      </h3>
-                      <p className="text-sm text-gray-600">{doctor.specialization}</p>
-                      <div className="flex items-center mt-1">
-                        <div className="flex text-yellow-400">
-                          {[...Array(5)].map((_, i) => (
-                            <span key={i} className={i < Math.floor(doctor.rating) ? 'text-yellow-400' : 'text-gray-300'}>
-                              ★
-                            </span>
-                          ))}
+            {doctorsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : filteredDoctors.length > 0 ? (
+              <div className="grid md:grid-cols-2 gap-4">
+                {filteredDoctors.map((doctor) => (
+                  <motion.div
+                    key={doctor.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow"
+                  >
+                    <div className="flex items-start space-x-4">
+                      <img
+                        src={doctor.avatar}
+                        alt={doctor.firstName}
+                        className="w-16 h-16 rounded-full object-cover"
+                      />
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900">
+                          Dr. {doctor.firstName} {doctor.lastName}
+                        </h3>
+                        <p className="text-sm text-gray-600">{doctor.specialization}</p>
+                        <div className="flex items-center mt-1">
+                          <div className="flex text-yellow-400">
+                            {[...Array(5)].map((_, i) => (
+                              <span key={i} className={i < Math.floor(doctor.rating) ? 'text-yellow-400' : 'text-gray-300'}>
+                                ★
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-sm text-gray-600 ml-1">{doctor.rating}</span>
                         </div>
-                        <span className="text-sm text-gray-600 ml-1">{doctor.rating}</span>
-                      </div>
-                      <p className="text-sm text-gray-500 mt-2">{doctor.experience} years experience</p>
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-primary-600 font-semibold">${doctor.consultationFee}</span>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedDoctor(doctor);
-                            setShowForm(true);
-                          }}
-                        >
-                          Book Now
-                        </Button>
+                        <p className="text-sm text-gray-500 mt-2">{doctor.experience} years experience</p>
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="text-primary-600 font-semibold">${doctor.consultationFee}</span>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedDoctor(doctor);
+                              setShowForm(true);
+                            }}
+                          >
+                            Book Now
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No doctors found matching your criteria</p>
+              </div>
+            )}
           </Card>
         </div>
 
         <div className="space-y-6">
           <Card className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Upcoming Appointments</h2>
-            <div className="space-y-3">
-              {upcomingAppointments.map((appointment) => (
-                <div key={appointment.id} className="border-l-4 border-primary-500 pl-4 py-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{appointment.date}</p>
-                      <p className="text-sm text-gray-600 flex items-center mt-1">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {appointment.time}
-                      </p>
+            {appointmentsError && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  {appointmentsError === 'Failed to fetch appointments' 
+                    ? 'Unable to load appointments. Please log in again or try later.'
+                    : appointmentsError}
+                </p>
+              </div>
+            )}
+            {appointmentsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : upcomingAppointments.length > 0 ? (
+              <div className="space-y-3">
+                {upcomingAppointments.map((appointment) => (
+                  <div key={appointment.id} className="border-l-4 border-primary-500 pl-4 py-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{appointment.date}</p>
+                        <p className="text-sm text-gray-600 flex items-center mt-1">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {appointment.time}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        appointment.type === 'video' 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {appointment.type}
+                      </span>
                     </div>
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      appointment.type === 'video' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {appointment.type}
-                    </span>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No upcoming appointments scheduled</p>
+            )}
           </Card>
 
           <Card className="p-6">

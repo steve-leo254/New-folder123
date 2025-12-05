@@ -29,13 +29,25 @@ def create_user(db: Session, full_name: str, email: str, password_hash: str, rol
     return user
 
 
-def get_appointments_for_user(db: Session, current_user: User, status_filter: Optional[AppointmentStatus] = None):
+def get_appointments_for_user(db: Session, current_user, status_filter: Optional[AppointmentStatus] = None):
     """Return appointments filtered by user role and optional status."""
+    # Handle both User objects and dict (from JWT token)
+    if isinstance(current_user, dict):
+        user_role_str = current_user.get("role")
+        user_id = current_user.get("id")
+        try:
+            user_role = Role(user_role_str)
+        except (ValueError, TypeError):
+            user_role = None
+    else:
+        user_role = current_user.role
+        user_id = current_user.id
+    
     query = db.query(Appointment)
-    if current_user.role == Role.PATIENT:
-        query = query.filter(Appointment.patient_id == current_user.id)
-    elif current_user.role == Role.CLINICIAN_ADMIN:
-        query = query.filter(Appointment.clinician_id == current_user.id)
+    if user_role == Role.PATIENT:
+        query = query.filter(Appointment.patient_id == user_id)
+    elif user_role == Role.CLINICIAN_ADMIN:
+        query = query.filter(Appointment.clinician_id == user_id)
     # SUPER_ADMIN sees all appointments
     if status_filter:
         query = query.filter(Appointment.status == status_filter)
