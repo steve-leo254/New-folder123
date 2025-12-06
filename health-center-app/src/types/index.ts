@@ -61,6 +61,7 @@ export interface Medication {
   category: string;
   inStock: boolean;
   prescriptionRequired: boolean;
+  image?: string;
 }
 
 export interface VideoCall {

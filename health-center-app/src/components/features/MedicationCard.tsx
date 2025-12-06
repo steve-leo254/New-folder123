@@ -1,16 +1,38 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Star, AlertCircle, Check } from 'lucide-react';
+import { ShoppingCart, Star, Check, Plus, Minus } from 'lucide-react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import { Medication } from '../../types';
+import { formatCurrency } from '../../services/formatCurrency';
+import { useShoppingCart } from '../../services/CartContext';
 
 interface MedicationCardProps {
   medication: Medication;
 }
 
 const MedicationCard: React.FC<MedicationCardProps> = ({ medication }) => {
+  const { addToCart, getItemQuantity, increaseCartQuantity, decreaseCartQuantity } = useShoppingCart();
+  const quantity = getItemQuantity(parseInt(medication.id));
+
+  const handleAddToCart = () => {
+    addToCart({
+      id: parseInt(medication.id),
+      name: medication.name,
+      price: medication.price,
+      img_url: medication.image || null,
+    });
+  };
+
+  const handleIncreaseQuantity = () => {
+    increaseCartQuantity(parseInt(medication.id));
+  };
+
+  const handleDecreaseQuantity = () => {
+    decreaseCartQuantity(parseInt(medication.id));
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -18,6 +40,15 @@ const MedicationCard: React.FC<MedicationCardProps> = ({ medication }) => {
       whileHover={{ y: -5 }}
     >
       <Card className="overflow-hidden hover:shadow-xl transition-shadow">
+        {medication.image && (
+          <div className="w-full h-48 bg-gray-200 overflow-hidden">
+            <img 
+              src={medication.image} 
+              alt={medication.name}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
         <div className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -54,9 +85,9 @@ const MedicationCard: React.FC<MedicationCardProps> = ({ medication }) => {
           </div>
 
           <div className="flex items-center justify-between mb-4">
-            <div>
-              <span className="text-2xl font-bold text-primary-600">${medication.price}</span>
-              <span className="text-sm text-gray-600 ml-1">per course</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-primary-600">{formatCurrency(medication.price)}</span>
+              <span className="text-sm text-gray-600">per course</span>
             </div>
             <div className="flex items-center">
               <div className="flex text-yellow-400">
@@ -69,19 +100,35 @@ const MedicationCard: React.FC<MedicationCardProps> = ({ medication }) => {
           </div>
 
           <div className="space-y-2">
-            <Button 
-              className="w-full" 
-              disabled={!medication.inStock}
-            >
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              {medication.inStock ? 'Add to Cart' : 'Out of Stock'}
-            </Button>
-            
-            {medication.prescriptionRequired && (
-              <div className="flex items-center text-sm text-amber-600 bg-amber-50 p-2 rounded">
-                <AlertCircle className="w-4 h-4 mr-2" />
-                Valid prescription required
+            {quantity > 0 ? (
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={handleDecreaseQuantity}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="Decrease quantity"
+                >
+                  <Minus className="w-4 h-4 text-gray-600" />
+                </button>
+                <span className="flex-1 text-center font-semibold text-gray-900">
+                  {quantity} in cart
+                </span>
+                <button
+                  onClick={handleIncreaseQuantity}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="Increase quantity"
+                >
+                  <Plus className="w-4 h-4 text-gray-600" />
+                </button>
               </div>
+            ) : (
+              <Button 
+                className="w-full" 
+                disabled={!medication.inStock}
+                onClick={handleAddToCart}
+              >
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                {medication.inStock ? 'Add to Cart' : 'Out of Stock'}
+              </Button>
             )}
             
             {medication.inStock && (

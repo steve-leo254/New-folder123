@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useLogout } from "../hooks/useLogout";
 import {
   Users,
   Calendar,
@@ -53,6 +54,7 @@ import {
 } from "recharts";
 
 const SuperDashboardPage: React.FC = () => {
+  const handleLogout = useLogout();
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedPeriod, setSelectedPeriod] = useState("month");
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -395,7 +397,7 @@ const SuperDashboardPage: React.FC = () => {
                   <p className="text-xs text-gray-500">Super Admin</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="w-4 h-4" />
               </Button>
             </div>

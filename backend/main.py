@@ -17,7 +17,7 @@ import models
 from database import engine, get_db
 from models import (
     User, Appointment, Prescription, Doctor, Medication,
-    Role, AppointmentStatus
+    Role, AppointmentStatus, VideoConsultation
 )
 from auth_router import (
     router as auth_router, 
@@ -48,6 +48,11 @@ from pydantic_models import (
     MedicationCreateRequest,
     MedicationUpdateRequest,
     MedicationResponse,
+    VideoConsultationCreateRequest,
+    VideoConsultationUpdateRequest,
+    VideoTokenRequest,
+    VideoTokenResponse,
+    VideoConsultationResponse,
 )
 
 # Load environment
@@ -713,6 +718,7 @@ def create_doctor_endpoint(
         user_id=payload.user_id,
         specialization=payload.specialization,
         bio=payload.bio,
+        license_number=payload.license_number,
         is_available=payload.is_available,
         consultation_fee=payload.consultation_fee,
         rating=payload.rating,
@@ -997,6 +1003,233 @@ def dashboard_summary(
 ) -> dict:
     """Get dashboard summary statistics."""
     return dashboard_snapshot(db)
+
+
+# ============================================================================
+# Video Consultation Routes
+# ============================================================================
+
+@app.post("/video-consultations", response_model=dict)
+def initialize_video_consultation(
+    payload: VideoConsultationCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Initialize a video consultation session."""
+    # Verify appointment exists
+    appointment = db.query(Appointment).filter(
+        Appointment.id == payload.appointment_id
+    ).first()
+    
+    if not appointment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Appointment not found"
+        )
+    
+    # Check authorization
+    if current_user.role == Role.PATIENT and appointment.patient_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this appointment"
+        )
+    elif current_user.role == Role.CLINICIAN_ADMIN and appointment.clinician_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this appointment"
+        )
+    
+    # Check if session already exists
+    existing = db.query(VideoConsultation).filter(
+        VideoConsultation.appointment_id == payload.appointment_id
+    ).first()
+    
+    if existing:
+        return {
+            "id": existing.id,
+            "appointmentId": existing.appointment_id,
+            "roomId": existing.room_id,
+            "doctorId": existing.doctor_id,
+            "patientId": existing.patient_id,
+            "status": existing.status,
+            "startTime": existing.start_time.isoformat() if existing.start_time else None,
+            "endTime": existing.end_time.isoformat() if existing.end_time else None,
+            "recordingUrl": existing.recording_url,
+            "notes": existing.notes,
+        }
+    
+    # Create new session
+    room_id = f"room-{payload.appointment_id}-{uuid.uuid4().hex[:8]}"
+    
+    session = VideoConsultation(
+        appointment_id=payload.appointment_id,
+        room_id=room_id,
+        doctor_id=appointment.clinician_id,
+        patient_id=appointment.patient_id,
+        status='waiting'
+    )
+    
+    try:
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+        logger.info(f"Video consultation session created: ID {session.id}, Room {room_id}")
+        
+        return {
+            "id": session.id,
+            "appointmentId": session.appointment_id,
+            "roomId": session.room_id,
+            "doctorId": session.doctor_id,
+            "patientId": session.patient_id,
+            "status": session.status,
+            "startTime": session.start_time.isoformat() if session.start_time else None,
+            "endTime": session.end_time.isoformat() if session.end_time else None,
+            "recordingUrl": session.recording_url,
+            "notes": session.notes,
+        }
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error creating video consultation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to initialize video consultation"
+        )
+
+
+@app.get("/video-consultations/{session_id}")
+def get_video_consultation(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Get video consultation session details."""
+    session = db.query(VideoConsultation).filter(
+        VideoConsultation.id == session_id
+    ).first()
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video consultation session not found"
+        )
+    
+    # Check authorization
+    if current_user.id not in [session.doctor_id, session.patient_id]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this session"
+        )
+    
+    return {
+        "id": session.id,
+        "appointmentId": session.appointment_id,
+        "roomId": session.room_id,
+        "doctorId": session.doctor_id,
+        "patientId": session.patient_id,
+        "status": session.status,
+        "startTime": session.start_time.isoformat() if session.start_time else None,
+        "endTime": session.end_time.isoformat() if session.end_time else None,
+        "recordingUrl": session.recording_url,
+        "notes": session.notes,
+    }
+
+
+@app.get("/video-consultations/{session_id}/token")
+def get_video_token(
+    session_id: int,
+    uid: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Get Agora token for video consultation."""
+    session = db.query(VideoConsultation).filter(
+        VideoConsultation.id == session_id
+    ).first()
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video consultation session not found"
+        )
+    
+    # Check authorization
+    if current_user.id not in [session.doctor_id, session.patient_id]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this session"
+        )
+    
+    # TODO: Integrate with Agora SDK to generate real token
+    # For now, return a mock token
+    mock_token = f"mock_token_{session_id}_{uid}_{uuid.uuid4().hex[:16]}"
+    
+    return {
+        "token": mock_token,
+        "uid": uid,
+        "appId": "mock_agora_app_id",
+        "channelName": session.room_id,
+    }
+
+
+@app.patch("/video-consultations/{session_id}")
+def update_video_consultation(
+    session_id: int,
+    payload: VideoConsultationUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Update video consultation session."""
+    session = db.query(VideoConsultation).filter(
+        VideoConsultation.id == session_id
+    ).first()
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video consultation session not found"
+        )
+    
+    # Check authorization
+    if current_user.id not in [session.doctor_id, session.patient_id]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this session"
+        )
+    
+    try:
+        if payload.status:
+            session.status = payload.status
+            if payload.status == 'active' and not session.start_time:
+                session.start_time = datetime.now()
+            elif payload.status == 'ended' and not session.end_time:
+                session.end_time = datetime.now()
+        
+        if payload.notes:
+            session.notes = payload.notes
+        
+        db.commit()
+        db.refresh(session)
+        logger.info(f"Video consultation updated: ID {session.id}, Status {session.status}")
+        
+        return {
+            "id": session.id,
+            "appointmentId": session.appointment_id,
+            "roomId": session.room_id,
+            "doctorId": session.doctor_id,
+            "patientId": session.patient_id,
+            "status": session.status,
+            "startTime": session.start_time.isoformat() if session.start_time else None,
+            "endTime": session.end_time.isoformat() if session.end_time else None,
+            "recordingUrl": session.recording_url,
+            "notes": session.notes,
+        }
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error updating video consultation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update video consultation"
+        )
 
 
 # ============================================================================

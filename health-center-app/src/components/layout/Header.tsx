@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useShoppingCart } from '../../services/CartContext';
 import { 
   Calendar, 
   User, 
@@ -18,13 +19,14 @@ import logoImage from '@/assets/kiangombe.jpg';
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const { cartQuantity } = useShoppingCart();
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Doctors', href: '/doctors', icon: Stethoscope },
     { name: 'Appointments', href: '/appointments', icon: Calendar },
     { name: 'Medications', href: '/medications', icon: Pill },
-    { name: 'Video Consult', href: '/video-chat', icon: Video },
+    { name: 'Video Consult', href: '/video-chat/1', icon: Video },
     { name: 'Prescriptions', href: '/prescriptions', icon: FileText },
   ];
 
@@ -71,13 +73,15 @@ const Header: React.FC = () => {
               <span>Dashboard</span>
             </Link>
             <Link
-              to="/checkout"
+              to="/cart"
               className="relative p-2 text-gray-700 hover:text-primary-600"
             >
               <ShoppingCart className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                2
-              </span>
+              {cartQuantity > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {cartQuantity}
+                </span>
+              )}
             </Link>
           </div>
 

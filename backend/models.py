@@ -331,3 +331,26 @@ class MedicalHistory(Base):
     # Relationships
     patient = relationship("User", back_populates="medical_history")
 
+
+class VideoConsultation(Base):
+    """Video consultation model for tracking video call sessions."""
+    __tablename__ = "video_consultations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False, unique=True, index=True)
+    room_id = Column(String(255), nullable=False, unique=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    status = Column(String(50), default='waiting', index=True)  # waiting, active, ended
+    start_time = Column(DateTime, nullable=True)
+    end_time = Column(DateTime, nullable=True)
+    recording_url = Column(String(500), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    appointment = relationship("Appointment", foreign_keys=[appointment_id])
+    doctor = relationship("User", foreign_keys=[doctor_id])
+    patient = relationship("User", foreign_keys=[patient_id])
+

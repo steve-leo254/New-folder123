@@ -27,13 +27,14 @@ const MedicationPage: React.FC = () => {
         id: med.id.toString(),
         name: med.name || 'Unknown Medication',
         dosage: med.dosage || 'N/A',
-        frequency: 'As directed',
-        duration: '30 days',
-        price: med.price || 0,
+        frequency: 'As directed',  // Default value - can be customized per medication
+        duration: '30 days',        // Default value - can be customized per medication
+        price: typeof med.price === 'string' ? parseFloat(med.price) : (med.price || 0),
         description: med.description || 'Professional medication',
         category: med.category || 'Other',
-        inStock: med.inStock !== false,
+        inStock: med.inStock !== false && med.stock > 0,
         prescriptionRequired: med.prescriptionRequired || false,
+        image: med.image || undefined,  // Add image from backend
       })),
     [backendMedications]
   );

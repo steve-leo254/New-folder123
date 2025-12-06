@@ -347,3 +347,50 @@ class PaginatedResponse(BaseModel):
     page: int
     limit: int
     pages: int
+
+
+# ============================================================================
+# Video Consultations
+# ============================================================================
+
+class VideoConsultationCreateRequest(BaseModel):
+    """Create video consultation request."""
+    appointment_id: int
+
+
+class VideoConsultationUpdateRequest(BaseModel):
+    """Update video consultation request."""
+    status: Optional[str] = None  # waiting, active, ended
+    notes: Optional[str] = None
+
+
+class VideoTokenRequest(BaseModel):
+    """Request for video token."""
+    uid: int
+
+
+class VideoTokenResponse(BaseModel):
+    """Video token response."""
+    token: str
+    uid: int
+    appId: str
+    channelName: str
+
+
+class VideoConsultationResponse(BaseModel):
+    """Video consultation response."""
+    id: int
+    appointment_id: int
+    room_id: str
+    doctor_id: int
+    patient_id: int
+    status: str
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    recording_url: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

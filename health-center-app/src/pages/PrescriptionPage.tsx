@@ -1,40 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Download, Filter, Calendar, Eye } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import PrescriptionCard from '../components/features/PrescriptionCard';
 import { Prescription } from '../types';
+import { usePrescription } from '../services/usePrescription';
 
 const PrescriptionPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const { prescriptions: backendPrescriptions, isLoading, error, fetchPrescriptions } = usePrescription();
 
-  const prescriptions: Prescription[] = [
-    {
-      id: '1',
-      patientId: '1',
-      doctorId: '1',
-      medications: [
-        { id: '1', name: 'Amoxicillin', dosage: '500mg', frequency: '3x daily', duration: '7 days', price: 25, description: 'Antibiotic', category: 'Antibiotics', inStock: true, prescriptionRequired: true },
-        { id: '2', name: 'Ibuprofen', dosage: '200mg', frequency: 'as needed', duration: '30 days', price: 15, description: 'Pain reliever', category: 'Pain Relief', inStock: true, prescriptionRequired: false }
-      ],
-      issuedDate: '2024-01-10',
-      expiryDate: '2024-04-10',
-      instructions: 'Take with food after meals'
-    },
-    {
-      id: '2',
-      patientId: '1',
-      doctorId: '2',
-      medications: [
-        { id: '3', name: 'Vitamin D', dosage: '1000 IU', frequency: 'daily', duration: '90 days', price: 20, description: 'Vitamin supplement', category: 'Vitamins', inStock: true, prescriptionRequired: false }
-      ],
-      issuedDate: '2024-01-05',
-      expiryDate: '2024-04-05',
-      instructions: 'Take with breakfast'
-    }
-  ];
+  // Load prescriptions on component mount
+  useEffect(() => {
+    fetchPrescriptions();
+  }, [fetchPrescriptions]);
+
+  // Convert backend prescriptions to Prescription type format
+  const prescriptions: Prescription[] = backendPrescriptions.map(p => ({
+    id: p.id.toString(),
+    patientId: p.patientId.toString(),
+    doctorId: p.doctorId.toString(),
+    medications: p.medications,
+    issuedDate: p.issuedDate,
+    expiryDate: p.expiryDate,
+    instructions: p.instructions
+  }));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -75,11 +68,29 @@ const PrescriptionPage: React.FC = () => {
         </div>
       </Card>
 
-      <div className="grid gap-6">
-        {prescriptions.map((prescription) => (
-          <PrescriptionCard key={prescription.id} prescription={prescription} />
-        ))}
-      </div>
+      {error && (
+        <Card className="p-6 mb-6 bg-red-50 border border-red-200">
+          <p className="text-sm text-red-800">
+            <strong>Unable to load prescriptions:</strong> {error}
+          </p>
+        </Card>
+      )}
+
+      {isLoading ? (
+        <Card className="p-12 flex items-center justify-center">
+          <LoadingSpinner />
+        </Card>
+      ) : prescriptions.length > 0 ? (
+        <div className="grid gap-6">
+          {prescriptions.map((prescription) => (
+            <PrescriptionCard key={prescription.id} prescription={prescription} />
+          ))}
+        </div>
+      ) : (
+        <Card className="p-12 text-center">
+          <p className="text-gray-600">No prescriptions found</p>
+        </Card>
+      )}
     </div>
   );
 };

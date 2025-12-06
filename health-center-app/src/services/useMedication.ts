@@ -15,6 +15,7 @@ export interface MedicationRecord {
   expiryDate?: string;
   batchNumber?: string;
   supplier?: string;
+  image?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -47,6 +48,7 @@ const normalizeMedication = (medication: any): MedicationRecord => ({
   expiryDate: medication.expiry_date || medication.expiryDate,
   batchNumber: medication.batch_number || medication.batchNumber,
   supplier: medication.supplier,
+  image: medication.image,
   createdAt: medication.created_at || medication.createdAt,
   updatedAt: medication.updated_at || medication.updatedAt,
 });

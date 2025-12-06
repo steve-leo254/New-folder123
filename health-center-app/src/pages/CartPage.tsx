@@ -4,12 +4,12 @@ import { Link } from 'react-router-dom';
 import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { useCart } from '../services/CartContext';
+import { useShoppingCart } from '../services/CartContext';
 
 const CartPage: React.FC = () => {
-  const { items, total, removeItem, updateQuantity, clearCart } = useCart();
+  const { cartItems, total, removeFromCart, increaseCartQuantity, decreaseCartQuantity, clearCart } = useShoppingCart();
 
-  if (items.length === 0) {
+  if (cartItems.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <motion.div
@@ -42,7 +42,7 @@ const CartPage: React.FC = () => {
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
-          {items.map((item, index) => (
+          {cartItems.map((item, index) => (
             <motion.div
               key={item.id}
               initial={{ opacity: 0, y: 20 }}
@@ -62,7 +62,7 @@ const CartPage: React.FC = () => {
                     <p className="text-sm text-gray-500 mt-2">Type: {item.type}</p>
                   </div>
                   <button
-                    onClick={() => removeItem(item.id)}
+                    onClick={() => removeFromCart(item.id)}
                     className="text-red-500 hover:text-red-700 transition-colors p-2"
                     aria-label="Remove item"
                   >
@@ -73,7 +73,7 @@ const CartPage: React.FC = () => {
                 <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                   <div className="flex items-center space-x-3">
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      onClick={() => decreaseCartQuantity(item.id)}
                       className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
                       aria-label="Decrease quantity"
                     >
@@ -83,7 +83,7 @@ const CartPage: React.FC = () => {
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      onClick={() => increaseCartQuantity(item.id)}
                       className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
                       aria-label="Increase quantity"
                     >
@@ -115,7 +115,7 @@ const CartPage: React.FC = () => {
 
             <div className="space-y-4 mb-6">
               <div className="flex justify-between text-gray-600">
-                <span>Subtotal ({items.length} items)</span>
+                <span>Subtotal ({cartItems.length} items)</span>
                 <span>KSH {total.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-gray-600">

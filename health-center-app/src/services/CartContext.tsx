@@ -1,92 +1,158 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+// ShoppingCartContext.tsx
+import { createContext, useContext } from "react";
+import { useLocalStorage } from "../hooks/useLocalStorage";
+import type { ReactNode } from "react";
 
-export interface CartItem {
-  id: string;
-  type: 'appointment' | 'medication' | 'consultation';
+type ShoppingCartProviderProps = {
+  children: ReactNode;
+};
+
+type CartItem = {
+  id: number;
   name: string;
   price: number;
+  img_url: string | null;
   quantity: number;
   description?: string;
-  image?: string;
-  doctorId?: string;
   appointmentDate?: string;
   appointmentTime?: string;
-}
+  type?: string;
+};
 
-interface CartContextType {
-  items: CartItem[];
-  total: number;
-  addItem: (item: CartItem) => void;
-  removeItem: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
+type Address = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  address: string;
+  city: string;
+  region: string;
+  is_default: boolean;
+};
+
+type DeliveryMethod = "pickup" | "delivery" | null;
+type PaymentMethod = "pay-now" | "pay-later" | null;
+
+type ShoppingCartContext = {
+  addToCart: (product: {
+    id: number;
+    name: string;
+    price: number;
+    img_url: string | null;
+  }) => void;
+  increaseCartQuantity: (id: number) => void;
+  decreaseCartQuantity: (id: number) => void;
+  removeFromCart: (id: number) => void;
   clearCart: () => void;
-  getItemCount: () => number;
+  getItemQuantity: (id: number) => number;
+  cartQuantity: number;
+  cartItems: CartItem[];
+  deliveryMethod: DeliveryMethod;
+  setDeliveryMethod: (method: DeliveryMethod) => void;
+  paymentMethod: PaymentMethod;
+  setPaymentMethod: (method: PaymentMethod) => void;
+  mpesaPhone: string | null;
+  setMpesaPhone: (phone: string | null) => void;
+  selectedAddress: Address | null;
+  setSelectedAddress: (address: Address | null) => void;
+  deliveryFee: number;
+  subtotal: number;
+  total: number;
+};
+
+const ShoppingCartContext = createContext({} as ShoppingCartContext);
+
+export function useShoppingCart() {
+  return useContext(ShoppingCartContext);
 }
 
-const CartContext = createContext<CartContextType | undefined>(undefined);
+export function ShoppingCartProvider({ children }: ShoppingCartProviderProps) {
+  const [cartItems, setCartItems] = useLocalStorage<CartItem[]>("shopping-cart", []);
+  const [deliveryMethod, setDeliveryMethod] = useLocalStorage<DeliveryMethod>("delivery-method", null);
+  const [paymentMethod, setPaymentMethod] = useLocalStorage<PaymentMethod>("payment-method", null);
+  const [mpesaPhone, setMpesaPhone] = useLocalStorage<string | null>("mpesa-phone", null);
+  const [selectedAddress, setSelectedAddress] = useLocalStorage<Address | null>("selected-address", null);
 
-export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const cartQuantity = cartItems.reduce((quantity, item) => item.quantity + quantity, 0);
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // Calculate subtotal from cartItems
+  const subtotal = cartItems.reduce((total, item) => total + item.quantity * item.price, 0);
 
-  const addItem = useCallback((item: CartItem) => {
-    setItems((prevItems) => {
-      const existingItem = prevItems.find((i) => i.id === item.id);
-      if (existingItem) {
-        return prevItems.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
+  // Calculate delivery fee based on delivery method
+  const deliveryFee = deliveryMethod === "delivery" ? 150 : 0; // KSh 150 for delivery, 0 for pickup
+
+  // Calculate total
+  const total = subtotal + deliveryFee;
+
+  function getItemQuantity(id: number) {
+    return cartItems.find((item) => item.id === id)?.quantity || 0;
+  }
+
+  function addToCart(product: { id: number; name: string; price: number; img_url: string | null }) {
+    setCartItems((currItems) => {
+      if (currItems.find((item) => item.id === product.id) == null) {
+        return [...currItems, { ...product, quantity: 1 }];
+      } else {
+        return currItems.map((item) =>
+          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prevItems, item];
     });
-  }, []);
+  }
 
-  const removeItem = useCallback((id: string) => {
-    setItems((prevItems) => prevItems.filter((item) => item.id !== id));
-  }, []);
-
-  const updateQuantity = useCallback((id: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(id);
-      return;
-    }
-    setItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === id ? { ...item, quantity } : item
+  function increaseCartQuantity(id: number) {
+    setCartItems((currItems) =>
+      currItems.map((item) =>
+        item.id === id ? { ...item, quantity: item.quantity + 1 } : item
       )
     );
-  }, [removeItem]);
+  }
 
-  const clearCart = useCallback(() => {
-    setItems([]);
-  }, []);
+  function decreaseCartQuantity(id: number) {
+    setCartItems((currItems) => {
+      if (currItems.find((item) => item.id === id)?.quantity === 1) {
+        return currItems.filter((item) => item.id !== id);
+      } else {
+        return currItems.map((item) =>
+          item.id === id ? { ...item, quantity: item.quantity - 1 } : item
+        );
+      }
+    });
+  }
 
-  const getItemCount = useCallback(() => {
-    return items.reduce((count, item) => count + item.quantity, 0);
-  }, [items]);
+  function removeFromCart(id: number) {
+    setCartItems((currItems) => currItems.filter((item) => item.id !== id));
+  }
+
+  const clearCart = () => {
+    setCartItems([]);
+  };
 
   return (
-    <CartContext.Provider
+    <ShoppingCartContext.Provider
       value={{
-        items,
-        total,
-        addItem,
-        removeItem,
-        updateQuantity,
+        addToCart,
+        increaseCartQuantity,
+        decreaseCartQuantity,
+        removeFromCart,
         clearCart,
-        getItemCount,
+        getItemQuantity,
+        cartItems,
+        cartQuantity,
+        deliveryMethod,
+        setDeliveryMethod,
+        paymentMethod,
+        setPaymentMethod,
+        mpesaPhone,
+        setMpesaPhone,
+        selectedAddress,
+        setSelectedAddress,
+        deliveryFee,
+        subtotal,
+        total,
       }}
     >
       {children}
-    </CartContext.Provider>
+    </ShoppingCartContext.Provider>
   );
-};
-
-export const useCart = () => {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error('useCart must be used within a CartProvider');
-  }
-  return context;
-};
+}

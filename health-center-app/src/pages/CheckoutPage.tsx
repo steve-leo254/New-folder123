@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { CreditCard, ShoppingBag, Truck, Shield, ArrowLeft } from 'lucide-react';
+import { CreditCard, Truck, Shield } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import CheckoutForm from '../components/features/checkoutForm';
-import { useCart } from '../services/CartContext';
+import { useShoppingCart } from '../services/CartContext';
 import { formatCurrency } from '../services/formatCurrency';
 
 const CheckoutPage: React.FC = () => {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const { items: cartItems, total: subtotal, clearCart } = useCart();
+  const cart = useShoppingCart();
 
-  const shipping = 0; 
+  // Provide defaults if context is not available
+  const cartItems = cart?.cartItems || [];
+  const subtotal = cart?.subtotal || 0;
+  const deliveryFee = cart?.deliveryFee || 0;
+
   const tax = subtotal * 0.16; // 16% VAT
-  const total = subtotal + shipping + tax;
+  const total = subtotal + deliveryFee + tax;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -39,10 +42,10 @@ const CheckoutPage: React.FC = () => {
                   <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div className="flex-1">
                       <h3 className="font-medium text-gray-900">{item.name}</h3>
-                      <p className="text-sm text-gray-600">{item.description}</p>
+                      {item.img_url && <p className="text-sm text-gray-600">Product</p>}
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-gray-900"> {item.price.toLocaleString()}</p>
+                      <p className="font-semibold text-gray-900">{formatCurrency(item.price)}</p>
                       <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                     </div>
                   </div>
@@ -94,20 +97,20 @@ const CheckoutPage: React.FC = () => {
             <div className="space-y-3">
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal ({cartItems.length} items)</span>
-                <span>KSH {subtotal.toLocaleString()}</span>
+                <span>{formatCurrency(subtotal)}</span>
               </div>
               <div className="flex justify-between text-gray-600">
-                <span>Shipping</span>
-                <span>{shipping === 0 ? 'Free' :' { formatcurency(for shipping.toLocaleString()'}</span>
+                <span>Delivery</span>
+                <span>{deliveryFee === 0 ? 'Free' : formatCurrency(deliveryFee)}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Tax (16%)</span>
-                <span>KSH {Math.round(tax).toLocaleString()}</span>
+                <span>{formatCurrency(Math.round(tax))}</span>
               </div>
               <div className="border-t pt-3">
                 <div className="flex justify-between font-semibold text-lg">
                   <span>Total</span>
-                  <span className="text-primary-600">KSH {Math.round(total).toLocaleString()}</span>
+                  <span className="text-primary-600">{formatCurrency(Math.round(total))}</span>
                 </div>
               </div>
             </div>
