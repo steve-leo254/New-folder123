@@ -65,12 +65,14 @@ const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
             </div>
           </div>
           
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-2xl font-bold text-primary-600">
-              ${doctor.consultationFee}
-            </span>
-            <span className="text-sm text-gray-600">per consultation</span>
-          </div>
+          {doctor.consultationFee && doctor.consultationFee > 0 && (
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-2xl font-bold text-primary-600">
+                KSH {doctor.consultationFee.toLocaleString()}
+              </span>
+              <span className="text-sm text-gray-600">per consultation</span>
+            </div>
+          )}
           
           <div className="flex gap-2">
             <Link to={`/appointments?doctor=${doctor.id}`} className="flex-1">

@@ -151,13 +151,13 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ doctor, onClose }) =>
                   <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-lg">
-                    Dr. {doctor.firstName} {doctor.lastName}
-                  </h3>
+                  <h3 className="font-semibold text-gray-900">{doctor.firstName} {doctor.lastName}</h3>
                   <p className="text-gray-600">{doctor.specialization}</p>
-                  <p className="text-primary-600 font-semibold mt-1">
-                    ${doctor.consultationFee} <span className="text-sm text-gray-500">per session</span>
-                  </p>
+                  {doctor.consultationFee && doctor.consultationFee > 0 && (
+                    <p className="text-primary-600 font-semibold mt-1">
+                      KSH {doctor.consultationFee.toLocaleString()} <span className="text-sm text-gray-500">per session</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>

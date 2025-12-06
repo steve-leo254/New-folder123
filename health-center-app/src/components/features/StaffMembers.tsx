@@ -216,10 +216,10 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
                     </div>
                   </div>
                   
-                  {member.consultationFee && (
+                  {member.consultationFee && member.consultationFee > 0 && (
                     <div className="flex items-center justify-between mb-4">
                       <span className="text-2xl font-bold text-primary-600">
-                        ${member.consultationFee}
+                        KSH {member.consultationFee.toLocaleString()}
                       </span>
                       <span className="text-sm text-gray-600">per consultation</span>
                     </div>

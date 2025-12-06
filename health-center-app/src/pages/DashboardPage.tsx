@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
@@ -11,32 +11,43 @@ import {
   CheckCircle
 } from 'lucide-react';
 import Card from '../components/ui/Card';
-import { Appointment, Prescription, Medication } from '../types';
+import { Prescription } from '../types';
+import { useAppointments, AppointmentRecord } from '../services/useAppointment';
+import { useAuth } from '../services/AuthContext';
+import { jwtDecode } from 'jwt-decode';
+
+interface JwtPayload {
+  sub: string;
+  id: number;
+  role: string;
+}
 
 const DashboardPage: React.FC = () => {
-  const upcomingAppointments: Appointment[] = [
-    {
-      id: '1',
-      patientId: '1',
-      doctorId: '1',
-      date: '2024-01-15',
-      time: '10:00 AM',
-      status: 'scheduled',
-      type: 'video',
-      paymentStatus: 'paid'
-    },
-    {
-      id: '2',
-      patientId: '1',
-      doctorId: '2',
-      date: '2024-01-20',
-      time: '2:00 PM',
-      status: 'scheduled',
-      type: 'in-person',
-      paymentStatus: 'pending'
-    }
-  ];
+  const { token } = useAuth();
+  const { appointments } = useAppointments();
+  const [userName, setUserName] = useState('User');
 
+  // Extract user name from token
+  useEffect(() => {
+    if (token) {
+      try {
+        const decoded: JwtPayload = jwtDecode(token);
+        const firstName = decoded.sub.split(' ')[0];
+        setUserName(firstName);
+      } catch (err) {
+        console.error('Failed to decode token:', err);
+      }
+    }
+  }, [token]);
+
+  // Get upcoming appointments (next 2)
+  const upcomingAppointments = useMemo(() => {
+    return appointments
+      .filter(apt => apt.status === 'scheduled')
+      .slice(0, 2);
+  }, [appointments]);
+
+  // Mock data for prescriptions and reminders (would come from backend)
   const recentPrescriptions: Prescription[] = [
     {
       id: '1',
@@ -68,7 +79,7 @@ const DashboardPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, John!</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, {userName}!</h1>
         <p className="text-gray-600">Here's your health overview for today</p>
       </motion.div>
 

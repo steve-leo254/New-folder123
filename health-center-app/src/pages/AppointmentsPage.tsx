@@ -6,6 +6,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { Doctor } from '../types';
+import { formatCurrency } from '@/services/formatCurrency';
 import { useDoctors } from '../services/useDoctor';
 import { useAppointments } from '../services/useAppointment';
 
@@ -159,7 +160,7 @@ const AppointmentsPage: React.FC = () => {
                         </div>
                         <p className="text-sm text-gray-500 mt-2">{doctor.experience} years experience</p>
                         <div className="flex items-center justify-between mt-3">
-                          <span className="text-primary-600 font-semibold">${doctor.consultationFee}</span>
+                          <span className="text-primary-600 font-semibold">{formatCurrency(doctor.consultationFee)}</span>
                           <Button
                             size="sm"
                             onClick={() => {

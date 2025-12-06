@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import Alert from '../components/ui/Alert';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -22,6 +23,7 @@ export const LoginPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -120,16 +122,30 @@ export const LoginPage: React.FC = () => {
           />
 
           {/* Password */}
-          <Input
-            type="password"
-            name="password"
-            label="Password"
-            placeholder="••••••••"
-            value={credentials.password}
-            onChange={(e) => handleInputChange('password', e.target.value)}
-            error={formErrors.password}
-            required
-          />
+          <div className="relative">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              label="Password"
+              placeholder="••••••••"
+              value={credentials.password}
+              onChange={(e) => handleInputChange('password', e.target.value)}
+              error={formErrors.password}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-10 text-gray-500 hover:text-gray-700"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? (
+                <EyeOff className="w-5 h-5" />
+              ) : (
+                <Eye className="w-5 h-5" />
+              )}
+            </button>
+          </div>
 
           {/* Forgot Password Link */}
           <div className="flex items-center justify-between">

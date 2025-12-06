@@ -1,5 +1,6 @@
 import React, { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -26,6 +27,8 @@ const Signup: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState<SignupFormData>({
     firstName: '',
     lastName: '',
@@ -274,29 +277,57 @@ const Signup: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Input
-                name="password"
-                type="password"
-                label="Password"
-                placeholder="Password (min 8 characters)"
-                value={formData.password}
-                onChange={handleInputChange}
-                required
-              />
+              <div className="relative">
+                <Input
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  label="Password"
+                  placeholder="Password (min 8 characters)"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-10 text-gray-500 hover:text-gray-700"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
               <p className="mt-1 text-xs text-gray-500">
                 Password must be at least 8 characters, with upper, lower, number and symbol.
               </p>
             </div>
 
-            <Input
-              name="confirmPassword"
-              type="password"
-              label="Confirm Password"
-              placeholder="Re-enter password"
-              value={formData.confirmPassword}
-              onChange={handleInputChange}
-              required
-            />
+            <div className="relative">
+              <Input
+                name="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
+                label="Confirm Password"
+                placeholder="Re-enter password"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-10 text-gray-500 hover:text-gray-700"
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -304,7 +335,6 @@ const Signup: React.FC = () => {
               <input
                 className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 type="checkbox"
-                id="newsletter"
                 name="newsletter"
                 checked={formData.newsletter}
                 onChange={handleInputChange}
@@ -318,7 +348,6 @@ const Signup: React.FC = () => {
               <input
                 className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 type="checkbox"
-                id="termsAccepted"
                 name="termsAccepted"
                 checked={formData.termsAccepted}
                 onChange={handleInputChange}
@@ -341,7 +370,6 @@ const Signup: React.FC = () => {
               <input
                 className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 type="checkbox"
-                id="ageVerified"
                 name="ageVerified"
                 checked={formData.ageVerified}
                 onChange={handleInputChange}

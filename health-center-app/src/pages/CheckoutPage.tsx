@@ -1,44 +1,19 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CreditCard, ShoppingBag, Truck, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CreditCard, ShoppingBag, Truck, Shield, ArrowLeft } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import CheckoutForm from '../components/features/checkoutForm';
-import { Medication } from '../types';
+import { useCart } from '../services/CartContext';
+import { formatCurrency } from '../services/formatCurrency';
 
 const CheckoutPage: React.FC = () => {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const { items: cartItems, total: subtotal, clearCart } = useCart();
 
-  const cartItems: Medication[] = [
-    {
-      id: '1',
-      name: 'Amoxicillin',
-      dosage: '500mg',
-      frequency: '3x daily',
-      duration: '7 days',
-      price: 25,
-      description: 'Antibiotic',
-      category: 'Antibiotics',
-      inStock: true,
-      prescriptionRequired: true
-    },
-    {
-      id: '2',
-      name: 'Ibuprofen',
-      dosage: '200mg',
-      frequency: 'as needed',
-      duration: '30 days',
-      price: 15,
-      description: 'Pain reliever',
-      category: 'Pain Relief',
-      inStock: true,
-      prescriptionRequired: false
-    }
-  ];
-
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price, 0);
-  const shipping = 5;
-  const tax = subtotal * 0.1;
+  const shipping = 0; 
+  const tax = subtotal * 0.16; // 16% VAT
   const total = subtotal + shipping + tax;
 
   return (
@@ -57,18 +32,22 @@ const CheckoutPage: React.FC = () => {
           <Card className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
             <div className="space-y-4">
-              {cartItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900">{item.name}</h3>
-                    <p className="text-sm text-gray-600">{item.dosage} - {item.duration}</p>
+              {cartItems.length === 0 ? (
+                <p className="text-gray-600 text-center py-8">Your cart is empty</p>
+              ) : (
+                cartItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900">{item.name}</h3>
+                      <p className="text-sm text-gray-600">{item.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900"> {item.price.toLocaleString()}</p>
+                      <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">${item.price}</p>
-                    <p className="text-sm text-gray-600">Qty: 1</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </Card>
 
@@ -114,21 +93,21 @@ const CheckoutPage: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Total</h2>
             <div className="space-y-3">
               <div className="flex justify-between text-gray-600">
-                <span>Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>Subtotal ({cartItems.length} items)</span>
+                <span>KSH {subtotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Shipping</span>
-                <span>${shipping.toFixed(2)}</span>
+                <span>{shipping === 0 ? 'Free' :' { formatcurency(for shipping.toLocaleString()'}</span>
               </div>
               <div className="flex justify-between text-gray-600">
-                <span>Tax</span>
-                <span>${tax.toFixed(2)}</span>
+                <span>Tax (16%)</span>
+                <span>KSH {Math.round(tax).toLocaleString()}</span>
               </div>
               <div className="border-t pt-3">
                 <div className="flex justify-between font-semibold text-lg">
                   <span>Total</span>
-                  <span className="text-primary-600">${total.toFixed(2)}</span>
+                  <span className="text-primary-600">KSH {Math.round(total).toLocaleString()}</span>
                 </div>
               </div>
             </div>
