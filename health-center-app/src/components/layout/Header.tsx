@@ -26,7 +26,7 @@ const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { cartQuantity } = useShoppingCart();
-  const { logout } = useAuth();
+  const { logout, role } = useAuth();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -107,14 +107,41 @@ const Header: React.FC = () => {
                   exit={{ opacity: 0, y: -10 }}
                   className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200"
                 >
-                  <Link
-                    to="/dashboard"
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                    onClick={() => setIsDropdownOpen(false)}
-                  >
-                    <User className="w-4 h-4 mr-2" />
-                    Dashboard
-                  </Link>
+                  {/* Role-based dashboard options */}
+                  {(role === 'PATIENT' || role === 'patient') && (
+                    <Link
+                      to="/patient"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      Patient Dashboard
+                    </Link>
+                  )}
+                  
+                  {(role === 'SUPER_ADMIN' || role === 'CLINICIAN_ADMIN' || role === 'DOCTOR' || role === 'NURSE' || role === 'RECEPTIONIST' || role === 'LAB_TECHNICIAN' || role === 'PHARMACIST') && (
+                    <Link
+                      to="/dashboard"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      Staff Dashboard
+                    </Link>
+                  )}
+
+                  {/* Super Admin specific */}
+                  {role === 'SUPER_ADMIN' && (
+                    <Link
+                      to="/superadmindashboard"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      Super Admin
+                    </Link>
+                  )}
+                  
                   <Link
                     to="/profile"
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

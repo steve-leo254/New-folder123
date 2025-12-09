@@ -17,11 +17,9 @@ import CheckoutPage from './pages/CheckoutPage';
 import CartPage from './pages/CartPage';
 import MedicationPage from './pages/MedicationPage';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
-import DoctorProfilePage from './pages/DoctorProfilePage';
 import DoctorsProfilePage from './pages/DoctorsProfilePage';
 import PatientPage from './pages/PatientPage';
 import PharmacyPage from './pages/PharmacyPage';
-import DoctorsPage1 from './pages/DoctorsPage1';
 import { useStaff } from './services/useStaff';
 import { Doctor } from './types';
 import DoctorPrescriptionPage from './pages/DoctorPrescriptionPage';
@@ -73,7 +71,7 @@ function App() {
       return <div>Loading...</div>;
     }
 
-    return <DoctorsPage1 doctors={doctors} onSelectDoctor={handleSelectDoctor} />;
+   
   };
 
   // Wrapper component for DoctorsProfilePage that provides required props
@@ -131,18 +129,28 @@ function App() {
                 <Route 
                   path="/superadmindashboard" 
                   element={
-                    <ProtectedRoute allowedRoles={['super_admin', 'clinician_admin']}>
+                    <ProtectedRoute allowedRoles={['super_admin']}>
                       <SuperAdminDashboard />
                     </ProtectedRoute>
                   } 
                 />
                 
-                {/* Authenticated user routes */}
+                {/* Staff-only routes */}
                 <Route 
                   path="/dashboard" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute allowedRoles={['super_admin', 'clinician_admin', 'doctor', 'nurse', 'receptionist', 'lab_technician', 'pharmacist']}>
                       <DashboardPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Patient-only routes */}
+                <Route 
+                  path="/patient" 
+                  element={
+                    <ProtectedRoute allowedRoles={['patient', 'PATIENT']}>
+                      <PatientPage />
                     </ProtectedRoute>
                   } 
                 />
@@ -182,7 +190,7 @@ function App() {
                   path="/doctor-profile/:doctorId" 
                   element={
                     <ProtectedRoute>
-                      <DoctorProfilePage />
+                      <DoctorsProfilePageWrapper />
                     </ProtectedRoute>
                   } 
                 />
