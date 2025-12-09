@@ -13,13 +13,24 @@ export interface Doctor {
   id: string;
   firstName: string;
   lastName: string;
+  name: string; 
   specialization: string;
-  experience: number;
+  specialty: string; 
+  experience: number | string; 
   rating: number;
   avatar: string;
   bio: string;
   availability: TimeSlot[];
   consultationFee: number;
+  available: boolean; 
+  hospital?: string;
+  location?: string;
+  phone?: string;
+  email?: string;
+  languages?: string[];
+  reviewCount?: number;
+  education?: string;
+  specializations?: string[];
 }
 
 export interface TimeSlot {

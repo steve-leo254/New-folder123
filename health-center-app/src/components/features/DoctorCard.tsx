@@ -9,14 +9,23 @@ import { Doctor } from '../../types';
 
 interface DoctorCardProps {
   doctor: Doctor;
+  onSelect?: (doctor: Doctor) => void;
 }
 
-const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
+const DoctorCard: React.FC<DoctorCardProps> = ({ doctor, onSelect }) => {
+  const handleClick = () => {
+    if (onSelect) {
+      onSelect(doctor);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -5 }}
+      onClick={handleClick}
+      className="cursor-pointer"
     >
       <Card className="overflow-hidden hover:shadow-xl transition-shadow relative">
         {/* Background image */}

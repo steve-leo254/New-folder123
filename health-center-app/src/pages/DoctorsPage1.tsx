@@ -18,7 +18,7 @@ import {
   TrendingUp,
   FilterX
 } from 'lucide-react';
-import { DoctorCard } from '../components/DoctorCard';
+import DoctorCard from '../components/features/DoctorCard';
 import type { Doctor } from '../types';
 import { motion } from 'framer-motion';
 
@@ -27,7 +27,7 @@ interface DoctorsPageProps {
   onSelectDoctor: (doctor: Doctor) => void;
 }
 
-export const DoctorsPage = ({ doctors, onSelectDoctor }: DoctorsPageProps) => {
+export const DoctorsPage1 = ({ doctors, onSelectDoctor }: DoctorsPageProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState('all');
   const [selectedAvailability, setSelectedAvailability] = useState('all');
@@ -40,7 +40,7 @@ export const DoctorsPage = ({ doctors, onSelectDoctor }: DoctorsPageProps) => {
   const filteredDoctors = doctors.filter(doctor => {
     const matchesSearch = doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          doctor.specialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doctor.experience.toLowerCase().includes(searchTerm.toLowerCase());
+                         doctor.experience.toString().toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesSpecialty = selectedSpecialty === 'all' || doctor.specialty === selectedSpecialty;
     const matchesAvailability = selectedAvailability === 'all' || 
@@ -53,7 +53,8 @@ export const DoctorsPage = ({ doctors, onSelectDoctor }: DoctorsPageProps) => {
       case 'rating':
         return b.rating - a.rating;
       case 'experience':
-        return parseInt(b.experience) - parseInt(a.experience);
+        return (typeof b.experience === 'number' ? b.experience : parseInt(b.experience)) - 
+               (typeof a.experience === 'number' ? a.experience : parseInt(a.experience));
       case 'name':
         return a.name.localeCompare(b.name);
       case 'price-low':
@@ -330,7 +331,7 @@ export const DoctorsPage = ({ doctors, onSelectDoctor }: DoctorsPageProps) => {
             {
               icon: Award,
               label: 'Board Certified',
-              value: doctors.filter(d => d.experience.includes('15+')).length,
+              value: doctors.filter(d => typeof d.experience === 'string' && d.experience.includes('15+')).length,
               color: 'blue'
             },
             {
@@ -375,3 +376,5 @@ export const DoctorsPage = ({ doctors, onSelectDoctor }: DoctorsPageProps) => {
     </div>
   );
 };
+
+export default DoctorsPage1;
