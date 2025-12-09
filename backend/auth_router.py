@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from starlette import status
-from database import db_dependency
+from database import get_db
 from models import User, Role, Nurse, Receptionist, LabTechnician, Pharmacist, Doctor
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
@@ -56,7 +56,7 @@ conf = ConnectionConfig(
 )
 
 @router.post("/register/customer", status_code=status.HTTP_201_CREATED)
-async def register_customer(db: db_dependency, create_user_request: CreateUserRequest):
+async def register_customer(create_user_request: CreateUserRequest, db: Session = Depends(get_db)):
     logger.info(f"Customer registration payload: {create_user_request}")
     existing_user = db.query(User).filter(
         User.email == create_user_request.email
@@ -97,7 +97,7 @@ async def register_customer(db: db_dependency, create_user_request: CreateUserRe
     }
 
 @router.post("/register/admin", status_code=status.HTTP_201_CREATED)
-async def register_admin(db: db_dependency, create_user_request: CreateUserRequest):
+async def register_admin(create_user_request: CreateUserRequest, db: Session = Depends(get_db)):
     logger.info(f"Admin registration payload: {create_user_request}")
     existing_user = db.query(User).filter(
         User.email == create_user_request.email
@@ -139,7 +139,7 @@ async def register_admin(db: db_dependency, create_user_request: CreateUserReque
 
 
 @router.post("/register/doctor", status_code=status.HTTP_201_CREATED)
-async def register_doctor(db: db_dependency, create_user_request: CreateUserRequest):
+async def register_doctor(create_user_request: CreateUserRequest, db: Session = Depends(get_db)):
     logger.info(f"Doctor registration payload: {create_user_request}")
     existing_user = db.query(User).filter(
         User.email == create_user_request.email
@@ -181,7 +181,7 @@ async def register_doctor(db: db_dependency, create_user_request: CreateUserRequ
 
 
 @router.post("/register/staff", status_code=status.HTTP_201_CREATED)
-async def register_staff(db: db_dependency, create_staff_request: CreateStaffRequest):
+async def register_staff(create_staff_request: CreateStaffRequest, db: Session = Depends(get_db)):
     logger.info(f"Staff registration payload: {create_staff_request}")
     existing_user = db.query(User).filter(
         User.email == create_staff_request.email
@@ -312,7 +312,7 @@ def create_access_token(full_name: str, user_id: int, role: str, expires_delta: 
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
 @router.post("/login", response_model=Token)
-async def login(form_data: LoginUserRequest, db: db_dependency):
+async def login(form_data: LoginUserRequest, db: Session = Depends(get_db)):
     logger.info(f"Login attempt for email: {form_data.email}")
     user = authenticate_user(form_data.email, form_data.password, db)
 
@@ -327,7 +327,7 @@ async def login(form_data: LoginUserRequest, db: db_dependency):
         "expires_in": int(token_expires.total_seconds()),
     }
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
+async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: Session = Depends(get_db)):
     """Get current user from token."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -336,7 +336,13 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
         role: str = payload.get("role")
         if username is None or user_id is None or role is None:
             raise HTTPException(status_code=401, detail="Could not validate user")
-        return {"username": username, "id": user_id, "role": role}
+        
+        # Fetch actual user from database
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        return user
     except jwt.ExpiredSignatureError:
         logger.warning("Token expired")
         raise HTTPException(status_code=401, detail="Token has expired")
@@ -345,7 +351,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-async def get_current_active_user(token: Annotated[str, Depends(oauth2_bearer)]):
+async def get_current_active_user(token: Annotated[str, Depends(oauth2_bearer)], db: Session = Depends(get_db)):
     """Get current active user from token."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -354,7 +360,13 @@ async def get_current_active_user(token: Annotated[str, Depends(oauth2_bearer)])
         role: str = payload.get("role")
         if username is None or user_id is None or role is None:
             raise HTTPException(status_code=401, detail="Could not validate user")
-        return {"username": username, "id": user_id, "role": role}
+        
+        # Fetch actual user from database
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        return user
     except jwt.ExpiredSignatureError:
         logger.warning("Token expired")
         raise HTTPException(status_code=401, detail="Token has expired")
@@ -379,7 +391,7 @@ async def verify_token(request_body: TokenVerifyRequest):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
-async def forgot_password(forgot_password_request: ForgotPasswordRequest, db: db_dependency):
+async def forgot_password(forgot_password_request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     email = forgot_password_request.email
     user = db.query(User).filter(User.email == email).first()
     if not user:
@@ -403,7 +415,7 @@ async def forgot_password(forgot_password_request: ForgotPasswordRequest, db: db
     
 
 @router.post("/reset-password/{token}", status_code=status.HTTP_200_OK)
-async def reset_password(token: str, reset_password_request: ResetPasswordRequest, db: db_dependency):
+async def reset_password(token: str, reset_password_request: ResetPasswordRequest, db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int = payload.get("id")

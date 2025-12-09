@@ -3,10 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import Alert from '../components/ui/Alert';
 import Button from '../components/ui/Button';
-import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import api from '../services/api';
 import { useAuth } from '../services/AuthContext';
+import logoImage from '../assets/kiangombe.jpg';
+import backgroundImage from '../assets/loginwalpaper.png';
 
 interface LoginCredentials {
   email: string;
@@ -83,19 +84,35 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="max-w-md w-full space-y-8 p-8">
+    <div 
+      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
+      style={{
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      <div 
+        className="max-w-md w-full space-y-8 p-8 relative overflow-hidden bg-white rounded-lg shadow-md"
+        style={{
+          backgroundImage: `url(${logoImage})`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'center 35%',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
         {/* Logo */}
         <div className="flex justify-center">
-          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">KH</span>
+          <div className="w-12 h-12  rounded-lg flex items-center justify-center">
+            <img src={logoImage} alt="Kiangombe Health" className="w-12 h-12" />
           </div>
         </div>
 
         {/* Title Section */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900">Welcome Back</h2>
-          <p className="mt-2 text-sm text-gray-600">Sign in to your account</p>
+          <p className="mt-2 text-sm text-gray-600">Sign in to your Kiangombe Health account</p>
         </div>
 
         {/* Alert Messages */}
@@ -197,17 +214,26 @@ export const LoginPage: React.FC = () => {
             </Button>
           </div>
 
-          {/* Signup Link */}
-          <div className="text-center">
-            <span className="text-sm text-gray-600">
-              Don't have an account?{' '}
-            </span>
-            <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
-              Sign Up
-            </Link>
+          {/* Creative Navigation */}
+          <div className="text-center space-y-4">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+              <p className="text-sm text-gray-700 mb-2">New to Kiangombe Health?</p>
+              <Link 
+                to="/register" 
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Create Your Account
+                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </Link>
+            </div>
+            <p className="text-xs text-gray-500">
+                We've missed you here at Kiangombe Health
+            </p>
           </div>
         </form>
-      </Card>
+      </div>
     </div>
   );
 };

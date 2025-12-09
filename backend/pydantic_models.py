@@ -51,6 +51,92 @@ class PrescriptionStatus(str, Enum):
 
 
 # ============================================================================
+# Staff Role Models
+# ============================================================================
+
+class StaffRoleBase(BaseModel):
+    """Base staff role model."""
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str = Field(..., min_length=1, max_length=500)
+    permissions: List[str] = Field(default_factory=list)
+    is_active: bool = True
+    requires_specialization: bool = False
+    requires_license: bool = False
+    default_consultation_fee: Optional[Decimal] = Field(None, ge=0)
+
+
+class StaffRoleCreate(StaffRoleBase):
+    """Staff role creation request."""
+    pass
+
+
+class StaffRoleUpdate(BaseModel):
+    """Staff role update request."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, min_length=1, max_length=500)
+    permissions: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+    requires_specialization: Optional[bool] = None
+    requires_license: Optional[bool] = None
+    default_consultation_fee: Optional[Decimal] = Field(None, ge=0)
+
+
+class StaffRoleResponse(StaffRoleBase):
+    """Staff role response."""
+    id: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# Staff Creation Models (Updated)
+# ============================================================================
+
+class StaffAccountCreate(BaseModel):
+    """Staff account creation data."""
+    full_name: str = Field(..., min_length=1, max_length=120)
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    phone: Optional[str] = Field(None, max_length=20)
+    gender: Optional[str] = Field(None, max_length=20)
+    date_of_birth: Optional[datetime] = None
+    role: str  # This will be the role name from StaffRole
+    profile_image: Optional[str] = None  # URL to profile image
+
+
+class StaffProfileCreate(BaseModel):
+    """Staff profile creation data."""
+    specialization: Optional[str] = Field(None, max_length=120)
+    bio: Optional[str] = Field(None, max_length=1000)
+    consultation_fee: Optional[Decimal] = Field(None, ge=0)
+    license_number: Optional[str] = Field(None, max_length=50)
+    is_available: bool = True
+
+
+class StaffCreateRequest(BaseModel):
+    """Complete staff creation request."""
+    account: StaffAccountCreate
+    profile: StaffProfileCreate
+
+
+class StaffResponse(BaseModel):
+    """Staff member response."""
+    id: int
+    full_name: str
+    email: str
+    phone: Optional[str]
+    role: str
+    staff_role: Optional[StaffRoleResponse] = None
+    specialization: Optional[str]
+    is_available: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
 # Authentication
 # ============================================================================
 
@@ -127,9 +213,16 @@ class UserProfileResponse(BaseModel):
     full_name: str
     email: str
     phone: Optional[str] = None
+    date_of_birth: Optional[datetime] = None
+    gender: Optional[str] = None
     role: str
     is_verified: bool
     created_at: datetime
+    profile_picture: Optional[str] = None
+    address: Optional[str] = None
+    emergencyContact: Optional[str] = None
+    bloodType: Optional[str] = None
+    allergies: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -262,6 +355,7 @@ class MedicationCreateRequest(BaseModel):
     expiry_date: Optional[datetime] = None
     batch_number: Optional[str] = Field(None, max_length=100)
     supplier: Optional[str] = Field(None, max_length=150)
+    image_url: Optional[str] = Field(None, max_length=500)
 
 
 class MedicationUpdateRequest(BaseModel):
@@ -276,6 +370,7 @@ class MedicationUpdateRequest(BaseModel):
     expiry_date: Optional[datetime] = None
     batch_number: Optional[str] = Field(None, max_length=100)
     supplier: Optional[str] = Field(None, max_length=150)
+    image_url: Optional[str] = Field(None, max_length=500)
 
 
 class MedicationResponse(BaseModel):
@@ -291,6 +386,7 @@ class MedicationResponse(BaseModel):
     expiry_date: Optional[datetime] = None
     batch_number: Optional[str] = None
     supplier: Optional[str] = None
+    image_url: Optional[str] = None
     in_stock: bool
     created_at: datetime
     updated_at: datetime
@@ -394,3 +490,9 @@ class VideoConsultationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ImageResponse(BaseModel):
+    """Image upload response."""
+    message: str
+    img_url: str

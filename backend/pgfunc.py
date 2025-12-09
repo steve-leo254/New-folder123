@@ -3,11 +3,13 @@ Database helper functions for querying User, Appointment, and Prescription model
 Models and database configuration are in models.py and database.py.
 """
 
+import logging
 from typing import Optional
 from sqlalchemy.orm import Session
 
 from models import User, Appointment, Prescription, Doctor, Role, AppointmentStatus
 
+logger = logging.getLogger(__name__)
 
 # Convenience DB helper functions used by other modules
 def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
@@ -43,15 +45,46 @@ def get_appointments_for_user(db: Session, current_user, status_filter: Optional
         user_role = current_user.role
         user_id = current_user.id
     
-    query = db.query(Appointment)
+    logger.info(f"Getting appointments for user role: {user_role}, user_id: {user_id}")
+    
+    query = db.query(Appointment).join(User, Appointment.clinician_id == User.id)
     if user_role == Role.PATIENT:
         query = query.filter(Appointment.patient_id == user_id)
+        logger.info(f"Filtering for PATIENT {user_id}")
     elif user_role == Role.CLINICIAN_ADMIN:
-        query = query.filter(Appointment.clinician_id == user_id)
+        # Allow CLINICIAN_ADMIN to see all appointments (for admin dashboard)
+        logger.info(f"CLINICIAN_ADMIN - showing all appointments for admin dashboard")
+    elif user_role == Role.SUPER_ADMIN:
+        logger.info("SUPER_ADMIN - showing all appointments")
     # SUPER_ADMIN sees all appointments
     if status_filter:
         query = query.filter(Appointment.status == status_filter)
-    return query.order_by(Appointment.scheduled_at.desc()).all()
+    
+    appointments = query.order_by(Appointment.scheduled_at.desc()).all()
+    logger.info(f"Found {len(appointments)} appointments")
+    
+    # Add doctor names to appointments
+    result = []
+    for apt in appointments:
+        appointment_dict = {
+            'id': apt.id,
+            'patient_id': apt.patient_id,
+            'clinician_id': apt.clinician_id,
+            'doctor_id': apt.clinician_id,  # Add for frontend compatibility
+            'doctor_name': apt.clinician.full_name if apt.clinician else '',
+            'clinician_name': apt.clinician.full_name if apt.clinician else '',
+            'visit_type': apt.visit_type,
+            'scheduled_at': apt.scheduled_at,
+            'status': apt.status.value if apt.status else 'scheduled',
+            'triage_notes': apt.triage_notes,
+            'cost': float(apt.cost) if apt.cost else 0.0,
+            'cancellation_reason': apt.cancellation_reason,
+            'created_at': apt.created_at,
+            'updated_at': apt.updated_at
+        }
+        result.append(appointment_dict)
+    
+    return result
 
 
 def dashboard_snapshot(db: Session) -> dict:

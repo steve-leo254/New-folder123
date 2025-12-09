@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useLogout } from "../hooks/useLogout";
+import { useNavigate } from "react-router-dom";
 import {
   Users,
   Calendar,
@@ -17,8 +18,9 @@ import {
   Filter,
   Database,
   Bell,
-  LogOut,
+  Shield,
 } from "lucide-react";
+import DropdownMenu from "../components/ui/DropdownMenu";
 import Card from "../components/ui/Card";
 import { formatCurrency } from "@/services/formatCurrency";
 import Button from "../components/ui/Button";
@@ -26,7 +28,7 @@ import Badge from "../components/ui/Badge";
 import StaffMembers from "../components/features/StaffMembers";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import { StaffMember } from "../types";
-import { useDoctors } from "../services/useDoctor";
+import { useStaff } from "../services/useStaff";
 import { useDashboardSummary } from "../services/useDashboardSummary";
 import { useAppointments } from "../services/useAppointment";
 import { useMedications } from "../services/useMedication";
@@ -35,6 +37,7 @@ import AddUserModal from "../components/modals/AddUserModal";
 import AddStaffModal from "../components/modals/AddStaffModal";
 import BookAppointmentModal from "../components/modals/BookAppointmentModal";
 import AddMedicationModal from "../components/modals/AddMedicationModal";
+import RoleManagementPage from "./RoleManagementPage";
 import Alert from "../components/ui/Alert";
 import { apiService } from "../services/api";
 import {
@@ -55,6 +58,7 @@ import {
 
 const SuperDashboardPage: React.FC = () => {
   const handleLogout = useLogout();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedPeriod, setSelectedPeriod] = useState("month");
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -72,13 +76,17 @@ const SuperDashboardPage: React.FC = () => {
     error: summaryError,
     refreshSummary,
   } = useDashboardSummary();
-  const { doctors, isLoading: doctorsLoading, fetchDoctors } = useDoctors();
+  const { staff, loading: staffLoading, fetchStaff } = useStaff();
   const {
     appointments,
     isLoading: appointmentsLoading,
     fetchAppointments,
     createAppointment,
   } = useAppointments();
+
+  // Debug: Log appointments for SuperAdmin
+  console.log('SuperAdmin appointments:', appointments);
+  console.log('SuperAdmin appointmentsLoading:', appointmentsLoading);
   const {
     medications,
     isLoading: medicationsLoading,
@@ -260,24 +268,24 @@ const SuperDashboardPage: React.FC = () => {
   }, [refreshSummary, fetchAppointments, fetchMedications, fetchBillings]);
 
   useEffect(() => {
-    fetchDoctors();
-  }, [fetchDoctors]);
+    fetchStaff();
+  }, []);
 
   const staffMembers: StaffMember[] = useMemo(
     () =>
-      doctors.map((doctor) => ({
-        id: doctor.id,
-        name: doctor.fullName,
-        role: "Doctor",
-        specialization: doctor.specialization,
-        status: doctor.isAvailable ? "active" : "inactive",
-        rating: doctor.rating,
-        patients: doctor.patientsCount,
-        avatar: doctor.avatar || "/images/doctor1.jpg",
-        bio: doctor.bio,
-        consultationFee: doctor.consultationFee,
+      staff.map((staffMember) => ({
+        id: staffMember.id,
+        name: staffMember.fullName,
+        role: staffMember.role,
+        specialization: staffMember.doctor?.specialization || '',
+        status: staffMember.doctor?.isAvailable ? "active" : "inactive",
+        rating: staffMember.doctor?.rating || 0,
+        patients: staffMember.patientsCount,
+        avatar: staffMember.avatar ? `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${staffMember.avatar}` : "/images/doctor1.jpg",
+        bio: staffMember.doctor?.bio || '',
+        consultationFee: staffMember.doctor?.consultationFee || 0,
       })),
-    [doctors]
+    [staff]
   );
 
   const overviewStats = [
@@ -384,28 +392,18 @@ const SuperDashboardPage: React.FC = () => {
                 <Bell className="w-6 h-6 text-gray-600 cursor-pointer" />
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
               </div>
-              <div className="flex items-center space-x-2">
-                <img
-                  src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=40&h=40&q=80"
-                  alt="Admin"
-                  className="w-10 h-10 rounded-full"
+              <div className="flex items-center space-x-4">
+                <DropdownMenu
+                  userName="Admin User"
+                  userRole="Super Admin"
+                  onProfileClick={() => navigate("/profile")}
+                  onLogoutClick={handleLogout}
                 />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    Admin User
-                  </p>
-                  <p className="text-xs text-gray-500">Super Admin</p>
-                </div>
               </div>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4" />
-              </Button>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Navigation Tabs */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
@@ -415,6 +413,7 @@ const SuperDashboardPage: React.FC = () => {
               "appointments",
               "medications",
               "billing",
+              "roles",
               "system",
             ].map((tab) => (
               <button
@@ -700,7 +699,7 @@ const SuperDashboardPage: React.FC = () => {
                 Staff Members
               </h3>
             </div>
-            {doctorsLoading ? (
+            {staffLoading ? (
               <Card className="p-6 flex items-center justify-center">
                 <LoadingSpinner />
               </Card>
@@ -985,7 +984,7 @@ const SuperDashboardPage: React.FC = () => {
                         Number(
                           medications
                             .reduce(
-                              (sum, m) => sum + m.price * m.stock * 0.1,
+                              (sum, m) => sum + (m.price * Math.max(1, Math.floor(m.stock * 0.15))), // Estimate 15% of stock sold
                               0
                             )
                             .toFixed(0)
@@ -993,7 +992,7 @@ const SuperDashboardPage: React.FC = () => {
                       )}
                     </p>
                     <p className="text-xs text-green-600 mt-1">
-                      +8% from last month
+                      +{Math.floor(Math.random() * 20 + 5)}% from last month
                     </p>
                   </Card>
                 </div>
@@ -1220,6 +1219,13 @@ const SuperDashboardPage: React.FC = () => {
           </div>
         )}
 
+        {/* Roles Tab */}
+        {activeTab === "roles" && (
+          <div className="space-y-6">
+            <RoleManagementPage />
+          </div>
+        )}
+
         {/* System Tab */}
         {activeTab === "system" && (
           <div className="space-y-6">
@@ -1383,24 +1389,29 @@ const SuperDashboardPage: React.FC = () => {
         isOpen={isStaffModalOpen}
         onClose={() => setIsStaffModalOpen(false)}
         onSubmit={async ({ account, profile }) => {
-          const response = await apiService.registerStaffAccount(account);
-          const userId = response?.user?.id;
-          if (!userId) {
-            throw new Error("User ID missing from server response");
-          }
-          await apiService.createDoctor({
-            user_id: userId,
-            specialization: profile.specialization,
-            bio: profile.bio,
-            consultation_fee: profile.consultation_fee,
-            license_number: profile.license_number,
-            is_available: profile.is_available,
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/staff`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              account,
+              profile,
+            }),
           });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Failed to create staff member');
+          }
+          
           setToast({
             type: "success",
             message: "Staff member created successfully",
           });
-          fetchDoctors();
+          fetchStaff();
           refreshSummary();
         }}
       />
@@ -1415,7 +1426,15 @@ const SuperDashboardPage: React.FC = () => {
         }
         onSubmit={async (appointmentData) => {
           try {
-            await createAppointment(appointmentData);
+            // Map old field names to new expected field names
+            const mappedData = {
+              patient_id: appointmentData.patient_id,
+              clinician_id: appointmentData.doctor_id,
+              visit_type: appointmentData.type,
+              scheduled_at: `${appointmentData.date}T${appointmentData.time}:00`,
+              triage_notes: appointmentData.notes,
+            };
+            await createAppointment(mappedData);
             setToast({
               type: "success",
               message: "Appointment booked successfully",

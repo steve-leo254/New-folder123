@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
 import Alert from '../ui/Alert';
+import { useStaffRoles } from '../../services/useStaffRoles';
+import { StaffRole } from '../../types';
 
 interface AddStaffModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ interface AddStaffModalProps {
       gender?: string;
       date_of_birth?: string;
       role: string;
+      profile_image?: string;
     };
     profile: {
       specialization: string;
@@ -29,6 +32,12 @@ interface AddStaffModalProps {
 }
 
 const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose, onSubmit }) => {
+  const { roles, loading: rolesLoading } = useStaffRoles();
+  const [selectedRole, setSelectedRole] = useState<StaffRole | null>(null);
+  
+  // Filter active roles only
+  const availableRoles = roles.filter(role => role.isActive);
+  
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -37,18 +46,44 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose, onSubmit
     dateOfBirth: '',
     password: '',
     confirmPassword: '',
-    role: 'doctor',
+    role: '', // Remove hardcoded default
     specialization: '',
     consultationFee: '',
     licenseNumber: '',
     bio: '',
     isAvailable: true,
+    profileImage: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    // Set default role to first available role if no role is selected
+    if (availableRoles.length > 0 && !formData.role) {
+      const defaultRole = availableRoles[0];
+      setFormData(prev => ({ ...prev, role: defaultRole.name.toLowerCase() }));
+      setSelectedRole(defaultRole);
+    } else if (formData.role) {
+      // Find the selected role object
+      const currentRole = availableRoles.find(r => r.name.toLowerCase() === formData.role.toLowerCase());
+      setSelectedRole(currentRole || null);
+    }
+  }, [availableRoles, formData.role]);
+
+  useEffect(() => {
+    // Update form fields when role changes
+    if (selectedRole) {
+      setFormData(prev => ({
+        ...prev,
+        consultationFee: selectedRole.defaultConsultationFee?.toString() || prev.consultationFee,
+        specialization: selectedRole.requiresSpecialization ? prev.specialization : '',
+        licenseNumber: selectedRole.requiresLicense ? prev.licenseNumber : prev.licenseNumber
+      }));
+    }
+  }, [selectedRole]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -58,6 +93,12 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose, onSubmit
       setFormData((prev) => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
+      
+      // Update selected role when role changes
+      if (name === 'role') {
+        const role = availableRoles.find(r => r.name.toLowerCase() === value.toLowerCase());
+        setSelectedRole(role || null);
+      }
     }
     if (errors[name]) {
       setErrors((prev) => {
@@ -76,9 +117,64 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose, onSubmit
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-    if (!formData.specialization.trim()) newErrors.specialization = 'Specialization is required';
+    
+    // Validate specialization if required by role
+    if (selectedRole?.requiresSpecialization && !formData.specialization.trim()) {
+      newErrors.specialization = 'Specialization is required for this role';
+    }
+    
+    // Validate license if required by role
+    if (selectedRole?.requiresLicense && !formData.licenseNumber.trim()) {
+      newErrors.licenseNumber = 'License number is required for this role';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setErrors({ ...errors, profileImage: 'Only image files are allowed' });
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors({ ...errors, profileImage: 'File size must be less than 5MB' });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/upload-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload image');
+      }
+
+      const result = await response.json();
+      setFormData(prev => ({ ...prev, profileImage: result.img_url }));
+      setErrors(prev => {
+        const copy = { ...prev };
+        delete copy.profileImage;
+        return copy;
+      });
+    } catch (error) {
+      setErrors({ ...errors, profileImage: 'Failed to upload image' });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,6 +193,7 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose, onSubmit
           gender: formData.gender || undefined,
           date_of_birth: formData.dateOfBirth || undefined,
           role: formData.role,
+          profile_image: formData.profileImage || undefined,
         },
         profile: {
           specialization: formData.specialization.trim(),
@@ -120,6 +217,7 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose, onSubmit
         licenseNumber: '',
         bio: '',
         isAvailable: true,
+        profileImage: '',
       });
       onClose();
     } catch (err: any) {
@@ -246,30 +344,70 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose, onSubmit
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Staff Role *</label>
-          <select
-            name="role"
-            value={formData.role}
-            onChange={handleChange}
+          {rolesLoading ? (
+            <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50">
+              <span className="text-gray-500">Loading roles...</span>
+            </div>
+          ) : availableRoles.length === 0 ? (
+            <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-red-50">
+              <span className="text-red-500">No active roles available. Please create roles first.</span>
+            </div>
+          ) : (
+            <select
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              required
+            >
+              <option value="">Select a role</option>
+              {availableRoles.map((role) => (
+                <option key={role.id} value={role.name.toLowerCase()}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {selectedRole && (
+            <p className="text-xs text-gray-500 mt-1">{selectedRole.description}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Profile Image</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            required
-          >
-            <option value="doctor">Doctor</option>
-            <option value="nurse">Nurse</option>
-            <option value="receptionist">Receptionist</option>
-            <option value="lab_technician">Lab Technician</option>
-            <option value="pharmacist">Pharmacist</option>
-          </select>
+          />
+          {errors.profileImage && (
+            <p className="text-red-500 text-sm mt-1">{errors.profileImage}</p>
+          )}
+          {formData.profileImage && (
+            <div className="mt-2">
+              <img
+                src={formData.profileImage}
+                alt="Profile preview"
+                className="w-20 h-20 object-cover rounded-lg"
+              />
+              <p className="text-xs text-green-600 mt-1">Image uploaded successfully</p>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Specialization"
-            name="specialization"
-            value={formData.specialization}
-            onChange={handleChange}
-            error={errors.specialization}
-            required
-          />
+          {selectedRole?.requiresSpecialization && (
+            <Input
+              label="Specialization"
+              name="specialization"
+              value={formData.specialization}
+              onChange={handleChange}
+              error={errors.specialization}
+              required={selectedRole?.requiresSpecialization}
+              placeholder={selectedRole?.requiresSpecialization ? "e.g., Cardiology, Pediatrics" : "Optional for this role"}
+            />
+          )}
           <Input
             label="Consultation Fee (USD)"
             name="consultationFee"
@@ -278,15 +416,21 @@ const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose, onSubmit
             onChange={handleChange}
             min="0"
             step="0.01"
+            placeholder={selectedRole?.defaultConsultationFee ? `Default: $${selectedRole.defaultConsultationFee}` : "0.00"}
           />
         </div>
 
-        <Input
-          label="License Number"
-          name="licenseNumber"
-          value={formData.licenseNumber}
-          onChange={handleChange}
-        />
+        {selectedRole?.requiresLicense && (
+          <Input
+            label="License Number"
+            name="licenseNumber"
+            value={formData.licenseNumber}
+            onChange={handleChange}
+            error={errors.licenseNumber}
+            required={selectedRole?.requiresLicense}
+            placeholder={selectedRole?.requiresLicense ? "Professional license number" : "Optional for this role"}
+          />
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>

@@ -4,8 +4,8 @@ Drops all tables and recreates them with the current schema.
 """
 
 import logging
-from database import engine, Base
-from models import *
+from database import engine
+from models import Base
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

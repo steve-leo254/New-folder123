@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Star, Check, Plus, Minus } from 'lucide-react';
+import { ShoppingCart, Star, Plus, Minus } from 'lucide-react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
@@ -21,7 +21,7 @@ const MedicationCard: React.FC<MedicationCardProps> = ({ medication }) => {
       id: parseInt(medication.id),
       name: medication.name,
       price: medication.price,
-      img_url: medication.image || null,
+      img_url: medication.image_url || null,
     });
   };
 
@@ -40,15 +40,15 @@ const MedicationCard: React.FC<MedicationCardProps> = ({ medication }) => {
       whileHover={{ y: -5 }}
     >
       <Card className="overflow-hidden hover:shadow-xl transition-shadow">
-        {medication.image && (
+        {medication.image_url && medication.image_url !== "" ? (
           <div className="w-full h-48 bg-gray-200 overflow-hidden">
             <img 
-              src={medication.image} 
+              src={medication.image_url.startsWith('http') ? medication.image_url : `http://localhost:8000${medication.image_url}`} 
               alt={medication.name}
               className="w-full h-full object-cover"
             />
           </div>
-        )}
+        ) : null}
         <div className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -87,7 +87,7 @@ const MedicationCard: React.FC<MedicationCardProps> = ({ medication }) => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-primary-600">{formatCurrency(medication.price)}</span>
-              <span className="text-sm text-gray-600">per course</span>
+              <span className="text-sm text-gray-600">Per Unit</span>
             </div>
             <div className="flex items-center">
               <div className="flex text-yellow-400">
@@ -129,13 +129,6 @@ const MedicationCard: React.FC<MedicationCardProps> = ({ medication }) => {
                 <ShoppingCart className="w-4 h-4 mr-2" />
                 {medication.inStock ? 'Add to Cart' : 'Out of Stock'}
               </Button>
-            )}
-            
-            {medication.inStock && (
-              <div className="flex items-center text-sm text-green-600">
-                <Check className="w-4 h-4 mr-2" />
-                Fast delivery available
-              </div>
             )}
           </div>
         </div>

@@ -66,6 +66,19 @@ export const apiService = {
     const { data } = await api.get('/doctors', { params });
     return data;
   },
+  getCurrentUser: async () => {
+    const { data } = await api.get('/users/me');
+    return data;
+  },
+  updateCurrentUser: async (payload: {
+    full_name?: string;
+    phone?: string;
+    date_of_birth?: string;
+    gender?: string;
+  }) => {
+    const { data } = await api.put('/users/me', payload);
+    return data;
+  },
   getStaff: async (params?: Record<string, unknown>) => {
     const { data } = await api.get('/staff', { params });
     return data;

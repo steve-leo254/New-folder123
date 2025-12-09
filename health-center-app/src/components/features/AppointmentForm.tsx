@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Clock, Video, Users, CheckCircle } from 'lucide-react';
 import Button from '../ui/Button';
 import { Doctor } from '../../types';
+import { useAppointments } from '../../services/useAppointment';
+import { useAuth } from '../../services/AuthContext';
+import { jwtDecode } from 'jwt-decode';
 
 interface AppointmentFormProps {
   doctor: Doctor | null;
@@ -11,20 +14,28 @@ interface AppointmentFormProps {
 
 type AppointmentType = 'video' | 'in-person';
 
-interface AppointmentData {
-  doctor: Doctor | null;
-  date: string;
-  time: string;
-  type: AppointmentType;
-  reason: string;
-}
-
 const AppointmentForm: React.FC<AppointmentFormProps> = ({ doctor, onClose }) => {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [appointmentType, setAppointmentType] = useState<AppointmentType>('video');
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Get user info and appointment service
+  const { token } = useAuth();
+  const { createAppointment } = useAppointments();
+
+  // Get current user ID from token
+  const getCurrentUserId = useCallback(() => {
+    if (!token) return null;
+    try {
+      const decoded: any = jwtDecode(token);
+      return decoded.id;
+    } catch (err) {
+      console.error('Failed to decode token:', err);
+      return null;
+    }
+  }, [token]);
 
   // Memoize time slots to prevent recreation on every render
   const timeSlots = useMemo(() => [
@@ -48,32 +59,47 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ doctor, onClose }) =>
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!isFormValid) return;
+    if (!isFormValid || !doctor) return;
     
     setIsSubmitting(true);
 
-    const appointmentData: AppointmentData = {
-      doctor,
-      date: selectedDate,
-      time: selectedTime,
-      type: appointmentType,
-      reason
-    };
+    const userId = getCurrentUserId();
+    if (!userId) {
+      console.error('User not authenticated');
+      return;
+    }
 
     try {
-      // Handle appointment booking logic here
-      console.log('Appointment booked:', appointmentData);
+      // Create appointment using real API with correct schema
+      // Convert time from "9:00 AM" format to 24-hour format
+      const timeTo24Hour = (timeStr: string): string => {
+        const [time, period] = timeStr.split(' ');
+        const [hours, minutes] = time.split(':');
+        let hour = parseInt(hours);
+        if (period === 'PM' && hour !== 12) hour += 12;
+        if (period === 'AM' && hour === 12) hour = 0;
+        return `${hour.toString().padStart(2, '0')}:${minutes}:00`;
+      };
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const time24Hour = timeTo24Hour(selectedTime);
+      const appointmentDateTime = new Date(`${selectedDate}T${time24Hour}`);
       
+      await createAppointment({
+        patient_id: userId,
+        clinician_id: parseInt(doctor.id),
+        visit_type: appointmentType === 'video' ? 'video' : 'in-person',
+        scheduled_at: appointmentDateTime.toISOString(),
+        triage_notes: reason
+      });
+      
+      console.log('Appointment successfully booked');
       onClose();
     } catch (error) {
       console.error('Error booking appointment:', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [doctor, selectedDate, selectedTime, appointmentType, reason, isFormValid, onClose]);
+  }, [doctor, selectedDate, selectedTime, appointmentType, reason, isFormValid, onClose, getCurrentUserId, createAppointment]);
 
   const handleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedDate(e.target.value);

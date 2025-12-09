@@ -5,42 +5,52 @@ import StaffMembers from '../components/features/StaffMembers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Card from '../components/ui/Card';
 import { Doctor, StaffMember } from '../types';
-import { useDoctors } from '../services/useDoctor';
+import { useStaff } from '../services/useStaff';
+import { getFullImageUrl } from '../utils/imageUtils';
 
 const DoctorsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { doctors, isLoading, fetchDoctors } = useDoctors();
+  const { staff, loading, fetchStaff } = useStaff();
 
-  // Load doctors on component mount
+  // Load staff on component mount
   useEffect(() => {
-    fetchDoctors();
-  }, [fetchDoctors]);
+    fetchStaff();
+  }, []);
 
-  // Convert backend doctors to Doctor type format
+  // Filter only doctors from staff and convert to Doctor type format
   const formattedDoctors: Doctor[] = useMemo(
-    () =>
-      doctors.map((doctor) => {
-        const nameParts = doctor.fullName.split(' ');
-        return {
-          id: doctor.id.toString(),
-          firstName: nameParts[0] || 'Dr',
-          lastName: nameParts.slice(1).join(' ') || '',
-          specialization: doctor.specialization || 'General Practitioner',
-          experience: 0,
-          rating: doctor.rating || 0,
-          avatar: doctor.avatar || '/images/doctor-default.jpg',
-          bio: doctor.bio || 'Professional healthcare provider',
-          availability: [],
-          consultationFee: doctor.consultationFee || 0,
-        };
-      }),
-    [doctors]
+    () => {
+      // Debug: Log the raw staff data
+      console.log('Raw staff data:', staff);
+      
+      const doctors = staff
+        .filter((staffMember) => staffMember.role === 'doctor' && staffMember.doctor)
+        .map((staffMember) => {
+          const nameParts = staffMember.fullName.split(' ');
+          const doctor = staffMember.doctor!; // We already filtered for doctor existence
+          return {
+            id: staffMember.id.toString(),
+            firstName: nameParts[0] || 'Dr',
+            lastName: nameParts.slice(1).join(' ') || '',
+            specialization: doctor.specialization,
+            experience: 0,
+            rating: doctor.rating,
+            avatar: getFullImageUrl(staffMember.avatar) || '/images/doctor-default.jpg',
+            bio: doctor.bio || 'Professional healthcare provider',
+            availability: [],
+            consultationFee: doctor.consultationFee,
+          };
+        });
+      console.log('Filtered doctors:', doctors);
+      return doctors;
+    },
+    [staff]
   );
 
   // Convert Doctor objects to StaffMember format for the shared component
   const staffMembers: StaffMember[] = useMemo(
     () =>
-      formattedDoctors.map(doctor => ({
+      formattedDoctors.map((doctor) => ({
         id: doctor.id,
         name: `${doctor.firstName} ${doctor.lastName}`,
         firstName: doctor.firstName,
@@ -74,7 +84,7 @@ const DoctorsPage: React.FC = () => {
         <p className="text-gray-600">Find and book appointments with our expert medical professionals</p>
       </motion.div>
 
-      {isLoading ? (
+      {loading ? (
         <Card className="p-12 flex items-center justify-center">
           <LoadingSpinner />
         </Card>

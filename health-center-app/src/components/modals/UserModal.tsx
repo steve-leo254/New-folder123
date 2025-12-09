@@ -19,6 +19,14 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose, onSubmit }) => {
     is_active: true,
     password: '',
     confirm_password: ''
+  } as {
+    full_name: string;
+    email: string;
+    phone: string;
+    role: string;
+    is_active: boolean;
+    password?: string;
+    confirm_password?: string;
   });
 
   const [errors, setErrors] = useState<any>({});

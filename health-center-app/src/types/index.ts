@@ -61,7 +61,7 @@ export interface Medication {
   category: string;
   inStock: boolean;
   prescriptionRequired: boolean;
-  image?: string;
+  image_url?: string;
 }
 
 export interface VideoCall {
@@ -74,12 +74,26 @@ export interface VideoCall {
   endTime?: string;
 }
 
+export interface StaffRole {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  requiresSpecialization?: boolean;
+  requiresLicense?: boolean;
+  defaultConsultationFee?: number;
+}
+
 export interface StaffMember {
   id: string | number;
   name?: string;
   firstName?: string;
   lastName?: string;
   role: string;
+  roleName?: string;
   specialization?: string;
   status?: 'active' | 'on-leave' | 'inactive';
   rating?: number;

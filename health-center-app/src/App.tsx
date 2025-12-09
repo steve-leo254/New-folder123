@@ -5,6 +5,7 @@ import { store } from './store';
 import { ShoppingCartProvider } from './services/CartContext';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import HomePage from './pages/HomePage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import DashboardPage from './pages/DashboardPage';
@@ -16,6 +17,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import CartPage from './pages/CartPage';
 import MedicationPage from './pages/MedicationPage';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import DoctorProfilePage from './pages/DoctorProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 import Signup from './pages/RegisterPage';
 import './styles/globals.css';
@@ -31,18 +33,99 @@ function App() {
             <main className="flex-grow">
               <Routes>
                 <Route path="/" element={<HomePage />} />
-                <Route path="/appointments" element={<AppointmentsPage />} />
                 <Route path="/register" element={<Signup />} />
                 <Route path="/login" element={<LoginPage />} />
-                <Route path="/superadmindashboard" element={<SuperAdminDashboard />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/prescriptions" element={<PrescriptionPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/doctors" element={<DoctorsPage />} />
-                <Route path="/video-chat/:id" element={<VideoChatPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/medications" element={<MedicationPage />} />
+                {/* Admin-only routes */}
+                <Route 
+                  path="/superadmindashboard" 
+                  element={
+                    <ProtectedRoute allowedRoles={['super_admin', 'clinician_admin']}>
+                      <SuperAdminDashboard />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Authenticated user routes */}
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <ProtectedRoute>
+                      <DashboardPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/appointments" 
+                  element={
+                    <ProtectedRoute>
+                      <AppointmentsPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/prescriptions" 
+                  element={
+                    <ProtectedRoute>
+                      <PrescriptionPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/profile" 
+                  element={
+                    <ProtectedRoute>
+                      <ProfilePage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/doctors" 
+                  element={
+                    <ProtectedRoute>
+                      <DoctorsPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/doctor-profile/:doctorId" 
+                  element={
+                    <ProtectedRoute>
+                      <DoctorProfilePage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/video-chat/:id" 
+                  element={
+                    <ProtectedRoute>
+                      <VideoChatPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/checkout" 
+                  element={
+                    <ProtectedRoute>
+                      <CheckoutPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/cart" 
+                  element={
+                    <ProtectedRoute>
+                      <CartPage />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/medications" 
+                  element={
+                    <ProtectedRoute>
+                      <MedicationPage />
+                    </ProtectedRoute>
+                  } 
+                />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>

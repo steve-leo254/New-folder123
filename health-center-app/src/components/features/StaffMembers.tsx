@@ -21,7 +21,7 @@ interface StaffMembersProps {
 }
 
 const StaffMembers: React.FC<StaffMembersProps> = ({
-  staff,
+  staff = [],
   viewMode = 'table',
   showActions = true,
   showFilters = true,
@@ -39,7 +39,7 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
   const [selectedStatus, setSelectedStatus] = useState('all');
 
   // Get unique roles and specializations for filters
-  const roles = Array.from(new Set(staff.map(member => member.role)));
+  const roles = Array.from(new Set(staff.map(member => member.role).filter(Boolean)));
   const specializations = Array.from(new Set(staff.map(member => member.specialization).filter(Boolean)));
 
   const filteredStaff = staff.filter(member => {

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useShoppingCart } from '../../services/CartContext';
+import { useAuth } from '../../services/AuthContext';
 import { 
   Calendar, 
   User, 
@@ -12,14 +13,38 @@ import {
   Video,
   Pill,
   FileText,
-  Home
+  Home,
+  LogOut,
+  ChevronDown
 } from 'lucide-react';
 import logoImage from '@/assets/kiangombe.jpg';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const { cartQuantity } = useShoppingCart();
+  const { logout } = useAuth();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+    setIsDropdownOpen(false);
+  };
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
@@ -65,13 +90,49 @@ const Header: React.FC = () => {
           </nav>
 
           <div className="hidden md:flex items-center space-x-4">
-            <Link
-              to="/dashboard"
-              className="flex items-center space-x-2 text-gray-700 hover:text-primary-600"
-            >
-              <User className="w-5 h-5" />
-              <span>Dashboard</span>
-            </Link>
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center space-x-2 text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                <User className="w-5 h-5" />
+                <span>Dashboard</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {isDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200"
+                >
+                  <Link
+                    to="/dashboard"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setIsDropdownOpen(false)}
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/profile"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setIsDropdownOpen(false)}
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Profile
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </button>
+                </motion.div>
+              )}
+            </div>
             <Link
               to="/cart"
               className="relative p-2 text-gray-700 hover:text-primary-600"

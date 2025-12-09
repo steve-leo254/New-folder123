@@ -1,13 +1,12 @@
 import React, { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Alert from '../components/ui/Alert';
 import api from '../services/api';
-
-
+import logoImage from '../assets/kiangombe.jpg';
+import backgroundImage from '../assets/loginwalpaper.png';
 
 interface SignupFormData {
   firstName: string;
@@ -172,26 +171,36 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="max-w-3xl w-full p-8 space-y-8">
+    <div 
+      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
+      style={{
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      <div 
+        className="max-w-3xl w-full p-8 space-y-8 relative overflow-hidden bg-white rounded-lg shadow-md"
+        style={{
+          backgroundImage: `url(${logoImage})`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'center 20%',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">KH</span>
+              <img src={logoImage} alt="Kiangombe Health" className="w-12 h-12" />
+              {/* <span className="text-white font-bold text-xl">KH</span> */}
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">Create your account</p>
-              <p className="text-sm text-gray-600">
-                Get started with Kiangombe Health. It only takes a minute.
-              </p>
+              <p className="text-2xl font-bold text-gray-900">Create Account</p>
+              
             </div>
           </div>
-          <div className="text-sm text-gray-600">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
-              Sign in
-            </Link>
-          </div>
+          
         </div>
 
         {error && (
@@ -417,8 +426,27 @@ const Signup: React.FC = () => {
               Sign up with Facebook
             </Button>
           </div>
+
+          {/* Creative Login Navigation */}
+          <div className="text-center space-y-4">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-100">
+              <p className="text-sm text-gray-700 mb-2">Already have an account?</p>
+              <Link 
+                to="/login" 
+                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+              >
+                Sign In Instead
+                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14" />
+                </svg>
+              </Link>
+            </div>
+            <p className="text-xs text-gray-500">
+               Join thousands of patients managing their health with Kiangombe
+            </p>
+          </div>
         </form>
-      </Card>
+      </div>
     </div>
   );
 };

@@ -18,19 +18,24 @@ const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -5 }}
     >
-      <Card className="overflow-hidden hover:shadow-xl transition-shadow">
-        <div className="relative">
-          <img
-            src={doctor.avatar}
-            alt={doctor.firstName}
-            className="w-full h-48 object-cover"
-          />
-          <Badge variant="primary" className="absolute top-4 right-4">
-            {doctor.specialization}
-          </Badge>
-        </div>
+      <Card className="overflow-hidden hover:shadow-xl transition-shadow relative">
+        {/* Background image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
+          style={{ backgroundImage: `url(${doctor.avatar})` }}
+        />
         
-        <div className="p-6">
+        {/* Gradient overlay for better text readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/90 via-white/95 to-white/100" />
+        
+        {/* Content container */}
+        <div className="relative z-10 p-6">
+          {/* Specialization badge */}
+          <div className="flex justify-end mb-4">
+            <Badge variant="primary" className="shadow-sm">
+              {doctor.specialization}
+            </Badge>
+          </div>
           <h3 className="text-xl font-semibold text-gray-900 mb-1">
             Dr. {doctor.firstName} {doctor.lastName}
           </h3>
@@ -78,9 +83,11 @@ const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
             <Link to={`/appointments?doctor=${doctor.id}`} className="flex-1">
               <Button className="w-full">Book Appointment</Button>
             </Link>
-            <Button variant="outline" size="sm">
-              View Profile
-            </Button>
+            <Link to={`/doctor-profile/${doctor.id}`}>
+              <Button variant="outline" size="sm">
+                View Profile
+              </Button>
+            </Link>
           </div>
         </div>
       </Card>

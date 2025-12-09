@@ -73,6 +73,22 @@ class PaymentStatus(enum.Enum):
 # ORM Models
 # ============================================================================
 
+class StaffRole(Base):
+    """Staff role model representing configurable staff roles with permissions."""
+    __tablename__ = "staff_roles"
+
+    id = Column(String(50), primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True, index=True)
+    description = Column(Text, nullable=False)
+    permissions = Column(JSON, nullable=False)  # List of permission strings
+    is_active = Column(Boolean, default=True, index=True)
+    requires_specialization = Column(Boolean, default=False)
+    requires_license = Column(Boolean, default=False)
+    default_consultation_fee = Column(Numeric(precision=10, scale=2), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
 class User(Base):
     """User model representing patients, clinicians, and admins in Kiangombe."""
     __tablename__ = "users"
@@ -89,11 +105,13 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     last_login = Column(DateTime, nullable=True)
     role = Column(Enum(Role), nullable=False, default=Role.PATIENT)
+    staff_role_id = Column(String(50), ForeignKey("staff_roles.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     last_login = Column(DateTime, nullable=True)
 
     # Relationships
+    staff_role = relationship("StaffRole", backref="users")
     appointments = relationship(
         "Appointment",
         back_populates="patient",
@@ -308,6 +326,7 @@ class Medication(Base):
     expiry_date = Column(DateTime, nullable=True)
     batch_number = Column(String(100), nullable=True, index=True)
     supplier = Column(String(150), nullable=True)
+    image_url = Column(String(500), nullable=True)
     in_stock = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

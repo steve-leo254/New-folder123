@@ -7,8 +7,9 @@ import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { Doctor } from '../types';
 import { formatCurrency } from '@/services/formatCurrency';
-import { useDoctors } from '../services/useDoctor';
+import { useStaff } from '../services/useStaff';
 import { useAppointments } from '../services/useAppointment';
+import { getFullImageUrl } from '../utils/imageUtils';
 
 const AppointmentsPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
@@ -17,34 +18,37 @@ const AppointmentsPage: React.FC = () => {
   const [filterSpecialization, setFilterSpecialization] = useState('all');
 
   // Fetch real data from hooks
-  const { doctors, isLoading: doctorsLoading, fetchDoctors } = useDoctors();
+  const { staff, loading: staffLoading, fetchStaff } = useStaff();
   const { appointments, isLoading: appointmentsLoading, fetchAppointments, error: appointmentsError } = useAppointments();
 
   // Load data on component mount
   useEffect(() => {
-    fetchDoctors();
+    fetchStaff();
     fetchAppointments();
-  }, [fetchDoctors, fetchAppointments]);
+  }, []);
 
-  // Convert doctors to Doctor type format
+  // Filter only doctors from staff and convert to Doctor type format
   const formattedDoctors: Doctor[] = useMemo(
     () =>
-      doctors.map((doctor) => {
-        const nameParts = doctor.fullName.split(' ');
-        return {
-          id: doctor.id.toString(),
-          firstName: nameParts[0] || 'Dr',
-          lastName: nameParts.slice(1).join(' ') || '',
-          specialization: doctor.specialization || 'General Practitioner',
-          experience: 0,
-          rating: doctor.rating || 0,
-          avatar: doctor.avatar || '/images/doctor-default.jpg',
-          bio: doctor.bio || 'Professional healthcare provider',
-          availability: [],
-          consultationFee: doctor.consultationFee || 0,
-        };
-      }),
-    [doctors]
+      staff
+        .filter((staffMember) => staffMember.role === 'doctor' && staffMember.doctor)
+        .map((staffMember) => {
+          const nameParts = staffMember.fullName.split(' ');
+          const doctor = staffMember.doctor!;
+          return {
+            id: staffMember.id.toString(),
+            firstName: nameParts[0] || 'Dr',
+            lastName: nameParts.slice(1).join(' ') || '',
+            specialization: doctor.specialization,
+            experience: 0,
+            rating: doctor.rating,
+            avatar: getFullImageUrl(staffMember.avatar) || '/images/doctor-default.jpg',
+            bio: doctor.bio || 'Professional healthcare provider',
+            availability: [],
+            consultationFee: doctor.consultationFee,
+          };
+        }),
+    [staff]
   );
 
   // Get unique specializations for filter dropdown
@@ -124,7 +128,7 @@ const AppointmentsPage: React.FC = () => {
               </select>
             </div>
 
-            {doctorsLoading ? (
+            {staffLoading ? (
               <div className="flex items-center justify-center py-8">
                 <LoadingSpinner />
               </div>

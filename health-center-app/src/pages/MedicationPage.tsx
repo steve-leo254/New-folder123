@@ -34,7 +34,7 @@ const MedicationPage: React.FC = () => {
         category: med.category || 'Other',
         inStock: med.inStock !== false && med.stock > 0,
         prescriptionRequired: med.prescriptionRequired || false,
-        image: med.image || undefined,  // Add image from backend
+        image_url: med.image || undefined,  // Map to image_url field for Medication type
       })),
     [backendMedications]
   );

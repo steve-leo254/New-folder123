@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Image as ImageIcon } from 'lucide-react';
 import Button from '../ui/Button';
 import Alert from '../ui/Alert';
 
@@ -17,6 +17,7 @@ interface AddMedicationModalProps {
     expiry_date?: string;
     batch_number?: string;
     supplier?: string;
+    image_url?: string;
   }) => Promise<void>;
 }
 
@@ -32,11 +33,15 @@ const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose
     expiry_date: '',
     batch_number: '',
     supplier: '',
+    image_url: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const categories = [
     'Antibiotics',
@@ -64,6 +69,61 @@ const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose
         delete newErrors[name];
         return newErrors;
       });
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setServerError('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setServerError('Image size must be less than 5MB');
+      return;
+    }
+
+    setImageFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload image to backend
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('http://localhost:8000/upload-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload image');
+      }
+
+      const result = await response.json();
+      setFormData(prev => ({ ...prev, image_url: result.img_url }));
+      setServerError(null);
+    } catch (error) {
+      setServerError('Failed to upload image. Please try again.');
+      setImagePreview('');
+      setImageFile(null);
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -99,7 +159,10 @@ const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose
         expiry_date: '',
         batch_number: '',
         supplier: '',
+        image_url: '',
       });
+      setImageFile(null);
+      setImagePreview('');
       onClose();
     } catch (error: any) {
       const message = error.response?.data?.detail || error.message || 'Failed to add medication';
@@ -265,6 +328,58 @@ const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose
                 placeholder="e.g., Pharma Corp"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+            </div>
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Medication Image
+            </label>
+            <div className="flex items-center space-x-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="hidden"
+                    id="medication-image-upload"
+                  />
+                  <label
+                    htmlFor="medication-image-upload"
+                    className={`flex items-center justify-center w-full px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                      uploadingImage 
+                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed' 
+                        : 'border-gray-300 hover:border-primary-500 hover:bg-primary-50'
+                    }`}
+                  >
+                    {uploadingImage ? (
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-600">Uploading image...</p>
+                      </div>
+                    ) : imagePreview ? (
+                      <div className="text-center">
+                        <img src={imagePreview} alt="Medication preview" className="h-20 w-20 object-cover rounded mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">Click to change image</p>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">Click to upload image</p>
+                        <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+              {imageFile && (
+                <div className="flex-shrink-0">
+                  <img src={imagePreview} alt="Medication" className="h-24 w-24 object-cover rounded-lg border" />
+                </div>
+              )}
             </div>
           </div>
 

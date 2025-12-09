@@ -48,7 +48,7 @@ const normalizeMedication = (medication: any): MedicationRecord => ({
   expiryDate: medication.expiry_date || medication.expiryDate,
   batchNumber: medication.batch_number || medication.batchNumber,
   supplier: medication.supplier,
-  image: medication.image,
+  image: medication.image_url || medication.image,
   createdAt: medication.created_at || medication.createdAt,
   updatedAt: medication.updated_at || medication.updatedAt,
 });
