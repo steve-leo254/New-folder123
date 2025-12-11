@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Doctor } from '../types';
+import { formatCurrency } from '../services/formatCurrency';
 
 interface Message {
   id: string;
@@ -117,8 +118,35 @@ export const DoctorProfilePage = ({
     medications: [{ name: '', dosage: '', frequency: '', duration: '', instructions: '' }],
   });
 
-  // Find the doctor - use first doctor if no ID provided
-  const doctor = doctors.find((d) => d.id === id) || doctors[0];
+  // Find the doctor - handle case where no doctors are available
+  const doctor = doctors.find((d) => d.id === id);
+
+  if (!doctor || doctors.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <User className="h-10 w-10 text-gray-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            {doctors.length === 0 ? 'No Doctors Available' : 'Doctor Not Found'}
+          </h2>
+          <p className="text-gray-600 mb-6">
+            {doctors.length === 0
+              ? 'There are currently no doctors available in the system.'
+              : 'The doctor you\'re looking for doesn\'t exist.'
+            }
+          </p>
+          <button
+            onClick={() => navigate('/doctors')}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Back to Doctors
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Mock appointments
   const [appointments] = useState<Appointment[]>([
@@ -376,7 +404,7 @@ export const DoctorProfilePage = ({
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               <div className="relative">
                 <img
-                  src={doctor.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=128&background=random`}
+                  src={doctor.avatar || doctor.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=128&background=4F46E5&color=fff`}
                   alt={doctor.name}
                   className="w-32 h-32 rounded-full border-4 border-white object-cover"
                 />
@@ -406,7 +434,7 @@ export const DoctorProfilePage = ({
                   </div>
                   <div className="flex items-center">
                     <DollarSign className="h-5 w-5 mr-1" />
-                    <span>${doctor.consultationFee} consultation</span>
+                    <span>{formatCurrency(doctor.consultationFee)} consultation</span>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -636,7 +664,7 @@ export const DoctorProfilePage = ({
                 <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <img
-                      src={doctor.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=40`}
+                      src={doctor.avatar || doctor.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=40&background=4F46E5&color=fff`}
                       alt={doctor.name}
                       className="w-10 h-10 rounded-full object-cover"
                     />
@@ -1218,7 +1246,7 @@ export const DoctorProfilePage = ({
                 <div className="p-6 space-y-4">
                   <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
                     <img
-                      src={doctor.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=60`}
+                      src={doctor.avatar || doctor.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=60&background=4F46E5&color=fff`}
                       alt={doctor.name}
                       className="w-15 h-15 rounded-full object-cover"
                     />
@@ -1226,7 +1254,7 @@ export const DoctorProfilePage = ({
                       <h3 className="font-semibold text-gray-900">{doctor.name}</h3>
                       <p className="text-sm text-gray-600">{doctor.specialty}</p>
                       <p className="text-sm text-blue-600 font-medium">
-                        ${doctor.consultationFee} per visit
+                        {formatCurrency(doctor.consultationFee)} per visit
                       </p>
                     </div>
                   </div>

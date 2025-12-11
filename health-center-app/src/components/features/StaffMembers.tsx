@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Search, Star, Eye, Edit, Trash2, UserPlus, MapPin, Calendar, Video } from 'lucide-react';
+import { Search, Star, Eye, Edit, Trash2, UserPlus } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import { StaffMember } from '../../types';
+import { getFullImageUrl } from '../../utils/imageUtils';
 
 interface StaffMembersProps {
   staff: StaffMember[];
@@ -166,9 +167,9 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
               <Card className="overflow-hidden hover:shadow-xl transition-shadow">
                 <div className="relative">
                   <img
-                    src={member.avatar || '/images/default-avatar.jpg'}
+                    src={getFullImageUrl(member.avatar) || '/images/default-avatar.jpg'}
                     alt={getFullName(member)}
-                    className="w-full h-48 object-cover"
+                    className="w-full h-64 object-cover"
                   />
                   {member.specialization && (
                     <Badge variant="primary" className="absolute top-4 right-4">
@@ -178,11 +179,11 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
                 </div>
                 
                 <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
                     {member.role === 'Doctor' ? 'Dr. ' : ''}{getFullName(member)}
                   </h3>
-                  {member.bio && (
-                    <p className="text-gray-600 mb-4">{member.bio}</p>
+                  {member.specialization && (
+                    <p className="text-gray-600 mb-4">{member.specialization}</p>
                   )}
                   
                   <div className="flex items-center mb-4">
@@ -196,34 +197,8 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
                         />
                       ))}
                     </div>
-                    <span className="ml-2 text-sm text-gray-600">{member.rating || '0.0'}</span>
+                    <span className="ml-2 text-sm text-gray-600">{member.rating || '0.0'} reviews</span>
                   </div>
-                  
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <MapPin className="w-4 h-4 mr-2" />
-                      Nairobi, Kenya
-                    </div>
-                    {member.experience && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        {member.experience} years experience
-                      </div>
-                    )}
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Video className="w-4 h-4 mr-2" />
-                      Available for video consultation
-                    </div>
-                  </div>
-                  
-                  {member.consultationFee && member.consultationFee > 0 && (
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-2xl font-bold text-primary-600">
-                        KSH {member.consultationFee.toLocaleString()}
-                      </span>
-                      <span className="text-sm text-gray-600">per consultation</span>
-                    </div>
-                  )}
                   
                   <div className="flex gap-2">
                     {onBookAppointment && (
@@ -234,13 +209,15 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
                         Book Appointment
                       </Button>
                     )}
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => onView?.(member)}
-                    >
-                      View Profile
-                    </Button>
+                    {onView && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => onView(member)}
+                      >
+                        View Profile
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card>

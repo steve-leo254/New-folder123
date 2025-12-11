@@ -7,7 +7,7 @@ export interface MedicationRecord {
   name: string;
   category: string;
   dosage?: string;
-  price: number;
+  price: number | string;
   stock: number;
   description?: string;
   inStock: boolean;
@@ -24,7 +24,7 @@ export interface MedicationCreateRequest {
   name: string;
   category: string;
   dosage?: string;
-  price: number;
+  price: number | string;
   stock: number;
   description?: string;
   prescription_required?: boolean;

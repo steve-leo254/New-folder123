@@ -27,7 +27,7 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const { cartQuantity } = useShoppingCart();
   const { logout, role } = useAuth();
-
+  
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -120,18 +120,29 @@ const Header: React.FC = () => {
                   )}
                   
                   {(role === 'SUPER_ADMIN' || role === 'CLINICIAN_ADMIN' || role === 'DOCTOR' || role === 'NURSE' || role === 'RECEPTIONIST' || role === 'LAB_TECHNICIAN' || role === 'PHARMACIST') && (
-                    <Link
-                      to="/dashboard"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                      onClick={() => setIsDropdownOpen(false)}
-                    >
-                      <User className="w-4 h-4 mr-2" />
-                      Staff Dashboard
-                    </Link>
+                    <>
+                      <Link
+                        to="/dashboard"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        onClick={() => setIsDropdownOpen(false)}
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        Staff Dashboard
+                      </Link>
+                      
+                      <Link
+                        to="/doctors-profile"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        onClick={() => setIsDropdownOpen(false)}
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        Find Doctors
+                      </Link>
+                    </>
                   )}
-
+                  
                   {/* Super Admin specific */}
-                  {role === 'SUPER_ADMIN' && (
+                  {(role === 'SUPER_ADMIN' || role === 'CLINICIAN_ADMIN') && (
                     <Link
                       to="/superadmindashboard"
                       className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

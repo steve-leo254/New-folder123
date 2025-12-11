@@ -34,7 +34,7 @@ const HomePage: React.FC = () => {
       icon: Pill,
       title: 'Medication Delivery',
       description: 'Order prescribed medicines and get them delivered to your doorstep',
-      link: '/medications'
+      link: '/pharmacy'
     },
     {
       icon: Stethoscope,

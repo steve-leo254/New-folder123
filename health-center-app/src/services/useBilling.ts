@@ -78,28 +78,19 @@ export const useBilling = () => {
       setError(null);
       try {
         const response = await apiService.getBilling(params);
+        const normalized = toArrayResponse(response);
+        setBillings(normalized);
         
-        // Handle both array and object responses
-        if (Array.isArray(response)) {
-          const normalized = response.map(normalizeBilling);
-          setBillings(normalized);
-        } else if (response.items) {
-          const normalized = response.items.map(normalizeBilling);
-          setBillings(normalized);
-          
-          // Extract stats if available
-          if (response.stats) {
-            setStats({
-              totalRevenue: response.stats.total_revenue || 0,
-              totalPending: response.stats.total_pending || 0,
-              totalPaid: response.stats.total_paid || 0,
-              totalRefunded: response.stats.total_refunded || 0,
-              averageTransactionValue: response.stats.average_transaction_value || 0,
-              transactionCount: response.stats.transaction_count || 0,
-            });
-          }
-        } else {
-          setBillings([normalizeBilling(response)]);
+        // Extract stats if available
+        if (response && typeof response === 'object' && 'stats' in response) {
+          setStats({
+            totalRevenue: response.stats.total_revenue || 0,
+            totalPending: response.stats.total_pending || 0,
+            totalPaid: response.stats.total_paid || 0,
+            totalRefunded: response.stats.total_refunded || 0,
+            averageTransactionValue: response.stats.average_transaction_value || 0,
+            transactionCount: response.stats.transaction_count || 0,
+          });
         }
       } catch (err) {
         const axiosError = err as AxiosError<{ detail?: string }>;

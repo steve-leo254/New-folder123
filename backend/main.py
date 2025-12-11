@@ -777,10 +777,14 @@ def get_doctor(
 
 
 @app.get("/staff")
-def list_staff(db: Session = Depends(get_db)):
+def list_staff(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """List all staff members (doctors, nurses, receptionists, etc.)."""
     staff_roles = [Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST, Role.LAB_TECHNICIAN, Role.PHARMACIST]
     staff_users = db.query(User).filter(User.role.in_(staff_roles)).all()
+    
+    logger.info(f"Found {len(staff_users)} staff users")
+    for user in staff_users:
+        logger.info(f"Staff user: {user.email}, role: {user.role}")
     
     result = []
     for user in staff_users:
@@ -1747,6 +1751,75 @@ def create_staff_member(
             detail="Failed to create staff member"
         )
 
+
+# ============================================================================
+# Patient Profile Endpoints
+# ============================================================================
+
+@app.get("/api/patient/profile", response_model=UserProfileResponse)
+async def get_patient_profile(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current patient's profile information."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can access patient profile"
+        )
+    
+    return UserProfileResponse(
+        id=current_user.id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        phone=current_user.phone,
+        role=current_user.role.value,
+        is_verified=current_user.is_verified,
+        created_at=current_user.created_at,
+        profile_picture=current_user.profile_picture
+    )
+
+@app.put("/api/patient/profile", response_model=UserProfileResponse)
+async def update_patient_profile(
+    profile_update: dict,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update current patient's profile information."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can update patient profile"
+        )
+    
+    # Update allowed fields
+    allowed_fields = ['full_name', 'phone', 'profile_picture']
+    for field, value in profile_update.items():
+        if field in allowed_fields and hasattr(current_user, field):
+            setattr(current_user, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(current_user)
+        logger.info(f"Patient profile updated: {current_user.email}")
+        
+        return UserProfileResponse(
+            id=current_user.id,
+            email=current_user.email,
+            full_name=current_user.full_name,
+            phone=current_user.phone,
+            role=current_user.role.value,
+            is_verified=current_user.is_verified,
+            created_at=current_user.created_at,
+            profile_picture=current_user.profile_picture
+        )
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error updating patient profile: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile"
+        )
 
 # ============================================================================
 # Application Entry Point

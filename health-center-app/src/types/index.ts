@@ -6,7 +6,12 @@ export interface User {
   phone: string;
   dateOfBirth: string;
   avatar?: string;
-  role: 'patient' | 'doctor' | 'admin';
+  role: 'patient' | 'doctor' | 'super_admin' | 'clinical_admin' | 'nurse' | 'receptionist' | 'lab_technician' | 'pharmacist';
+  roleIdentifier?: string; // Unique identifier like "doctor_123" or "patient_456"
+  permissions?: string[];
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Doctor {

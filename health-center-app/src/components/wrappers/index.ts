@@ -1,0 +1,1 @@
+export { DoctorsProfilePageWrapper } from './DoctorsProfilePageWrapper';

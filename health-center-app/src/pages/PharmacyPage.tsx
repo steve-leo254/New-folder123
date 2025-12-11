@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   ShoppingCart,
@@ -16,6 +17,11 @@ import {
   Minus,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useMedications } from '../services/useMedication';
+import { formatCurrency } from '../services/formatCurrency';
+import { useShoppingCart } from '../services/CartContext';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import Card from '../components/ui/Card';
 
 interface Medication {
   id: string;
@@ -38,255 +44,243 @@ interface Medication {
   imageUrl?: string;
 }
 
-interface CartItem {
-  medication: Medication;
-  quantity: number;
-}
-
 interface PharmacyPageProps {
   patientId?: string;
 }
 
 export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSort, setSelectedSort] = useState('name');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [wishlist, setWishlist] = useState<Medication[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
 
-  // Mock pharmacy data
-  const [medications] = useState<Medication[]>([
-    {
-      id: '1',
-      name: 'Amoxicillin',
-      genericName: 'Amoxicillin Trihydrate',
-      dosage: '500mg',
-      form: 'Capsules',
-      strength: '500mg',
-      quantity: 20,
-      price: 12.99,
-      category: 'Antibiotics',
-      description: 'Broad-spectrum antibiotic used to treat bacterial infections',
-      sideEffects: ['Nausea', 'Diarrhea', 'Rash'],
-      inStock: true,
-      requiresPrescription: true,
-      manufacturer: 'Pfizer',
-      expiryDate: '2025-12-31',
-      rating: 4.5,
-      reviews: 1247,
-    },
-    {
-      id: '2',
-      name: 'Lisinopril',
-      genericName: 'Lisinopril Dihydrate',
-      dosage: '10mg',
-      form: 'Tablets',
-      strength: '10mg',
-      quantity: 30,
-      price: 15.99,
-      category: 'Blood Pressure',
-      description: 'ACE inhibitor used to treat high blood pressure and heart failure',
-      sideEffects: ['Dry cough', 'Dizziness', 'Headache'],
-      inStock: true,
-      requiresPrescription: true,
-      manufacturer: 'Merck',
-      expiryDate: '2026-06-30',
-      rating: 4.7,
-      reviews: 892,
-    },
-    {
-      id: '3',
-      name: 'Ibuprofen',
-      genericName: 'Ibuprofen',
-      dosage: '400mg',
-      form: 'Tablets',
-      strength: '400mg',
-      quantity: 50,
-      price: 8.99,
-      category: 'Pain Relief',
-      description:
-        'Nonsteroidal anti-inflammatory drug (NSAID) used for pain relief and fever reduction',
-      sideEffects: ['Stomach upset', 'Headache', 'Dizziness'],
-      inStock: true,
-      requiresPrescription: false,
-      manufacturer: 'Advil',
-      expiryDate: '2025-08-15',
-      rating: 4.3,
-      reviews: 2341,
-    },
-    {
-      id: '4',
-      name: 'Vitamin D3',
-      genericName: 'Cholecalciferol',
-      dosage: '1000 IU',
-      form: 'Softgels',
-      strength: '1000 IU',
-      quantity: 60,
-      price: 9.99,
-      category: 'Vitamins',
-      description: 'Essential vitamin for bone health and immune function',
-      sideEffects: ['Generally well tolerated'],
-      inStock: true,
-      requiresPrescription: false,
-      manufacturer: 'Nature Made',
-      expiryDate: '2026-12-31',
-      rating: 4.8,
-      reviews: 567,
-    },
-    {
-      id: '5',
-      name: 'Metformin',
-      genericName: 'Metformin Hydrochloride',
-      dosage: '500mg',
-      form: 'Extended-Release Tablets',
-      strength: '500mg',
-      quantity: 25,
-      price: 18.99,
-      category: 'Diabetes',
-      description: 'First-line medication for type 2 diabetes',
-      sideEffects: ['Nausea', 'Diarrhea', 'Metallic taste'],
-      inStock: true,
-      requiresPrescription: true,
-      manufacturer: 'Bristol-Myers Squibb',
-      expiryDate: '2025-03-15',
-      rating: 4.6,
-      reviews: 1789,
-    },
-    {
-      id: '6',
-      name: 'Atorvastatin',
-      genericName: 'Atorvastatin Calcium',
-      dosage: '20mg',
-      form: 'Tablets',
-      strength: '20mg',
-      quantity: 15,
-      price: 45.99,
-      category: 'Cholesterol',
-      description: 'Statin medication used to lower cholesterol levels',
-      sideEffects: ['Muscle pain', 'Headache', 'Nausea'],
-      inStock: true,
-      requiresPrescription: true,
-      manufacturer: 'Pfizer',
-      expiryDate: '2026-09-30',
-      rating: 4.4,
-      reviews: 456,
-    },
-    {
-      id: '7',
-      name: 'Omeprazole',
-      genericName: 'Omeprazole Magnesium',
-      dosage: '20mg',
-      form: 'Delayed-Release Capsules',
-      strength: '20mg',
-      quantity: 40,
-      price: 14.99,
-      category: 'Stomach',
-      description: 'Proton pump inhibitor used to treat GERD and stomach ulcers',
-      sideEffects: ['Headache', 'Diarrhea', 'Nausea'],
-      inStock: true,
-      requiresPrescription: true,
-      manufacturer: 'AstraZeneca',
-      expiryDate: '2025-11-30',
-      rating: 4.2,
-      reviews: 1234,
-    },
-    {
-      id: '8',
-      name: 'Aspirin',
-      genericName: 'Acetylsalicylic Acid',
-      dosage: '81mg',
-      form: 'Enteric-Coated Tablets',
-      strength: '81mg',
-      quantity: 100,
-      price: 4.99,
-      category: 'Pain Relief',
-      description:
-        'Salicylate drug used for pain relief, fever reduction, and blood thinning',
-      sideEffects: ['Stomach irritation', 'Bleeding', 'Tinnitus'],
-      inStock: true,
-      requiresPrescription: false,
-      manufacturer: 'Bayer',
-      expiryDate: '2026-01-31',
-      rating: 4.1,
-      reviews: 3456,
-    },
-  ]);
+  // Use CartContext instead of local cart state
+  const { 
+    addToCart: contextAddToCart, 
+    increaseCartQuantity, 
+    decreaseCartQuantity, 
+    removeFromCart: contextRemoveFromCart, 
+    clearCart: contextClearCart,
+    getItemQuantity,
+    cartItems,
+    cartQuantity,
+    subtotal,
+    deliveryFee,
+    total
+  } = useShoppingCart();
 
-  const categories = ['all', ...Array.from(new Set(medications.map((med) => med.category)))];
+  // Fetch real medication data from backend
+  const { 
+    medications: backendMedications, 
+    isLoading, 
+    fetchMedications, 
+    error: medicationsError 
+  } = useMedications();
+
+  // Load medications on component mount
+  useEffect(() => {
+    fetchMedications();
+  }, [fetchMedications]);
+
+  // Helper function to determine form from dosage
+  const determineForm = (dosage: string): string => {
+    const lower = dosage.toLowerCase();
+    if (lower.includes('tablet')) return 'Tablets';
+    if (lower.includes('capsule')) return 'Capsules';
+    if (lower.includes('syrup') || lower.includes('liquid')) return 'Syrup';
+    if (lower.includes('injection')) return 'Injection';
+    if (lower.includes('cream') || lower.includes('ointment')) return 'Topical';
+    if (lower.includes('drop')) return 'Drops';
+    return 'Tablets'; // default
+  };
+
+  // Helper function to safely format price using formatCurrency
+  const formatPrice = (price: number | string): string => {
+    let numericPrice = 0;
+    if (typeof price === 'number') {
+      numericPrice = price;
+    } else if (typeof price === 'string') {
+      // Extract price from string - look for $ followed by numbers
+      const priceMatch = price.match(/\$(\d+\.?\d*)/);
+      if (priceMatch) {
+        numericPrice = parseFloat(priceMatch[1]);
+      } else {
+        // Try to parse as regular number
+        numericPrice = parseFloat(price);
+      }
+    }
+    return formatCurrency(isNaN(numericPrice) ? 0 : numericPrice);
+  };
+
+  // Convert backend medications to Medication type format
+  const medications: Medication[] = useMemo(
+    () =>
+      backendMedications.map((med) => {
+        // Parse side effects from description or use defaults
+        const defaultSideEffects = ['Consult your doctor', 'Read package insert'];
+        const sideEffects = med.description?.includes('Side effects:') 
+          ? med.description.split('Side effects:')[1]?.split(',').map(s => s.trim()) 
+          : defaultSideEffects;
+
+        // Calculate expiry date (default 2 years from now if not provided)
+        const expiryDate = med.expiryDate 
+          ? new Date(med.expiryDate).toISOString().split('T')[0]
+          : new Date(Date.now() + 730 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        return {
+          id: med.id.toString(),
+          name: med.name || 'Unknown Medication',
+          genericName: med.name || 'Generic Name',
+          // Extract dosage/strength from malformed data
+          dosage: (() => {
+            let cleanDosage = med.dosage || 'As directed';
+            if (typeof med.dosage === 'string' && med.dosage.includes('$')) {
+              // Remove price part from malformed strings
+              cleanDosage = med.dosage.replace(/\$[\d.]+/, '').trim() || 'As directed';
+            }
+            return cleanDosage;
+          })(),
+          form: (() => {
+            const cleanDosage = (() => {
+              let dosage = med.dosage || 'As directed';
+              if (typeof med.dosage === 'string' && med.dosage.includes('$')) {
+                dosage = med.dosage.replace(/\$[\d.]+/, '').trim() || 'As directed';
+              }
+              return dosage;
+            })();
+            return determineForm(cleanDosage);
+          })(),
+          strength: (() => {
+            let strength = med.dosage || 'N/A';
+            if (typeof med.dosage === 'string') {
+              // Extract strength from strings like "Ibuprofen$1200.00500mg"
+              const strengthMatch = med.dosage.match(/(\d+\.?\d*)mg/);
+              if (strengthMatch) {
+                strength = `${strengthMatch[1]}mg`;
+              } else if (med.dosage.includes('$')) {
+                // Remove price part for malformed strings
+                strength = med.dosage.replace(/\$[\d.]+/, '').trim() || 'N/A';
+              }
+            }
+            return strength;
+          })(),
+          quantity: med.stock || 0,
+          // Handle malformed price data - extract price from strings like "Ibuprofen$1200.00500mg"
+          price: (() => {
+            let parsedPrice = 0;
+            if (med.price && typeof med.price === 'string') {
+              // Extract price from string - look for $ followed by numbers
+              const priceMatch = med.price.match(/\$(\d+\.?\d*)/);
+              if (priceMatch) {
+                parsedPrice = parseFloat(priceMatch[1]);
+              } else {
+                // Try to parse as regular number
+                parsedPrice = parseFloat(med.price);
+              }
+            } else if (med.price && typeof med.price === 'number') {
+              parsedPrice = med.price;
+            }
+            return parsedPrice;
+          })(),
+          category: med.category || 'Other',
+          description: med.description || 'Professional medication',
+          sideEffects: sideEffects,
+          inStock: med.inStock !== false && med.stock > 0,
+          requiresPrescription: med.prescriptionRequired || false,
+          manufacturer: med.supplier || 'Certified Manufacturer',
+          expiryDate: expiryDate,
+          rating: 4.5, // Default rating - can be added to backend
+          reviews: Math.floor(Math.random() * 2000) + 100, // Random reviews - can be added to backend
+          imageUrl: med.image || undefined,
+        };
+      }),
+    [backendMedications]
+  );
+
+  const categories = useMemo(
+    () => ['all', ...new Set(medications.map((med) => med.category))],
+    [medications]
+  );
+  
   const sortOptions = ['name', 'price-low', 'price-high', 'rating', 'reviews'];
 
-  const filteredMedications = medications
-    .filter((medication) => {
-      const matchesSearch =
-        medication.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        medication.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        medication.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        medication.manufacturer.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredMedications = useMemo(
+    () =>
+      medications
+        .filter((medication) => {
+          const matchesSearch =
+            medication.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            medication.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            medication.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            medication.manufacturer.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesCategory =
-        selectedCategory === 'all' || medication.category === selectedCategory;
+          const matchesCategory =
+            selectedCategory === 'all' || medication.category === selectedCategory;
 
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      switch (selectedSort) {
-        case 'name':
-          return a.name.localeCompare(b.name);
-        case 'price-low':
-          return a.price - b.price;
-        case 'price-high':
-          return b.price - a.price;
-        case 'rating':
-          return b.rating - a.rating;
-        case 'reviews':
-          return b.reviews - a.reviews;
-        default:
-          return 0;
-      }
+          return matchesSearch && matchesCategory;
+        })
+        .sort((a, b) => {
+          switch (selectedSort) {
+            case 'name':
+              return a.name.localeCompare(b.name);
+            case 'price-low':
+              return a.price - b.price;
+            case 'price-high':
+              return b.price - a.price;
+            case 'rating':
+              return b.rating - a.rating;
+            case 'reviews':
+              return b.reviews - a.reviews;
+            default:
+              return 0;
+          }
+        }),
+    [medications, searchTerm, selectedCategory, selectedSort]
+  );
+
+  // Enhanced addToCart with notification - using CartContext
+  const handleAddToCart = (medication: Medication) => {
+    contextAddToCart({
+      id: parseInt(medication.id),
+      name: medication.name,
+      price: medication.price,
+      img_url: medication.imageUrl || null
     });
+    showNotificationMessage(`${medication.name} added to cart`);
+  };
 
-  const addToCart = (medication: Medication) => {
-    const existingItem = cart.find((item) => item.medication.id === medication.id);
-    if (existingItem) {
-      setCart(
-        cart.map((item) =>
-          item.medication.id === medication.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      );
+  // Wishlist functions
+  const addToWishlist = (medication: Medication) => {
+    const isInWishlist = wishlist.some((item) => item.id === medication.id);
+    if (!isInWishlist) {
+      setWishlist([...wishlist, medication]);
+      showNotificationMessage(`${medication.name} added to wishlist`);
     } else {
-      setCart([...cart, { medication, quantity: 1 }]);
+      removeFromWishlist(medication.id);
+      showNotificationMessage(`${medication.name} removed from wishlist`);
     }
   };
 
-  const updateQuantity = (medicationId: string, quantity: number) => {
-    if (quantity <= 0) {
-      setCart(cart.filter((item) => item.medication.id !== medicationId));
-    } else {
-      setCart(
-        cart.map((item) =>
-          item.medication.id === medicationId ? { ...item, quantity } : item
-        )
-      );
-    }
+  const removeFromWishlist = (medicationId: string) => {
+    setWishlist(wishlist.filter((item) => item.id !== medicationId));
   };
 
-  const removeFromCart = (medicationId: string) => {
-    setCart(cart.filter((item) => item.medication.id !== medicationId));
+  const isInWishlist = (medicationId: string) => {
+    return wishlist.some((item) => item.id === medicationId);
   };
 
-  const getTotalPrice = () => {
-    return cart.reduce((total, item) => total + item.medication.price * item.quantity, 0);
-  };
-
-  const getTotalItems = () => {
-    return cart.reduce((total, item) => total + item.quantity, 0);
-  };
-
-  const clearCart = () => {
-    setCart([]);
+  // Notification function
+  const showNotificationMessage = (message: string) => {
+    setNotificationMessage(message);
+    setShowNotification(true);
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 3000);
   };
 
   const clearFilters = () => {
@@ -308,6 +302,27 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
       .join(' ');
   };
 
+  // Default placeholder image
+  const getImageUrl = (imageUrl?: string) => {
+    if (imageUrl) return imageUrl;
+    return 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop'; // Pharmacy/pills placeholder
+  };
+
+  // Handle image error
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.src = 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <Card className="p-12">
+          <LoadingSpinner message="Loading pharmacy products..." />
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -327,24 +342,16 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
             </div>
 
             <div className="flex items-center space-x-4">
-              <div className="relative">
-                <ShoppingCart className="h-6 w-6 text-blue-600" />
-                {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                    {getTotalItems()}
-                  </span>
-                )}
-              </div>
               <button
                 onClick={() => setShowCheckout(!showCheckout)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center hover:bg-blue-700 transition-colors"
               >
                 <Package className="h-4 w-4 mr-2" />
-                {showCheckout ? 'Continue Shopping' : 'View Cart'} ({getTotalItems()})
+                {showCheckout ? 'Continue Shopping' : 'View Cart'} ({cartQuantity})
               </button>
               <button
                 onClick={clearFilters}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
               >
                 Clear Filters
               </button>
@@ -352,8 +359,37 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
           </div>
         </motion.div>
 
+        {/* Error Message */}
+        {medicationsError && (
+          <Card className="p-6 mb-6 bg-red-50 border border-red-200">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 text-red-600 mr-3 mt-0.5" />
+              <div>
+                <p className="text-sm text-red-800 font-medium">
+                  Unable to load medications
+                </p>
+                <p className="text-sm text-red-700 mt-1">
+                  {medicationsError}. Please try again later.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Notification Toast */}
+        {showNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg"
+          >
+            <p className="text-sm font-medium">{notificationMessage}</p>
+          </motion.div>
+        )}
+
         {/* Cart Sidebar */}
-        {showCheckout && cart.length > 0 && (
+        {showCheckout && cartItems.length > 0 && (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -363,40 +399,46 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
               <h2 className="text-xl font-bold text-gray-900">Your Cart</h2>
               <button
                 onClick={() => setShowCheckout(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="space-y-4 mb-6">
-              {cart.map((item) => (
-                <div key={item.medication.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+              {cartItems.map((item) => (
+                <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                  {/* Cart Item Image */}
+                  <img
+                    src={getImageUrl(item.img_url || undefined)}
+                    alt={item.name}
+                    onError={handleImageError}
+                    className="w-16 h-16 object-cover rounded-lg"
+                  />
                   <div className="flex-1">
-                    <h3 className="font-medium text-gray-900">{item.medication.name}</h3>
-                    <p className="text-sm text-gray-500">{item.medication.dosage}</p>
+                    <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
                     <p className="text-sm font-medium text-blue-600">
-                      ${item.medication.price.toFixed(2)}
+                      {formatPrice(item.price)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => updateQuantity(item.medication.id, item.quantity - 1)}
-                      className="p-1 hover:bg-gray-200 rounded"
+                      onClick={() => decreaseCartQuantity(item.id)}
+                      className="p-1 hover:bg-gray-200 rounded transition-colors"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
-                    <span className="w-8 text-center">{item.quantity}</span>
+                    <span className="w-8 text-center font-medium">{item.quantity}</span>
                     <button
-                      onClick={() => updateQuantity(item.medication.id, item.quantity + 1)}
-                      className="p-1 hover:bg-gray-200 rounded"
+                      onClick={() => increaseCartQuantity(item.id)}
+                      className="p-1 hover:bg-gray-200 rounded transition-colors"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
                   <button
-                    onClick={() => removeFromCart(item.medication.id)}
-                    className="p-1 text-red-500 hover:bg-red-50 rounded"
+                    onClick={() => contextRemoveFromCart(item.id)}
+                    className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -405,18 +447,33 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
             </div>
 
             <div className="border-t pt-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">Subtotal:</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {formatCurrency(subtotal)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">Delivery:</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {formatCurrency(deliveryFee)}
+                </span>
+              </div>
               <div className="flex justify-between items-center mb-4">
                 <span className="text-lg font-medium text-gray-900">Total:</span>
                 <span className="text-2xl font-bold text-blue-600">
-                  ${getTotalPrice().toFixed(2)}
+                  {formatCurrency(total)}
                 </span>
               </div>
-              <button className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">
+              <button 
+                onClick={() => navigate('/checkout')}
+                className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
                 Proceed to Checkout
               </button>
               <button
-                onClick={clearCart}
-                className="w-full py-2 mt-2 text-gray-600 hover:text-gray-900"
+                onClick={contextClearCart}
+                className="w-full py-2 mt-2 text-gray-600 hover:text-gray-900 transition-colors"
               >
                 Clear Cart
               </button>
@@ -573,185 +630,72 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                 transition={{ duration: 0.6, delay: index * 0.05 }}
               >
                 {viewMode === 'grid' ? (
-                  <div className="bg-white rounded-xl shadow p-6 hover:shadow-lg transition-all duration-300 group">
-                    {/* Badges */}
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {medication.requiresPrescription && (
-                        <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
-                          Rx Required
-                        </span>
-                      )}
-                      {!isInStock(medication) && (
-                        <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">
-                          Out of Stock
-                        </span>
-                      )}
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                        {medication.category}
-                      </span>
-                    </div>
-
-                    {/* Title and Price */}
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                          {medication.name}
-                        </h3>
-                        <p className="text-sm text-gray-500">{medication.genericName}</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-gray-900">
-                          ${medication.price.toFixed(2)}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {medication.dosage} • {medication.form}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {medication.description}
-                    </p>
-
-                    {/* Details Grid */}
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                      <div>
-                        <p className="text-xs text-gray-500">Form</p>
-                        <p className="text-sm font-medium text-gray-900">{medication.form}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Strength</p>
-                        <p className="text-sm font-medium text-gray-900">{medication.strength}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Stock</p>
-                        <p
-                          className={`text-sm font-medium ${
-                            isInStock(medication) ? 'text-emerald-600' : 'text-red-600'
-                          }`}
-                        >
-                          {isInStock(medication)
-                            ? `${medication.quantity} units`
-                            : 'Out of Stock'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Expires</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {medication.expiryDate}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Rating and Manufacturer */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
-                        <Star className="h-4 w-4 text-amber-500 fill-current" />
-                        <span className="ml-1 text-sm font-medium text-gray-900">
-                          {medication.rating}
-                        </span>
-                        <span className="ml-1 text-sm text-gray-500">
-                          ({medication.reviews})
-                        </span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-500">
-                        <Shield className="h-4 w-4 text-blue-600 mr-1" />
-                        {medication.manufacturer}
-                      </div>
-                    </div>
-
-                    {/* Side Effects */}
-                    {medication.sideEffects.length > 0 && (
-                      <div className="mb-4">
-                        <p className="text-xs text-gray-500 mb-2">Common Side Effects</p>
-                        <div className="flex flex-wrap gap-1">
-                          {medication.sideEffects.slice(0, 3).map((effect, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full"
-                            >
-                              {effect}
-                            </span>
-                          ))}
-                          {medication.sideEffects.length > 3 && (
-                            <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-                              +{medication.sideEffects.length - 3} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 pt-4 border-t">
-                      <button
-                        onClick={() => addToCart(medication)}
-                        disabled={!isInStock(medication)}
-                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center ${
-                          isInStock(medication)
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }`}
-                      >
-                        {isInStock(medication) ? (
-                          <>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add to Cart
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="h-4 w-4 mr-2" />
-                            Out of Stock
-                          </>
-                        )}
-                      </button>
-                      <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                        <Heart className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* List View */
-                  <div className="bg-white rounded-xl shadow p-6 hover:shadow-lg transition-all duration-300">
-                    <div className="flex flex-col md:flex-row md:items-center gap-4">
-                      {/* Info */}
-                      <div className="flex-1">
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {medication.requiresPrescription && (
-                            <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
-                              Rx Required
-                            </span>
-                          )}
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                            {medication.category}
+                  <div className="bg-white rounded-xl shadow hover:shadow-lg transition-all duration-300 group overflow-hidden">
+                    {/* Product Image */}
+                    <div className="relative h-48 overflow-hidden bg-gray-100">
+                      <img
+                        src={getImageUrl(medication.imageUrl)}
+                        alt={medication.name}
+                        onError={handleImageError}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      {/* Overlay Badges */}
+                      <div className="absolute top-3 left-3 flex flex-col gap-2">
+                        {medication.requiresPrescription && (
+                          <span className="px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded-full shadow-lg">
+                            Rx Required
                           </span>
+                        )}
+                        {!isInStock(medication) && (
+                          <span className="px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full shadow-lg">
+                            Out of Stock
+                          </span>
+                        )}
+                      </div>
+                      {/* Category Badge */}
+                      <div className="absolute top-3 right-3">
+                        <span className="px-2 py-1 bg-blue-500 text-white text-xs font-medium rounded-full shadow-lg">
+                          {medication.category}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card Content */}
+                    <div className="p-6">
+                      {/* Title and Price */}
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+                            {medication.name}
+                          </h3>
+                          {medication.genericName !== medication.name && (
+                            <p className="text-sm text-gray-500 line-clamp-1">{medication.genericName}</p>
+                          )}
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900">{medication.name}</h3>
-                        <p className="text-sm text-gray-500 mb-1">{medication.genericName}</p>
-                        <p className="text-sm text-gray-600">{medication.description}</p>
+                        <div className="text-right ml-2">
+                          <div className="text-xl font-bold text-gray-900">
+                            {formatPrice(medication.price)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {medication.dosage}
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Details */}
-                      <div className="flex flex-wrap gap-6 md:gap-8">
+                      {/* Description */}
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                        {medication.description}
+                      </p>
+
+                      {/* Details Grid */}
+                      <div className="grid grid-cols-2 gap-3 mb-4">
                         <div>
-                          <p className="text-xs text-gray-500">Dosage</p>
-                          <p className="text-sm font-medium text-gray-900">
-                            {medication.dosage}
-                          </p>
+                          <p className="text-xs text-gray-500">Form</p>
+                          <p className="text-sm font-medium text-gray-900">{medication.form}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Price</p>
-                          <p className="text-lg font-bold text-gray-900">
-                            ${medication.price.toFixed(2)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Rating</p>
-                          <div className="flex items-center">
-                            <Star className="h-4 w-4 text-amber-500 fill-current" />
-                            <span className="ml-1 text-sm font-medium">{medication.rating}</span>
-                          </div>
+                          <p className="text-xs text-gray-500">Strength</p>
+                          <p className="text-sm font-medium text-gray-900">{medication.strength}</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Stock</p>
@@ -760,34 +704,246 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                               isInStock(medication) ? 'text-emerald-600' : 'text-red-600'
                             }`}
                           >
-                            {isInStock(medication) ? 'In Stock' : 'Out of Stock'}
+                            {isInStock(medication)
+                              ? `${medication.quantity} units`
+                              : 'Out of Stock'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Expires</p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {new Date(medication.expiryDate).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
 
+                      {/* Rating and Manufacturer */}
+                      <div className="flex items-center justify-between mb-4 pb-4 border-b">
+                        <div className="flex items-center">
+                          <Star className="h-4 w-4 text-amber-500 fill-current" />
+                          <span className="ml-1 text-sm font-medium text-gray-900">
+                            {medication.rating}
+                          </span>
+                          <span className="ml-1 text-sm text-gray-500">
+                            ({medication.reviews})
+                          </span>
+                        </div>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <Shield className="h-3 w-3 text-blue-600 mr-1" />
+                          <span className="line-clamp-1">{medication.manufacturer}</span>
+                        </div>
+                      </div>
+
+                      {/* Side Effects */}
+                      {medication.sideEffects.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-xs text-gray-500 mb-2">Common Side Effects</p>
+                          <div className="flex flex-wrap gap-1">
+                            {medication.sideEffects.slice(0, 3).map((effect, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full"
+                              >
+                                {effect}
+                              </span>
+                            ))}
+                            {medication.sideEffects.length > 3 && (
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                                +{medication.sideEffects.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Actions */}
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => addToCart(medication)}
-                          disabled={!isInStock(medication)}
-                          className={`py-2 px-4 rounded-lg font-medium transition-colors flex items-center ${
-                            isInStock(medication)
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        {getItemQuantity(parseInt(medication.id)) > 0 ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <button
+                              onClick={() => decreaseCartQuantity(parseInt(medication.id))}
+                              className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                            <span className="w-8 text-center font-semibold">
+                              {getItemQuantity(parseInt(medication.id))}
+                            </span>
+                            <button
+                              onClick={() => increaseCartQuantity(parseInt(medication.id))}
+                              className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleAddToCart(medication)}
+                            disabled={!isInStock(medication)}
+                            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all flex items-center justify-center ${
+                              isInStock(medication)
+                                ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
+                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {isInStock(medication) ? (
+                              <>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add to Cart
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="h-4 w-4 mr-2" />
+                                Out of Stock
+                              </>
+                            )}
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => addToWishlist(medication)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            isInWishlist(medication.id)
+                              ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                              : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
                           }`}
                         >
-                          {isInStock(medication) ? (
-                            <>
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add
-                            </>
-                          ) : (
-                            <AlertCircle className="h-4 w-4" />
+                          <Heart className={`h-5 w-5 ${isInWishlist(medication.id) ? 'fill-current' : ''}`} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* List View */
+                  <div className="bg-white rounded-xl shadow hover:shadow-lg transition-all duration-300 overflow-hidden">
+                    <div className="flex flex-col md:flex-row">
+                      {/* List View Image */}
+                      <div className="md:w-48 h-48 md:h-auto relative bg-gray-100 flex-shrink-0">
+                        <img
+                          src={getImageUrl(medication.imageUrl)}
+                          alt={medication.name}
+                          onError={handleImageError}
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Badges */}
+                        <div className="absolute top-3 left-3 flex flex-col gap-2">
+                          {medication.requiresPrescription && (
+                            <span className="px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded-full shadow-lg">
+                              Rx Required
+                            </span>
                           )}
-                        </button>
-                        <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                          <Heart className="h-5 w-5" />
-                        </button>
+                          {!isInStock(medication) && (
+                            <span className="px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full shadow-lg">
+                              Out of Stock
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 p-6">
+                        <div className="flex flex-col md:flex-row md:items-start gap-4">
+                          {/* Info */}
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                                  {medication.category}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold text-gray-900">
+                                  {formatPrice(medication.price)}
+                                </div>
+                                <div className="text-sm text-gray-500">{medication.dosage}</div>
+                              </div>
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-1">{medication.name}</h3>
+                            {medication.genericName !== medication.name && (
+                              <p className="text-sm text-gray-500 mb-2">{medication.genericName}</p>
+                            )}
+                            <p className="text-sm text-gray-600 mb-3 line-clamp-2">{medication.description}</p>
+
+                            {/* Details Row */}
+                            <div className="flex flex-wrap gap-4 mb-3">
+                              <div className="flex items-center text-sm">
+                                <Star className="h-4 w-4 text-amber-500 fill-current mr-1" />
+                                <span className="font-medium">{medication.rating}</span>
+                                <span className="text-gray-500 ml-1">({medication.reviews})</span>
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <Shield className="h-4 w-4 text-blue-600 mr-1" />
+                                <span className="text-gray-600">{medication.manufacturer}</span>
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <Package className="h-4 w-4 text-gray-400 mr-1" />
+                                <span
+                                  className={`font-medium ${
+                                    isInStock(medication) ? 'text-emerald-600' : 'text-red-600'
+                                  }`}
+                                >
+                                  {isInStock(medication)
+                                    ? `${medication.quantity} in stock`
+                                    : 'Out of Stock'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 pt-3 border-t">
+                              {getItemQuantity(parseInt(medication.id)) > 0 ? (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => decreaseCartQuantity(parseInt(medication.id))}
+                                    className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                  >
+                                    <Minus className="h-4 w-4" />
+                                  </button>
+                                  <span className="w-8 text-center font-semibold">
+                                    {getItemQuantity(parseInt(medication.id))}
+                                  </span>
+                                  <button
+                                    onClick={() => increaseCartQuantity(parseInt(medication.id))}
+                                    className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleAddToCart(medication)}
+                                  disabled={!isInStock(medication)}
+                                  className={`py-2 px-6 rounded-lg font-medium transition-all flex items-center ${
+                                    isInStock(medication)
+                                      ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
+                                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  }`}
+                                >
+                                  {isInStock(medication) ? (
+                                    <>
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      Add to Cart
+                                    </>
+                                  ) : (
+                                    <>
+                                      <AlertCircle className="h-4 w-4 mr-2" />
+                                      Out of Stock
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => addToWishlist(medication)}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  isInWishlist(medication.id)
+                                    ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                                    : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                                }`}
+                              >
+                                <Heart className={`h-5 w-5 ${isInWishlist(medication.id) ? 'fill-current' : ''}`} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -807,13 +963,15 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">No Medications Found</h3>
               <p className="text-gray-600 mb-8">
-                {searchTerm || selectedCategory !== 'all'
+                {medicationsError 
+                  ? 'Unable to load medications. Please try again later.' 
+                  : searchTerm || selectedCategory !== 'all'
                   ? 'Try adjusting your search criteria or filters'
                   : 'No medications available in this category.'}
               </p>
               <button
                 onClick={clearFilters}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Clear Filters
               </button>
@@ -858,7 +1016,7 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.8 + index * 0.1 }}
-              className="bg-white rounded-xl shadow p-6 text-center"
+              className="bg-white rounded-xl shadow p-6 text-center hover:shadow-lg transition-shadow"
             >
               <div
                 className={`w-16 h-16 ${stat.bgColor} rounded-2xl flex items-center justify-center mx-auto mb-4`}
