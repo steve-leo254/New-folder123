@@ -169,7 +169,7 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
                   <img
                     src={getFullImageUrl(member.avatar) || '/images/default-avatar.jpg'}
                     alt={getFullName(member)}
-                    className="w-full h-64 object-cover"
+                    className="w-full h-80 object-cover"
                   />
                   {member.specialization && (
                     <Badge variant="primary" className="absolute top-4 right-4">
@@ -185,20 +185,6 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
                   {member.specialization && (
                     <p className="text-gray-600 mb-4">{member.specialization}</p>
                   )}
-                  
-                  <div className="flex items-center mb-4">
-                    <div className="flex text-yellow-400">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-4 h-4 ${
-                            member.rating && i < Math.floor(member.rating) ? 'fill-current' : ''
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="ml-2 text-sm text-gray-600">{member.rating || '0.0'} reviews</span>
-                  </div>
                   
                   <div className="flex gap-2">
                     {onBookAppointment && (

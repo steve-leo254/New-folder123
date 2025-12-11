@@ -13,7 +13,7 @@ export interface Doctor {
   isAvailable: boolean;
   rating: number;
   consultationFee: number;
-  profile_picture?: string;
+  avatar?: string;  // Changed from profile_picture to match API response
   created_at: string;
   updated_at: string;
 }

@@ -984,7 +984,7 @@ const SuperDashboardPage: React.FC = () => {
                         Number(
                           medications
                             .reduce(
-                              (sum, m) => sum + (m.price * Math.max(1, Math.floor(m.stock * 0.15))), // Estimate 15% of stock sold
+                              (sum, m) => sum + (Number(m.price) * Math.max(1, Math.floor(m.stock * 0.15))), // Estimate 15% of stock sold
                               0
                             )
                             .toFixed(0)
@@ -1038,7 +1038,7 @@ const SuperDashboardPage: React.FC = () => {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900">
-                                  {formatCurrency(medication.price)}
+                                  {formatCurrency(Number(medication.price))}
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">

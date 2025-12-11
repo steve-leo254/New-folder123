@@ -8,7 +8,7 @@ import RegisterPage from '../pages/RegisterPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import DashboardPage from '../pages/DashboardPage';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
-import WishlistPage from '../pages/WishListPage';
+import WishlistPage from '../pages/WishlistPage';
 import MedicationDetailPage from '../pages/MedicationDetailPage';
 import PatientProfile from '../pages/PatientProfile';
 import AppointmentsPage from '../pages/AppointmentsPage';
@@ -21,6 +21,7 @@ import CartPage from '../pages/CartPage';
 import PharmacyPage from '../pages/PharmacyPage';
 import DoctorPrescriptionPage from '../pages/DoctorPrescriptionPage';
 import LabTestPage from '../pages/LabTestPage';
+import SettingsPage from '../pages/SettingsPage';
 // import LabResultsPage from '../pages/LabResultsPage';
 
 // Wrapper Components
@@ -86,6 +87,11 @@ export const adminRoutes: RouteConfig[] = [
     element: <SuperAdminDashboard />,
     allowedRoles: ADMIN_ROLES,
   },
+  {
+    path: '/admin/settings',
+    element: <SettingsPage />,
+    allowedRoles: ADMIN_ROLES,
+  },
 ];
 
 // Staff Routes
@@ -147,6 +153,13 @@ export const protectedRoutes: RouteConfig[] = [
   {
     path: '/profile',
     element: <ProfilePage />,
+    allowedRoles: ALL_AUTHENTICATED_ROLES,
+  },
+
+  // Settings
+  {
+    path: '/settings',
+    element: <SettingsPage />,
     allowedRoles: ALL_AUTHENTICATED_ROLES,
   },
 

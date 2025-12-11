@@ -102,7 +102,6 @@ export const DoctorProfilePage = ({
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
-  const [showBookingModal, setShowBookingModal] = useState(false);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
 
   // Prescription form state
@@ -404,7 +403,7 @@ export const DoctorProfilePage = ({
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               <div className="relative">
                 <img
-                  src={doctor.avatar || doctor.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=128&background=4F46E5&color=fff`}
+                  src={doctor.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=128&background=4F46E5&color=fff`}
                   alt={doctor.name}
                   className="w-32 h-32 rounded-full border-4 border-white object-cover"
                 />
@@ -439,7 +438,7 @@ export const DoctorProfilePage = ({
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <button
-                    onClick={() => setShowBookingModal(true)}
+                    onClick={() => navigate(`/appointments?doctor=${doctor.id}`)}
                     className="px-6 py-2 bg-white text-blue-600 rounded-lg font-medium hover:bg-gray-100 flex items-center"
                   >
                     <Calendar className="h-4 w-4 mr-2" />
@@ -473,11 +472,10 @@ export const DoctorProfilePage = ({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`flex-1 py-4 px-6 flex items-center justify-center gap-2 font-medium transition-colors ${
-                    activeTab === tab.id
+                  className={`flex-1 py-4 px-6 flex items-center justify-center gap-2 font-medium transition-colors ${activeTab === tab.id
                       ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <tab.icon className="h-5 w-5" />
                   {tab.label}
@@ -664,7 +662,7 @@ export const DoctorProfilePage = ({
                 <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <img
-                      src={doctor.avatar || doctor.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=40&background=4F46E5&color=fff`}
+                      src={doctor.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=60&background=4F46E5&color=fff`}
                       alt={doctor.name}
                       className="w-10 h-10 rounded-full object-cover"
                     />
@@ -703,16 +701,14 @@ export const DoctorProfilePage = ({
                   {messages.map((message) => (
                     <div
                       key={message.id}
-                      className={`flex ${
-                        message.senderId === currentUserId ? 'justify-end' : 'justify-start'
-                      }`}
+                      className={`flex ${message.senderId === currentUserId ? 'justify-end' : 'justify-start'
+                        }`}
                     >
                       <div
-                        className={`max-w-[70%] ${
-                          message.senderId === currentUserId
+                        className={`max-w-[70%] ${message.senderId === currentUserId
                             ? 'order-2'
                             : 'order-1'
-                        }`}
+                          }`}
                       >
                         {message.type === 'prescription' && message.prescription ? (
                           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
@@ -747,19 +743,17 @@ export const DoctorProfilePage = ({
                           </div>
                         ) : (
                           <div
-                            className={`px-4 py-3 rounded-2xl ${
-                              message.senderId === currentUserId
+                            className={`px-4 py-3 rounded-2xl ${message.senderId === currentUserId
                                 ? 'bg-blue-600 text-white rounded-br-md'
                                 : 'bg-gray-100 text-gray-900 rounded-bl-md'
-                            }`}
+                              }`}
                           >
                             <p>{message.content}</p>
                           </div>
                         )}
                         <p
-                          className={`text-xs text-gray-400 mt-1 ${
-                            message.senderId === currentUserId ? 'text-right' : 'text-left'
-                          }`}
+                          className={`text-xs text-gray-400 mt-1 ${message.senderId === currentUserId ? 'text-right' : 'text-left'
+                            }`}
                         >
                           {formatTime(message.timestamp)}
                         </p>
@@ -842,49 +836,39 @@ export const DoctorProfilePage = ({
             >
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-900">Your Appointments</h2>
-                <button
-                  onClick={() => setShowBookingModal(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Book New Appointment
-                </button>
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
                 {appointments.map((appointment) => (
                   <div
                     key={appointment.id}
-                    className={`bg-white rounded-xl shadow p-6 border-l-4 ${
-                      appointment.status === 'scheduled'
+                    className={`bg-white rounded-xl shadow p-6 border-l-4 ${appointment.status === 'scheduled'
                         ? 'border-blue-500'
                         : appointment.status === 'completed'
-                        ? 'border-emerald-500'
-                        : 'border-red-500'
-                    }`}
+                          ? 'border-emerald-500'
+                          : 'border-red-500'
+                      }`}
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            appointment.status === 'scheduled'
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${appointment.status === 'scheduled'
                               ? 'bg-blue-100 text-blue-800'
                               : appointment.status === 'completed'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
                         >
                           {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
                         </span>
                       </div>
                       <div
-                        className={`p-2 rounded-lg ${
-                          appointment.type === 'video'
+                        className={`p-2 rounded-lg ${appointment.type === 'video'
                             ? 'bg-purple-100'
                             : appointment.type === 'phone'
-                            ? 'bg-amber-100'
-                            : 'bg-blue-100'
-                        }`}
+                              ? 'bg-amber-100'
+                              : 'bg-blue-100'
+                          }`}
                       >
                         {appointment.type === 'video' ? (
                           <Video className="h-5 w-5 text-purple-600" />
@@ -1214,127 +1198,6 @@ export const DoctorProfilePage = ({
           )}
         </AnimatePresence>
 
-        {/* Booking Modal */}
-        <AnimatePresence>
-          {showBookingModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowBookingModal(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-white rounded-2xl shadow-xl max-w-lg w-full"
-              >
-                <div className="p-6 border-b">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-gray-900">Book Appointment</h2>
-                    <button
-                      onClick={() => setShowBookingModal(false)}
-                      className="p-2 hover:bg-gray-100 rounded-lg"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-6 space-y-4">
-                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                    <img
-                      src={doctor.avatar || doctor.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&size=60&background=4F46E5&color=fff`}
-                      alt={doctor.name}
-                      className="w-15 h-15 rounded-full object-cover"
-                    />
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{doctor.name}</h3>
-                      <p className="text-sm text-gray-600">{doctor.specialty}</p>
-                      <p className="text-sm text-blue-600 font-medium">
-                        {formatCurrency(doctor.consultationFee)} per visit
-                      </p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Appointment Type
-                    </label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { type: 'in-person', icon: MapPin, label: 'In-Person' },
-                        { type: 'video', icon: Video, label: 'Video Call' },
-                        { type: 'phone', icon: Phone, label: 'Phone Call' },
-                      ].map((option) => (
-                        <button
-                          key={option.type}
-                          className="p-3 border-2 border-gray-200 rounded-lg hover:border-blue-500 flex flex-col items-center gap-2"
-                        >
-                          <option.icon className="h-5 w-5 text-gray-600" />
-                          <span className="text-sm font-medium">{option.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Date
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Time
-                    </label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {['9:00 AM', '10:00 AM', '11:00 AM', '2:00 PM', '3:00 PM', '4:00 PM'].map(
-                        (time) => (
-                          <button
-                            key={time}
-                            className="py-2 px-3 border border-gray-200 rounded-lg text-sm hover:border-blue-500 hover:bg-blue-50"
-                          >
-                            {time}
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Reason for Visit
-                    </label>
-                    <textarea
-                      placeholder="Briefly describe your symptoms or reason for appointment"
-                      rows={3}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-6 border-t bg-gray-50 flex gap-4">
-                  <button
-                    onClick={() => setShowBookingModal(false)}
-                    className="flex-1 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100"
-                  >
-                    Cancel
-                  </button>
-                  <button className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">
-                    Confirm Booking
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );

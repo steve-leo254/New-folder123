@@ -87,6 +87,12 @@ export const patientNavigation: NavItem[] = [
     icon: User,
     allowedRoles: PATIENT_ROLES,
   },
+  {
+    label: 'Settings',
+    path: '/settings',
+    icon: Settings,
+    allowedRoles: PATIENT_ROLES,
+  },
 ];
 
 export const staffNavigation: NavItem[] = [
@@ -119,6 +125,12 @@ export const staffNavigation: NavItem[] = [
     path: '/consultations',
     icon: Video,
     allowedRoles: [ROLES.DOCTOR],
+  },
+  {
+    label: 'Settings',
+    path: '/settings',
+    icon: Settings,
+    allowedRoles: STAFF_ROLES,
   },
 ];
 

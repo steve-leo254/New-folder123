@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Video, 
   VideoOff, 
@@ -9,41 +9,135 @@ import {
   Phone, 
   MessageSquare, 
   Settings,
-  Monitor
+  Monitor,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import { useWebRTC } from '../hooks/useWebRTC';
 
 const VideoChatPage: React.FC = () => {
   const navigate = useNavigate();
-  const [isVideoOn, setIsVideoOn] = useState(true);
-  const [isMicOn, setIsMicOn] = useState(true);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const { id: appointmentId } = useParams<{ id: string }>();
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [showChat, setShowChat] = useState(false);
-  const [callStatus, setCallStatus] = useState<'connecting' | 'connected' | 'ended'>('connecting');
+  const [messages, setMessages] = useState<Array<{id: string, sender: 'user' | 'remote', text: string, time: string}>>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [callDuration, setCallDuration] = useState(0);
+
+  const {
+    localStream,
+    remoteStream,
+    isConnecting,
+    isConnected,
+    error,
+    startCall,
+    endCall,
+    toggleVideo,
+    toggleAudio,
+    isVideoEnabled,
+    isAudioEnabled
+  } = useWebRTC();
+
+  // Set video streams to refs
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
 
   useEffect(() => {
-    // Simulate connection
-    const timer = setTimeout(() => {
-      setCallStatus('connected');
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, []);
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  // Handle call duration
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isConnected) {
+      interval = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
+  // Start call automatically when component mounts
+  useEffect(() => {
+    if (appointmentId) {
+      // For demo, start as initiator
+      startCall(true);
+    }
+  }, [appointmentId, startCall]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleEndCall = () => {
-    setCallStatus('ended');
+    endCall();
     setTimeout(() => {
       navigate('/dashboard');
     }, 1000);
   };
 
-  const messages = [
-    { id: 1, sender: 'doctor', text: 'Hello! How are you feeling today?', time: '10:00 AM' },
-    { id: 2, sender: 'patient', text: 'I have been experiencing some chest pain', time: '10:01 AM' },
-    { id: 3, sender: 'doctor', text: 'Can you describe the pain? Is it sharp or dull?', time: '10:02 AM' }
-  ];
+  const sendMessage = () => {
+    if (newMessage.trim()) {
+      const message = {
+        id: Date.now().toString(),
+        sender: 'user' as const,
+        text: newMessage,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, message]);
+      setNewMessage('');
+      
+      // Simulate response
+      setTimeout(() => {
+        const response = {
+          id: (Date.now() + 1).toString(),
+          sender: 'remote' as const,
+          text: 'Thank you for your message. I can see you clearly.',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, response]);
+      }, 1000);
+    }
+  };
 
-  if (callStatus === 'ended') {
+  const toggleSpeaker = () => {
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.muted = !isSpeakerOn;
+      setIsSpeakerOn(!isSpeakerOn);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <Card className="p-8 text-center max-w-md">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Connection Error</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <div className="space-y-3">
+            <Button onClick={() => window.location.reload()} className="w-full">
+              Try Again
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/dashboard')} className="w-full">
+              Back to Dashboard
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isConnected && !isConnecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <Card className="p-8 text-center">
@@ -62,39 +156,61 @@ const VideoChatPage: React.FC = () => {
       <div className="flex h-screen">
         {/* Main Video Area */}
         <div className="flex-1 relative">
-          {callStatus === 'connecting' ? (
+          {isConnecting ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-white text-lg">Connecting to doctor...</p>
+                <p className="text-gray-400 text-sm mt-2">Please allow camera and microphone access</p>
               </div>
             </div>
           ) : (
             <>
+              {/* Remote Video */}
               <div className="absolute inset-0 bg-gray-800">
-                <img
-                  src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1280&h=720&q=80"
-                  alt="Doctor"
-                  className="w-full h-full object-cover"
-                />
+                {remoteStream ? (
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-32 h-32 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Video className="w-16 h-16 text-gray-500" />
+                      </div>
+                      <p className="text-white text-lg">Waiting for remote video...</p>
+                    </div>
+                  </div>
+                )}
               </div>
               
-              {/* Self Video */}
+              {/* Local Video */}
               <div className="absolute top-4 right-4 w-48 h-36 bg-gray-700 rounded-lg overflow-hidden shadow-lg">
-                <img
-                  src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&h=300&q=80"
-                  alt="You"
-                  className="w-full h-full object-cover"
-                />
+                {localStream ? (
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover transform scale-x-[-1]"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <VideoOff className="w-8 h-8 text-gray-500" />
+                  </div>
+                )}
               </div>
 
               {/* Call Info */}
-              <div className="absolute top-4 left-4 text-white">
+              <div className="absolute top-4 left-4 text-white bg-black/50 p-3 rounded-lg">
                 <h2 className="text-xl font-semibold">Dr. Sarah Johnson</h2>
                 <p className="text-sm opacity-90">Cardiologist</p>
                 <div className="flex items-center mt-2 space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm">00:12:45</span>
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                  <span className="text-sm">{formatTime(callDuration)}</span>
                 </div>
               </div>
             </>
@@ -107,33 +223,36 @@ const VideoChatPage: React.FC = () => {
                 variant="outline"
                 size="lg"
                 className={`bg-white/10 border-white/30 text-white hover:bg-white/20 ${
-                  !isVideoOn ? 'bg-red-600/20 border-red-600' : ''
+                  !isVideoEnabled ? 'bg-red-600/20 border-red-600' : ''
                 }`}
-                onClick={() => setIsVideoOn(!isVideoOn)}
+                onClick={toggleVideo}
+                disabled={!localStream}
               >
-                {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
               </Button>
               
               <Button
                 variant="outline"
                 size="lg"
                 className={`bg-white/10 border-white/30 text-white hover:bg-white/20 ${
-                  !isMicOn ? 'bg-red-600/20 border-red-600' : ''
+                  !isAudioEnabled ? 'bg-red-600/20 border-red-600' : ''
                 }`}
-                onClick={() => setIsMicOn(!isMicOn)}
+                onClick={toggleAudio}
+                disabled={!localStream}
               >
-                {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                {isAudioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
               </Button>
 
               <Button
                 variant="outline"
                 size="lg"
                 className={`bg-white/10 border-white/30 text-white hover:bg-white/20 ${
-                  isScreenSharing ? 'bg-blue-600/20 border-blue-600' : ''
+                  !isSpeakerOn ? 'bg-red-600/20 border-red-600' : ''
                 }`}
-                onClick={() => setIsScreenSharing(!isScreenSharing)}
+                onClick={toggleSpeaker}
+                disabled={!remoteStream}
               >
-                <Monitor className="w-5 h-5" />
+                {isSpeakerOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
               </Button>
 
               <Button
@@ -180,11 +299,11 @@ const VideoChatPage: React.FC = () => {
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${message.sender === 'patient' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
                     className={`max-w-xs px-4 py-2 rounded-lg ${
-                      message.sender === 'patient'
+                      message.sender === 'user'
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-700 text-white'
                     }`}
@@ -201,9 +320,14 @@ const VideoChatPage: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Type a message..."
-                  className="flex-1 px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                  className="flex-1 px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <Button size="sm">Send</Button>
+                <Button size="sm" onClick={sendMessage}>
+                  Send
+                </Button>
               </div>
             </div>
           </motion.div>

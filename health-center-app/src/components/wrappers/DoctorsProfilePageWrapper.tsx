@@ -20,8 +20,8 @@ export const DoctorsProfilePageWrapper: React.FC = () => {
       specialty: doctor.specialization,
       experience: 5, // Default value - could be calculated from created_at
       rating: doctor.rating,
-      avatar: getFullImageUrl(doctor.profile_picture) || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff`,
-      imageUrl: getFullImageUrl(doctor.profile_picture) || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff`,
+      avatar: getFullImageUrl(doctor.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff`,
+      imageUrl: getFullImageUrl(doctor.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff`,
       bio: doctor.bio || 'Professional healthcare provider',
       availability: [],
       consultationFee: doctor.consultationFee,
