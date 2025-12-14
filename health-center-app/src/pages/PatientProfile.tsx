@@ -2,9 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  User, Lock, Heart, AlertTriangle,
-  Shield, Bell, Save, X,
-  Edit3
+  Calendar, // ✅ Changed from User
+  Lock,
+  Heart,
+  AlertTriangle,
+  Shield,
+  Bell,
+  Save,
+  X,
+  Edit3,
 } from 'lucide-react';
 
 import { usePatient } from '../services/usePatient';
@@ -21,7 +27,7 @@ import {
   NavigationCard,
   QuickActionsCard,
   PasswordChangeModal,
-  PersonalInfoSection,
+  AppointmentsSection, // ✅ Changed from PersonalInfoSection
   MedicalInfoSection,
   EmergencyContactSection,
   InsuranceSection,
@@ -36,7 +42,7 @@ interface SectionConfig {
 }
 
 const sections: SectionConfig[] = [
-  { id: 'personal', label: 'Personal Info', icon: User },
+  { id: 'appointments', label: 'My Appointments', icon: Calendar }, // ✅ Changed
   { id: 'medical', label: 'Medical Info', icon: Heart },
   { id: 'emergency', label: 'Emergency Contact', icon: AlertTriangle },
   { id: 'insurance', label: 'Insurance', icon: Shield },
@@ -60,7 +66,7 @@ const PatientProfile: React.FC = () => {
     exportData,
   } = usePatient();
 
-  const [activeSection, setActiveSection] = useState<string>('personal');
+  const [activeSection, setActiveSection] = useState<string>('appointments'); // ✅ Changed default
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -107,11 +113,9 @@ const PatientProfile: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     if (!formData) return;
-    
+
     const { name, value, type } = e.target;
-    const newValue = type === 'checkbox' 
-      ? (e.target as HTMLInputElement).checked 
-      : value;
+    const newValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
 
     setFormData({
       ...formData,
@@ -122,7 +126,7 @@ const PatientProfile: React.FC = () => {
   // Handle toggle changes for notifications
   const handleToggleChange = (field: keyof PatientProfileType) => {
     if (!formData) return;
-    
+
     setFormData({
       ...formData,
       [field]: !formData[field],
@@ -218,10 +222,7 @@ const PatientProfile: React.FC = () => {
       return;
     }
 
-    const result = await changePassword(
-      passwordForm.currentPassword,
-      passwordForm.newPassword
-    );
+    const result = await changePassword(passwordForm.currentPassword, passwordForm.newPassword);
 
     if (result.success) {
       setShowPasswordModal(false);
@@ -313,11 +314,7 @@ const PatientProfile: React.FC = () => {
   if (error && !patient) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Alert
-          type="error"
-          message={error}
-          onClose={() => navigate('/dashboard')}
-        />
+        <Alert type="error" message={error} onClose={() => navigate('/dashboard')} />
       </div>
     );
   }
@@ -326,6 +323,9 @@ const PatientProfile: React.FC = () => {
   if (!formData) {
     return null;
   }
+
+  // ✅ Hide edit controls for appointments section
+  const showEditControls = activeSection !== 'appointments';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -361,7 +361,7 @@ const PatientProfile: React.FC = () => {
             />
 
             {/* Health Summary Card */}
-            <HealthSummaryCard formData={formData} />
+            <HealthSummaryCard />
 
             {/* Navigation Card */}
             <NavigationCard
@@ -380,84 +380,57 @@ const PatientProfile: React.FC = () => {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            {/* Edit Controls */}
-            <div className="mb-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {sections.find((s) => s.id === activeSection)?.label}
-              </h2>
-              
-              {!isEditing ? (
-                <Button onClick={() => setIsEditing(true)}>
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  Edit Profile
-                </Button>
-              ) : (
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={handleCancel}>
-                    <X className="w-4 h-4 mr-2" />
-                    Cancel
+            {/* Edit Controls - Only show for editable sections */}
+            {showEditControls && (
+              <div className="mb-6 flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {sections.find((s) => s.id === activeSection)?.label}
+                </h2>
+
+                {!isEditing ? (
+                  <Button onClick={() => setIsEditing(true)}>
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Edit Profile
                   </Button>
-                  <Button onClick={handleSave}>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </Button>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={handleCancel}>
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSave}>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Section Content */}
             <AnimatePresence mode="wait">
-              {activeSection === 'personal' && (
-                <PersonalInfoSection
-                  formData={formData}
-                  isEditing={isEditing}
-                  onChange={handleInputChange}
-                />
+              {activeSection === 'appointments' && (
+                <AppointmentsSection patientId={formData.id} />
               )}
 
               {activeSection === 'medical' && (
-                <MedicalInfoSection
-                  formData={formData}
-                  isEditing={isEditing}
-                  newItems={newItems}
-                  onChange={handleInputChange}
-                  onNewItemChange={(field, value) =>
-                    setNewItems((prev) => ({ ...prev, [field]: value }))
-                  }
-                  onAddItem={addItem}
-                  onRemoveItem={removeItem}
-                />
+                <MedicalInfoSection isEditing={isEditing} />
               )}
 
               {activeSection === 'emergency' && (
-                <EmergencyContactSection
-                  formData={formData}
-                  isEditing={isEditing}
-                  onChange={handleInputChange}
-                />
+                <EmergencyContactSection isEditing={isEditing} />
               )}
 
               {activeSection === 'insurance' && (
-                <InsuranceSection
-                  formData={formData}
-                  isEditing={isEditing}
-                  onChange={handleInputChange}
-                />
+                <InsuranceSection isEditing={isEditing} />
               )}
 
               {activeSection === 'notifications' && (
-                <NotificationsSection
-                  formData={formData}
-                  isEditing={isEditing}
-                  onToggle={handleToggleChange}
-                />
+                <NotificationsSection isEditing={isEditing} />
               )}
 
               {activeSection === 'security' && (
-                <SecuritySection
-                  formData={formData}
-                  onChangePassword={() => setShowPasswordModal(true)}
-                />
+                <SecuritySection onChangePassword={() => setShowPasswordModal(true)} />
               )}
             </AnimatePresence>
           </div>

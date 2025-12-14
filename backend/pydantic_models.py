@@ -317,6 +317,144 @@ class DoctorResponse(BaseModel):
 
 
 # ============================================================================
+# Doctor Profile Sections
+# ============================================================================
+
+class DoctorEducationRequest(BaseModel):
+    """Doctor education/certification request."""
+    title: str = Field(..., min_length=1, max_length=200)
+    institution: str = Field(..., min_length=1, max_length=200)
+    year: str = Field(..., min_length=4, max_length=4, pattern=r'^\d{4}$')
+    type: str = Field(..., enum=['degree', 'certification', 'license'])
+    license_number: Optional[str] = Field(None, max_length=50)
+    expiry_date: Optional[str] = Field(None, pattern=r'^\d{4}-\d{2}-\d{2}$')
+
+class DoctorEducationResponse(BaseModel):
+    """Doctor education/certification response."""
+    id: int
+    doctor_id: int
+    title: str
+    institution: str
+    year: str
+    type: str
+    license_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class DoctorContactInfoRequest(BaseModel):
+    """Doctor contact info request."""
+    hospital: Optional[str] = Field(None, max_length=200)
+    department: Optional[str] = Field(None, max_length=100)
+    location: Optional[str] = Field(None, max_length=300)
+    languages: Optional[List[str]] = []
+    consultation_fee: Optional[Decimal] = Field(None, ge=0)
+    response_rate: Optional[Decimal] = Field(None, ge=0, le=100)
+    on_time_rate: Optional[Decimal] = Field(None, ge=0, le=100)
+    patient_satisfaction: Optional[Decimal] = Field(None, ge=0, le=5)
+
+class DoctorContactInfoResponse(BaseModel):
+    """Doctor contact info response."""
+    id: int
+    doctor_id: int
+    hospital: Optional[str] = None
+    department: Optional[str] = None
+    location: Optional[str] = None
+    languages: Optional[List[str]] = []
+    consultation_fee: Optional[Decimal] = None
+    response_rate: Optional[Decimal] = None
+    on_time_rate: Optional[Decimal] = None
+    patient_satisfaction: Optional[Decimal] = None
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class DoctorAvailabilityRequest(BaseModel):
+    """Doctor availability request."""
+    day: str = Field(..., enum=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+    is_open: bool = True
+    start_time: Optional[str] = Field(None, pattern=r'^\d{2}:\d{2}$')
+    end_time: Optional[str] = Field(None, pattern=r'^\d{2}:\d{2}$')
+    break_start: Optional[str] = Field(None, pattern=r'^\d{2}:\d{2}$')
+    break_end: Optional[str] = Field(None, pattern=r'^\d{2}:\d{2}$')
+    appointment_duration: int = Field(30, ge=15, le=180)
+    buffer_time: int = Field(10, ge=0, le=60)
+    max_appointments_per_day: int = Field(20, ge=1, le=50)
+
+class DoctorAvailabilityResponse(BaseModel):
+    """Doctor availability response."""
+    id: int
+    doctor_id: int
+    day: str
+    is_open: bool
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    break_start: Optional[str] = None
+    break_end: Optional[str] = None
+    appointment_duration: int
+    buffer_time: int
+    max_appointments_per_day: int
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class DoctorSettingsRequest(BaseModel):
+    """Doctor settings request."""
+    # Profile visibility settings
+    show_profile_to_patients: bool = True
+    show_rating_reviews: bool = True
+    allow_online_booking: bool = True
+    show_availability: bool = True
+    
+    # Notification settings
+    email_notifications: bool = True
+    sms_notifications: bool = True
+    appointment_reminders: bool = True
+    new_appointment_requests: bool = True
+    cancellation_alerts: bool = True
+    patient_messages: bool = True
+    weekly_summary: bool = False
+    marketing_emails: bool = False
+    
+    # Consultation types enabled
+    in_person_consultations: bool = True
+    video_consultations: bool = True
+    phone_consultations: bool = True
+    chat_consultations: bool = False
+
+class DoctorSettingsResponse(BaseModel):
+    """Doctor settings response."""
+    id: int
+    doctor_id: int
+    # Profile visibility settings
+    show_profile_to_patients: bool
+    show_rating_reviews: bool
+    allow_online_booking: bool
+    show_availability: bool
+    
+    # Notification settings
+    email_notifications: bool
+    sms_notifications: bool
+    appointment_reminders: bool
+    new_appointment_requests: bool
+    cancellation_alerts: bool
+    patient_messages: bool
+    weekly_summary: bool
+    marketing_emails: bool
+    
+    # Consultation types enabled
+    in_person_consultations: bool
+    video_consultations: bool
+    phone_consultations: bool
+    chat_consultations: bool
+    
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
 # Payments
 # ============================================================================
 
@@ -496,3 +634,205 @@ class ImageResponse(BaseModel):
     """Image upload response."""
     message: str
     img_url: str
+
+
+# ============================================================================
+# Patient Profile Models
+# ============================================================================
+
+class MedicalInfoRequest(BaseModel):
+    """Medical information request model."""
+    blood_type: Optional[str] = None
+    height: Optional[str] = None
+    weight: Optional[str] = None
+    allergies: Optional[List[str]] = []
+    conditions: Optional[List[str]] = []
+    medications: Optional[List[str]] = []
+
+
+class MedicalInfoResponse(BaseModel):
+    """Medical information response model."""
+    id: int
+    patient_id: int
+    blood_type: Optional[str] = None
+    height: Optional[str] = None
+    weight: Optional[str] = None
+    allergies: Optional[List[str]] = []
+    conditions: Optional[List[str]] = []
+    medications: Optional[List[str]] = []
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EmergencyContactRequest(BaseModel):
+    """Emergency contact request model."""
+    name: str
+    phone: str
+    relation: str
+
+
+class EmergencyContactResponse(BaseModel):
+    """Emergency contact response model."""
+    id: int
+    patient_id: int
+    name: str
+    phone: str
+    relation: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class InsuranceRequest(BaseModel):
+    """Insurance request model."""
+    provider: str
+    policy_number: str
+    group_number: Optional[str] = None
+    holder_name: str
+
+
+class InsuranceResponse(BaseModel):
+    """Insurance response model."""
+    id: int
+    patient_id: int
+    provider: str
+    policy_number: str
+    group_number: Optional[str] = None
+    holder_name: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationSettingsRequest(BaseModel):
+    """Notification settings request model."""
+    email_notifications: Optional[bool] = True
+    sms_notifications: Optional[bool] = True
+    appointment_reminders: Optional[bool] = True
+    lab_results_notifications: Optional[bool] = True
+
+
+class NotificationSettingsResponse(BaseModel):
+    """Notification settings response model."""
+    id: int
+    patient_id: int
+    email_notifications: bool
+    sms_notifications: bool
+    appointment_reminders: bool
+    lab_results_notifications: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SecuritySettingsRequest(BaseModel):
+    """Security settings request model."""
+    two_factor_enabled: Optional[bool] = False
+    login_alerts: Optional[bool] = True
+
+
+class SecuritySettingsResponse(BaseModel):
+    """Security settings response model."""
+    id: int
+    patient_id: int
+    two_factor_enabled: bool
+    login_alerts: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ActivityLogResponse(BaseModel):
+    """Activity log response model."""
+    id: int
+    user_id: int
+    action: str
+    device: Optional[str] = None
+    location: Optional[str] = None
+    ip_address: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# Chat Models
+# ============================================================================
+
+class ChatMessageRequest(BaseModel):
+    """Chat message request model."""
+    recipient_id: int
+    appointment_id: Optional[int] = None
+    message: str
+    message_type: str = "text"
+
+    class Config:
+        from_attributes = True
+
+
+class ChatMessageResponse(BaseModel):
+    """Chat message response model."""
+    id: int
+    sender_id: int
+    recipient_id: int
+    appointment_id: Optional[int] = None
+    message: str
+    message_type: str
+    is_read: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChatRoomRequest(BaseModel):
+    """Chat room request model."""
+    doctor_id: int
+    appointment_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ChatRoomResponse(BaseModel):
+    """Chat room response model."""
+    id: int
+    patient_id: int
+    doctor_id: int
+    appointment_id: Optional[int] = None
+    is_active: bool
+    last_message_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChatRoomWithMessages(BaseModel):
+    """Chat room with messages response model."""
+    id: int
+    patient_id: int
+    doctor_id: int
+    appointment_id: Optional[int] = None
+    is_active: bool
+    last_message_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    messages: List[ChatMessageResponse] = []
+
+    class Config:
+        from_attributes = True

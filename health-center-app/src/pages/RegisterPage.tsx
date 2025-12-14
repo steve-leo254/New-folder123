@@ -41,6 +41,14 @@ const Signup: React.FC = () => {
     termsAccepted: false,
     ageVerified: false,
   });
+  const [ageError, setAgeError] = useState<string>('');
+
+  // Calculate max date (18 years ago from today)
+  const getMaxDate = () => {
+    const today = new Date();
+    const maxDate = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+    return maxDate.toISOString().split('T')[0];
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -58,7 +66,50 @@ const Signup: React.FC = () => {
         ...prev,
         [name]: value,
       }));
+      
+      // Real-time age validation when date of birth changes
+      if (name === 'dateOfBirth' && value) {
+        const ageCheck = validateAge(value);
+        setAgeError(ageCheck.valid ? '' : ageCheck.message);
+      } else if (name === 'dateOfBirth' && !value) {
+        setAgeError('');
+      }
     }
+  };
+
+  // Age validation helper
+  const validateAge = (dateOfBirth: string): { valid: boolean; message: string } => {
+    if (!dateOfBirth) {
+      return { valid: false, message: 'Date of birth is required' };
+    }
+    
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    
+    // Check if date is in the future
+    if (birthDate > today) {
+      return { valid: false, message: 'Date of birth cannot be in the future' };
+    }
+    
+    // Calculate age
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    // Check if user is at least 18
+    if (age < 18) {
+      return { valid: false, message: `You must be at least 18 years old to register. Current age: ${age}` };
+    }
+    
+    // Check if user is unreasonably old (optional)
+    if (age > 120) {
+      return { valid: false, message: 'Please enter a valid date of birth' };
+    }
+    
+    return { valid: true, message: '' };
   };
 
   // Password validation helper
@@ -85,6 +136,13 @@ const Signup: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
+    // Validate age first
+    const ageCheck = validateAge(formData.dateOfBirth);
+    if (!ageCheck.valid) {
+      setError(ageCheck.message);
+      return false;
+    }
+
     // Check if passwords match
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
@@ -105,7 +163,7 @@ const Signup: React.FC = () => {
     }
 
     if (!formData.ageVerified) {
-      setError('You must be over 18 years old to register');
+      setError('You must confirm you are over 18 years old to register');
       return false;
     }
 
@@ -270,8 +328,12 @@ const Signup: React.FC = () => {
               label="Date of Birth"
               value={formData.dateOfBirth}
               onChange={handleInputChange}
+              max={getMaxDate()}
               required
             />
+            {ageError && (
+              <p className="mt-1 text-xs text-red-600">{ageError}</p>
+            )}
           </div>
 
           <Input

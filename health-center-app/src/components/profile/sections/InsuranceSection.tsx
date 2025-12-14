@@ -1,20 +1,70 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CreditCard, Shield } from 'lucide-react';
+import { CreditCard, Shield, AlertCircle } from 'lucide-react';
 import Card from '../../ui/Card';
-import { PatientProfile } from '../../../services/api/patientApi';
+import { useInsurance, Insurance } from '../../../services/useInsurance';
 
 interface InsuranceSectionProps {
-  formData: PatientProfile;
   isEditing: boolean;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-export const InsuranceSection: React.FC<InsuranceSectionProps> = ({
-  formData,
-  isEditing,
-  onChange,
-}) => {
+export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ isEditing }) => {
+  const { insurance, loading, error, updateInsurance } = useInsurance();
+  const [formData, setFormData] = useState<Insurance>({
+    provider: '',
+    policyNumber: '',
+    groupNumber: '',
+    holderName: '',
+  });
+
+  // Update local form data when insurance changes
+  useEffect(() => {
+    if (insurance) {
+      setFormData(insurance);
+    }
+  }, [insurance]);
+
+  // Handle input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Save insurance info
+  const handleSave = async () => {
+    const result = await updateInsurance(formData);
+    if (!result.success) {
+      console.error('Failed to update insurance:', result.error);
+    }
+  };
+
+  // Auto-save when editing stops
+  useEffect(() => {
+    if (!isEditing && insurance && JSON.stringify(formData) !== JSON.stringify(insurance)) {
+      handleSave();
+    }
+  }, [isEditing, insurance]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-12 text-center">
+        <AlertCircle className="h-16 w-16 text-red-300 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Insurance Information</h3>
+        <p className="text-gray-600">{error}</p>
+      </Card>
+    );
+  }
   return (
     <motion.div
       key="insurance"
@@ -41,9 +91,9 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({
             </label>
             <input
               type="text"
-              name="insuranceProvider"
-              value={formData.insuranceProvider}
-              onChange={onChange}
+              name="provider"
+              value={formData.provider}
+              onChange={handleInputChange}
               disabled={!isEditing}
               placeholder="e.g., Blue Cross Blue Shield"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
@@ -55,9 +105,9 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({
             </label>
             <input
               type="text"
-              name="insurancePolicyNumber"
-              value={formData.insurancePolicyNumber}
-              onChange={onChange}
+              name="policyNumber"
+              value={formData.policyNumber}
+              onChange={handleInputChange}
               disabled={!isEditing}
               placeholder="Enter policy number"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
@@ -69,9 +119,9 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({
             </label>
             <input
               type="text"
-              name="insuranceGroupNumber"
-              value={formData.insuranceGroupNumber}
-              onChange={onChange}
+              name="groupNumber"
+              value={formData.groupNumber}
+              onChange={handleInputChange}
               disabled={!isEditing}
               placeholder="Enter group number"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
@@ -83,9 +133,9 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({
             </label>
             <input
               type="text"
-              name="insuranceHolderName"
-              value={formData.insuranceHolderName}
-              onChange={onChange}
+              name="holderName"
+              value={formData.holderName}
+              onChange={handleInputChange}
               disabled={!isEditing}
               placeholder="Enter policy holder's name"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"

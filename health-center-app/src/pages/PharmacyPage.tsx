@@ -15,6 +15,7 @@ import {
   X,
   Zap,
   Minus,
+  Eye,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMedications } from '../services/useMedication';
@@ -665,7 +666,8 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                       {/* Title and Price */}
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
-                          <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+                          <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-1 cursor-pointer"
+                            onClick={() => navigate(`/medication/${medication.id}`)}>
                             {medication.name}
                           </h3>
                           {medication.genericName !== medication.name && (
@@ -758,6 +760,13 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
 
                       {/* Actions */}
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => navigate(`/medication/${medication.id}`)}
+                          className="flex-1 py-2 px-4 rounded-lg font-medium transition-all flex items-center justify-center bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View 
+                        </button>
                         {getItemQuantity(parseInt(medication.id)) > 0 ? (
                           <div className="flex items-center gap-2 flex-1">
                             <button
@@ -857,7 +866,8 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                                 <div className="text-sm text-gray-500">{medication.dosage}</div>
                               </div>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-1">{medication.name}</h3>
+                            <h3 className="text-xl font-bold text-gray-900 mb-1 cursor-pointer hover:text-blue-600 transition-colors"
+                            onClick={() => navigate(`/medication/${medication.id}`)}>{medication.name}</h3>
                             {medication.genericName !== medication.name && (
                               <p className="text-sm text-gray-500 mb-2">{medication.genericName}</p>
                             )}
@@ -890,6 +900,13 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
 
                             {/* Actions */}
                             <div className="flex items-center gap-2 pt-3 border-t">
+                              <button
+                                onClick={() => navigate(`/medication/${medication.id}`)}
+                                className="py-2 px-4 rounded-lg font-medium transition-all flex items-center bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md"
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </button>
                               {getItemQuantity(parseInt(medication.id)) > 0 ? (
                                 <div className="flex items-center gap-2">
                                   <button

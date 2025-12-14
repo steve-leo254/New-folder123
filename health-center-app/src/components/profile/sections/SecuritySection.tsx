@@ -1,19 +1,48 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, AlertTriangle } from 'lucide-react';
+import { Lock, AlertTriangle, AlertCircle, Shield, Activity } from 'lucide-react';
 import Card from '../../ui/Card';
 import Button from '../../ui/Button';
-import { PatientProfile } from '../../../services/api/patientApi';
+import { useSecurity, SecuritySettings, ActivityLog } from '../../../services/useSecurity';
+import { usePatient } from '../../../services/usePatient';
 
 interface SecuritySectionProps {
-  formData: PatientProfile;
   onChangePassword: () => void;
 }
 
-export const SecuritySection: React.FC<SecuritySectionProps> = ({
-  formData,
-  onChangePassword,
-}) => {
+export const SecuritySection: React.FC<SecuritySectionProps> = ({ onChangePassword }) => {
+  const { securitySettings, activityLogs, loading, error, updateSecuritySettings, refreshActivityLogs } = useSecurity();
+  const { patient } = usePatient();
+  const [showActivityLogs, setShowActivityLogs] = useState(false);
+
+  // Handle security settings changes
+  const handleSecurityToggle = async (setting: keyof SecuritySettings) => {
+    if (!securitySettings) return;
+    
+    const newValue = !securitySettings[setting];
+    const result = await updateSecuritySettings({ [setting]: newValue });
+    if (!result.success) {
+      console.error('Failed to update security setting:', result.error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-12 text-center">
+        <AlertCircle className="h-16 w-16 text-red-300 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Security Settings</h3>
+        <p className="text-gray-600">{error}</p>
+      </Card>
+    );
+  }
   return (
     <motion.div
       key="security"
@@ -50,17 +79,41 @@ export const SecuritySection: React.FC<SecuritySectionProps> = ({
               <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
               <p className="text-sm text-gray-500">Add an extra layer of security</p>
             </div>
-            <Button variant="outline" size="sm">
-              Enable
+            <Button 
+              variant={securitySettings?.twoFactorEnabled ? "default" : "outline"} 
+              size="sm"
+              onClick={() => handleSecurityToggle('twoFactorEnabled')}
+            >
+              {securitySettings?.twoFactorEnabled ? 'Disable' : 'Enable'}
             </Button>
           </div>
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div>
-              <h4 className="font-medium text-gray-900">Active Sessions</h4>
-              <p className="text-sm text-gray-500">Manage your active sessions</p>
+              <h4 className="font-medium text-gray-900">Login Alerts</h4>
+              <p className="text-sm text-gray-500">Get notified of new logins</p>
             </div>
-            <Button variant="outline" size="sm">
-              View All
+            <Button 
+              variant={securitySettings?.loginAlerts ? "default" : "outline"} 
+              size="sm"
+              onClick={() => handleSecurityToggle('loginAlerts')}
+            >
+              {securitySettings?.loginAlerts ? 'Disable' : 'Enable'}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <h4 className="font-medium text-gray-900">Activity Logs</h4>
+              <p className="text-sm text-gray-500">View your recent account activity</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setShowActivityLogs(!showActivityLogs);
+                if (!showActivityLogs) refreshActivityLogs();
+              }}
+            >
+              {showActivityLogs ? 'Hide' : 'View All'}
             </Button>
           </div>
         </div>
@@ -72,28 +125,65 @@ export const SecuritySection: React.FC<SecuritySectionProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500">Member ID</p>
-            <p className="font-medium text-gray-900">{formData.memberId}</p>
+            <p className="font-medium text-gray-900">{patient?.memberId || 'N/A'}</p>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500">Account Status</p>
-            <p className="font-medium text-emerald-600 capitalize">{formData.status}</p>
+            <p className="font-medium text-emerald-600 capitalize">{patient?.status || 'active'}</p>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500">Member Since</p>
             <p className="font-medium text-gray-900">
-              {new Date(formData.registrationDate).toLocaleDateString('en-US', {
+              {patient?.registrationDate ? new Date(patient.registrationDate).toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
-              })}
+              }) : 'N/A'}
             </p>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500">Last Login</p>
-            <p className="font-medium text-gray-900">Today at 10:30 AM</p>
+            <p className="font-medium text-gray-900">
+              {activityLogs.length > 0 ? new Date(activityLogs[0].timestamp).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              }) : 'Today at 10:30 AM'}
+            </p>
           </div>
         </div>
       </Card>
+
+      {/* Activity Logs */}
+      {showActivityLogs && (
+        <Card className="p-6">
+          <div className="flex items-center mb-4">
+            <Activity className="h-5 w-5 text-blue-600 mr-2" />
+            <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+          </div>
+          <div className="space-y-3">
+            {activityLogs.length > 0 ? activityLogs.map((log) => (
+              <div key={log.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">{log.action}</p>
+                  <p className="text-sm text-gray-500">{log.device} • {log.location}</p>
+                </div>
+                <p className="text-sm text-gray-500">
+                  {new Date(log.timestamp).toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+            )) : (
+              <p className="text-gray-500 text-center py-4">No recent activity found</p>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Danger Zone */}
       <Card className="p-6 bg-red-50 border border-red-200">

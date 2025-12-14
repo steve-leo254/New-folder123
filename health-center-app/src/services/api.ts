@@ -131,6 +131,88 @@ export const apiService = {
     const { data } = await api.get('/billing', { params });
     return data;
   },
+  // Medical Info endpoints
+  getMedicalInfo: async () => {
+    const { data } = await api.get('/api/patient/medical-info');
+    return data;
+  },
+  updateMedicalInfo: async (payload: {
+    blood_type?: string;
+    height?: string;
+    weight?: string;
+    allergies?: string[];
+    conditions?: string[];
+    medications?: string[];
+  }) => {
+    const { data } = await api.put('/api/patient/medical-info', payload);
+    return data;
+  },
+  addMedicalItem: async (type: 'allergy' | 'condition' | 'medication', value: string) => {
+    const { data } = await api.post(`/api/patient/medical-info/${type}`, { value });
+    return data;
+  },
+  removeMedicalItem: async (type: 'allergy' | 'condition' | 'medication', index: number) => {
+    const { data } = await api.delete(`/api/patient/medical-info/${type}/${index}`);
+    return data;
+  },
+  // Emergency Contact endpoints
+  getEmergencyContact: async () => {
+    const { data } = await api.get('/api/patient/emergency-contact');
+    return data;
+  },
+  updateEmergencyContact: async (payload: {
+    emergency_contact_name?: string;
+    emergency_contact_phone?: string;
+    emergency_contact_relation?: string;
+  }) => {
+    const { data } = await api.put('/api/patient/emergency-contact', payload);
+    return data;
+  },
+  // Insurance endpoints
+  getInsurance: async () => {
+    const { data } = await api.get('/api/patient/insurance');
+    return data;
+  },
+  updateInsurance: async (payload: {
+    insurance_provider?: string;
+    insurance_policy_number?: string;
+    insurance_group_number?: string;
+    insurance_holder_name?: string;
+  }) => {
+    const { data } = await api.put('/api/patient/insurance', payload);
+    return data;
+  },
+  // Notifications endpoints
+  getNotifications: async () => {
+    const { data } = await api.get('/api/patient/notifications');
+    return data;
+  },
+  updateNotifications: async (payload: {
+    email_notifications?: boolean;
+    sms_notifications?: boolean;
+    appointment_reminders?: boolean;
+    lab_results_notifications?: boolean;
+  }) => {
+    const { data } = await api.put('/api/patient/notifications', payload);
+    return data;
+  },
+  // Security endpoints
+  getSecuritySettings: async () => {
+    const { data } = await api.get('/api/patient/security');
+    return data;
+  },
+  updateSecuritySettings: async (payload: {
+    two_factor_enabled?: boolean;
+    login_alerts?: boolean;
+    session_timeout?: number;
+  }) => {
+    const { data } = await api.put('/api/patient/security', payload);
+    return data;
+  },
+  getActivityLogs: async () => {
+    const { data } = await api.get('/api/patient/activity-logs');
+    return data;
+  },
 };
 
 export default api;

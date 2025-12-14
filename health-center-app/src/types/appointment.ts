@@ -8,6 +8,7 @@ export interface Appointment {
   type: 'in-person' | 'video';
   notes?: string;
   paymentStatus: 'pending' | 'paid' | 'refunded';
+  duration?: number;
   createdAt: string;
   updatedAt: string;
 }

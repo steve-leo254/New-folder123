@@ -13,13 +13,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import or_, and_
 from dotenv import load_dotenv
 
 import models
 from database import engine, get_db
 from models import (
     User, Appointment, Prescription, Doctor, Medication,
-    Role, AppointmentStatus, VideoConsultation, StaffRole
+    Role, AppointmentStatus, VideoConsultation, StaffRole,
+    MedicalInfo, EmergencyContact, Insurance, NotificationSettings,
+    SecuritySettings, ActivityLog, ChatMessage, ChatRoom
 )
 from auth_router import (
     router as auth_router, 
@@ -27,6 +30,7 @@ from auth_router import (
     get_current_active_user,
     bcrypt_context
 )
+from doctor_profile_router import router as doctor_profile_router
 from pgfunc import (
     dashboard_snapshot,
     get_appointments_for_user,
@@ -61,6 +65,24 @@ from pydantic_models import (
     VideoTokenResponse,
     VideoConsultationResponse,
     ImageResponse,
+    # Patient Profile Models
+    MedicalInfoRequest,
+    MedicalInfoResponse,
+    EmergencyContactRequest,
+    EmergencyContactResponse,
+    InsuranceRequest,
+    InsuranceResponse,
+    NotificationSettingsRequest,
+    NotificationSettingsResponse,
+    SecuritySettingsRequest,
+    SecuritySettingsResponse,
+    ActivityLogResponse,
+    # Chat Models
+    ChatMessageRequest,
+    ChatMessageResponse,
+    ChatRoomRequest,
+    ChatRoomResponse,
+    ChatRoomWithMessages,
 )
 
 # Load environment
@@ -116,6 +138,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include routers
 app.include_router(auth_router)
+app.include_router(doctor_profile_router)
 
 
 def require_admin(*allowed_roles: Role):
@@ -238,13 +261,18 @@ def create_user_account(
 
 @app.get("/users/me", response_model=UserProfileResponse)
 def get_current_user_profile(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> UserProfileResponse:
     """Get current user profile."""
     # Convert relative profile_picture URL to full URL if needed
     profile_picture = current_user.profile_picture
     if profile_picture and not profile_picture.startswith('http'):
         profile_picture = f"http://localhost:8000{profile_picture}"
+    
+    # Get medical info and emergency contact
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+    emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == current_user.id).first()
     
     return UserProfileResponse(
         id=current_user.id,
@@ -258,9 +286,9 @@ def get_current_user_profile(
         created_at=current_user.created_at,
         profile_picture=profile_picture,
         address=current_user.address,
-        emergencyContact=None,  
-        bloodType=None,  
-        allergies=None  
+        emergencyContact=emergency_contact.phone if emergency_contact else None,
+        bloodType=medical_info.blood_type if medical_info else None,
+        allergies=medical_info.allergies if medical_info else None
     )
 
 
@@ -282,10 +310,23 @@ def update_current_user_profile(
         db.refresh(current_user)
         logger.info(f"User profile updated: {current_user.id}")
         
+        # Log profile update
+        from activity_logger import create_activity_log
+        create_activity_log(
+            user_id=current_user.id,
+            action="Profile Update",
+            device="Web Application",
+            db=db
+        )
+        
         # Convert relative profile_picture URL to full URL if needed
         profile_picture = current_user.profile_picture
         if profile_picture and not profile_picture.startswith('http'):
             profile_picture = f"http://localhost:8000{profile_picture}"
+        
+        # Get medical info and emergency contact
+        medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+        emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == current_user.id).first()
         
         return UserProfileResponse(
             id=current_user.id,
@@ -299,9 +340,9 @@ def update_current_user_profile(
             created_at=current_user.created_at,
             profile_picture=profile_picture,
             address=current_user.address,
-            emergencyContact=current_user.emergencyContact,  
-            bloodType=current_user.bloodType,  
-            allergies=current_user.allergies  
+            emergencyContact=emergency_contact.phone if emergency_contact else None,
+            bloodType=medical_info.blood_type if medical_info else None,
+            allergies=medical_info.allergies if medical_info else None
         )
     except SQLAlchemyError as e:
         db.rollback()
@@ -477,7 +518,7 @@ def update_appointment(
 @app.patch("/appointments/{appointment_id}/reschedule", response_model=UserProfileResponse)
 def reschedule_appointment(
     appointment_id: int,
-    new_scheduled_at: datetime,
+    payload: AppointmentRescheduleRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Appointment:
@@ -490,24 +531,31 @@ def reschedule_appointment(
             detail="Appointment not found"
         )
 
-    # Check permissions
+    # Check permissions - allow patients, doctors, and admin
     if current_user.role == Role.PATIENT and appt.patient_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to reschedule this appointment"
         )
-    elif current_user.role == Role.CLINICIAN_ADMIN and appt.clinician_id != current_user.id:
+    elif current_user.role == Role.DOCTOR and appt.doctor_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to reschedule this appointment"
         )
 
-    appt.scheduled_at = new_scheduled_at
+    # Update appointment with new date and time
+    appt.date = payload.date
+    appt.time = payload.time
+    appt.updated_at = datetime.utcnow()
     
+    # Add notes if provided
+    if payload.notes:
+        appt.notes = payload.notes
+
     try:
         db.commit()
         db.refresh(appt)
-        logger.info(f"Appointment rescheduled: ID {appt.id}")
+        logger.info(f"Appointment rescheduled: ID {appt.id} by user {current_user.id}")
         return appt
     except SQLAlchemyError as e:
         db.rollback()
@@ -1819,6 +1867,692 @@ async def update_patient_profile(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update profile"
+        )
+
+# ============================================================================
+# Patient Profile Endpoints
+# ============================================================================
+
+@app.get("/api/patient/medical-info", response_model=MedicalInfoResponse)
+async def get_medical_info(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current patient's medical information."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can access medical information"
+        )
+    
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+    
+    if not medical_info:
+        # Create default medical info if none exists
+        medical_info = MedicalInfo(patient_id=current_user.id)
+        db.add(medical_info)
+        db.commit()
+        db.refresh(medical_info)
+    
+    return medical_info
+
+@app.put("/api/patient/medical-info", response_model=MedicalInfoResponse)
+async def update_medical_info(
+    medical_update: MedicalInfoRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update current patient's medical information."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can update medical information"
+        )
+    
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+    
+    if not medical_info:
+        medical_info = MedicalInfo(patient_id=current_user.id)
+        db.add(medical_info)
+    
+    # Update fields
+    for field, value in medical_update.dict(exclude_unset=True).items():
+        setattr(medical_info, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(medical_info)
+        logger.info(f"Medical info updated for patient: {current_user.email}")
+        
+        # Log medical info update
+        from activity_logger import create_activity_log
+        create_activity_log(
+            user_id=current_user.id,
+            action="Medical Info Update",
+            device="Web Application",
+            db=db
+        )
+        
+        return medical_info
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error updating medical info: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update medical information"
+        )
+
+@app.post("/api/patient/medical-info/{item_type}", response_model=MedicalInfoResponse)
+async def add_medical_item(
+    item_type: str,
+    payload: dict,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Add item to medical information arrays (allergies, conditions, medications)."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can update medical information"
+        )
+    
+    if item_type not in ['allergies', 'conditions', 'medications']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid item type. Must be: allergies, conditions, or medications"
+        )
+    
+    value = payload.get('value')
+    if not value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Value is required"
+        )
+    
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+    
+    if not medical_info:
+        medical_info = MedicalInfo(patient_id=current_user.id)
+        db.add(medical_info)
+    
+    # Add item to the appropriate array
+    current_array = getattr(medical_info, item_type) or []
+    current_array.append(value)
+    setattr(medical_info, item_type, current_array)
+    
+    try:
+        db.commit()
+        db.refresh(medical_info)
+        logger.info(f"Medical item added for patient {current_user.id}: {item_type} = {value}")
+        return medical_info
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error adding medical item: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add medical item"
+        )
+
+@app.delete("/api/patient/medical-info/{item_type}/{index}", response_model=MedicalInfoResponse)
+async def remove_medical_item(
+    item_type: str,
+    index: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Remove item from medical information arrays (allergies, conditions, medications)."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can update medical information"
+        )
+    
+    if item_type not in ['allergies', 'conditions', 'medications']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid item type. Must be: allergies, conditions, or medications"
+        )
+    
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+    
+    if not medical_info:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Medical information not found"
+        )
+    
+    current_array = getattr(medical_info, item_type) or []
+    
+    if index < 0 or index >= len(current_array):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid index"
+        )
+    
+    # Remove item at the specified index
+    current_array.pop(index)
+    setattr(medical_info, item_type, current_array)
+    
+    try:
+        db.commit()
+        db.refresh(medical_info)
+        logger.info(f"Medical item removed for patient {current_user.id}: {item_type} at index {index}")
+        return medical_info
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error removing medical item: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to remove medical item"
+        )
+
+@app.get("/api/patient/emergency-contact", response_model=EmergencyContactResponse)
+async def get_emergency_contact(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current patient's emergency contact information."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can access emergency contact information"
+        )
+    
+    emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == current_user.id).first()
+    
+    if not emergency_contact:
+        # Create default emergency contact if none exists
+        emergency_contact = EmergencyContact(
+            patient_id=current_user.id,
+            name="",
+            phone="",
+            relation=""
+        )
+        db.add(emergency_contact)
+        db.commit()
+        db.refresh(emergency_contact)
+    
+    return emergency_contact
+
+@app.put("/api/patient/emergency-contact", response_model=EmergencyContactResponse)
+async def update_emergency_contact(
+    contact_update: EmergencyContactRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update current patient's emergency contact information."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can update emergency contact information"
+        )
+    
+    emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == current_user.id).first()
+    
+    if not emergency_contact:
+        emergency_contact = EmergencyContact(patient_id=current_user.id)
+        db.add(emergency_contact)
+    
+    # Update fields
+    for field, value in contact_update.dict(exclude_unset=True).items():
+        setattr(emergency_contact, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(emergency_contact)
+        logger.info(f"Emergency contact updated for patient: {current_user.email}")
+        return emergency_contact
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error updating emergency contact: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update emergency contact"
+        )
+
+@app.get("/api/patient/insurance", response_model=InsuranceResponse)
+async def get_insurance(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current patient's insurance information."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can access insurance information"
+        )
+    
+    insurance = db.query(Insurance).filter(Insurance.patient_id == current_user.id).first()
+    
+    if not insurance:
+        # Create default insurance if none exists
+        insurance = Insurance(
+            patient_id=current_user.id,
+            provider="",
+            policy_number="",
+            holder_name=""
+        )
+        db.add(insurance)
+        db.commit()
+        db.refresh(insurance)
+    
+    return insurance
+
+@app.put("/api/patient/insurance", response_model=InsuranceResponse)
+async def update_insurance(
+    insurance_update: InsuranceRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update current patient's insurance information."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can update insurance information"
+        )
+    
+    insurance = db.query(Insurance).filter(Insurance.patient_id == current_user.id).first()
+    
+    if not insurance:
+        insurance = Insurance(patient_id=current_user.id)
+        db.add(insurance)
+    
+    # Update fields
+    for field, value in insurance_update.dict(exclude_unset=True).items():
+        setattr(insurance, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(insurance)
+        logger.info(f"Insurance updated for patient: {current_user.email}")
+        return insurance
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error updating insurance: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update insurance information"
+        )
+
+@app.get("/api/patient/notifications", response_model=NotificationSettingsResponse)
+async def get_notification_settings(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current patient's notification settings."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can access notification settings"
+        )
+    
+    notification_settings = db.query(NotificationSettings).filter(NotificationSettings.patient_id == current_user.id).first()
+    
+    if not notification_settings:
+        # Create default notification settings if none exists
+        notification_settings = NotificationSettings(patient_id=current_user.id)
+        db.add(notification_settings)
+        db.commit()
+        db.refresh(notification_settings)
+    
+    return notification_settings
+
+@app.put("/api/patient/notifications", response_model=NotificationSettingsResponse)
+async def update_notification_settings(
+    notification_update: NotificationSettingsRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update current patient's notification settings."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can update notification settings"
+        )
+    
+    notification_settings = db.query(NotificationSettings).filter(NotificationSettings.patient_id == current_user.id).first()
+    
+    if not notification_settings:
+        notification_settings = NotificationSettings(patient_id=current_user.id)
+        db.add(notification_settings)
+    
+    # Update fields
+    for field, value in notification_update.dict(exclude_unset=True).items():
+        setattr(notification_settings, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(notification_settings)
+        logger.info(f"Notification settings updated for patient: {current_user.email}")
+        return notification_settings
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error updating notification settings: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update notification settings"
+        )
+
+@app.get("/api/patient/security", response_model=SecuritySettingsResponse)
+async def get_security_settings(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current patient's security settings."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can access security settings"
+        )
+    
+    security_settings = db.query(SecuritySettings).filter(SecuritySettings.patient_id == current_user.id).first()
+    
+    if not security_settings:
+        # Create default security settings if none exists
+        security_settings = SecuritySettings(patient_id=current_user.id)
+        db.add(security_settings)
+        db.commit()
+        db.refresh(security_settings)
+    
+    return security_settings
+
+@app.put("/api/patient/security", response_model=SecuritySettingsResponse)
+async def update_security_settings(
+    security_update: SecuritySettingsRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update current patient's security settings."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can update security settings"
+        )
+    
+    security_settings = db.query(SecuritySettings).filter(SecuritySettings.patient_id == current_user.id).first()
+    
+    if not security_settings:
+        security_settings = SecuritySettings(patient_id=current_user.id)
+        db.add(security_settings)
+    
+    # Update fields
+    for field, value in security_update.dict(exclude_unset=True).items():
+        setattr(security_settings, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(security_settings)
+        logger.info(f"Security settings updated for patient: {current_user.email}")
+        return security_settings
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error updating security settings: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update security settings"
+        )
+
+@app.get("/api/patient/activity-logs", response_model=List[ActivityLogResponse])
+async def get_activity_logs(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current patient's activity logs."""
+    if current_user.role != Role.PATIENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only patients can access activity logs"
+        )
+    
+    activity_logs = db.query(ActivityLog).filter(
+        ActivityLog.user_id == current_user.id
+    ).order_by(ActivityLog.timestamp.desc()).limit(50).all()
+    
+    return activity_logs
+
+# ============================================================================
+# Chat Endpoints
+# ============================================================================
+
+@app.post("/api/chat/rooms", response_model=ChatRoomResponse)
+async def create_chat_room(
+    room_request: ChatRoomRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Create a new chat room between patient and doctor."""
+    # Verify the doctor exists and is actually a doctor
+    doctor = db.query(User).filter(
+        User.id == room_request.doctor_id,
+        User.role == Role.DOCTOR
+    ).first()
+    
+    if not doctor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Doctor not found"
+        )
+    
+    # Check if chat room already exists
+    existing_room = db.query(ChatRoom).filter(
+        ChatRoom.patient_id == current_user.id,
+        ChatRoom.doctor_id == room_request.doctor_id,
+        ChatRoom.appointment_id == room_request.appointment_id,
+        ChatRoom.is_active == True
+    ).first()
+    
+    if existing_room:
+        return existing_room
+    
+    # Create new chat room
+    chat_room = ChatRoom(
+        patient_id=current_user.id,
+        doctor_id=room_request.doctor_id,
+        appointment_id=room_request.appointment_id
+    )
+    
+    try:
+        db.add(chat_room)
+        db.commit()
+        db.refresh(chat_room)
+        logger.info(f"Chat room created between patient {current_user.id} and doctor {room_request.doctor_id}")
+        return chat_room
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error creating chat room: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create chat room"
+        )
+
+@app.get("/api/chat/rooms", response_model=List[ChatRoomResponse])
+async def get_chat_rooms(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get all chat rooms for the current user."""
+    if current_user.role == Role.PATIENT:
+        rooms = db.query(ChatRoom).filter(
+            ChatRoom.patient_id == current_user.id,
+            ChatRoom.is_active == True
+        ).order_by(ChatRoom.last_message_at.desc()).all()
+    else:
+        rooms = db.query(ChatRoom).filter(
+            ChatRoom.doctor_id == current_user.id,
+            ChatRoom.is_active == True
+        ).order_by(ChatRoom.last_message_at.desc()).all()
+    
+    return rooms
+
+@app.get("/api/chat/rooms/{room_id}", response_model=ChatRoomWithMessages)
+async def get_chat_room_with_messages(
+    room_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get chat room details with all messages."""
+    # Verify user has access to this chat room
+    room = db.query(ChatRoom).filter(ChatRoom.id == room_id).first()
+    
+    if not room:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat room not found"
+        )
+    
+    if current_user.role == Role.PATIENT and room.patient_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this chat room"
+        )
+    
+    if current_user.role == Role.DOCTOR and room.doctor_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this chat room"
+        )
+    
+    # Get all messages for this room
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.appointment_id == room.appointment_id
+    ).order_by(ChatMessage.created_at.asc()).all()
+    
+    room_response = ChatRoomWithMessages(
+        **room.__dict__,
+        messages=messages
+    )
+    
+    return room_response
+
+@app.post("/api/chat/messages", response_model=ChatMessageResponse)
+async def send_message(
+    message_request: ChatMessageRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Send a message to another user."""
+    # Verify recipient exists
+    recipient = db.query(User).filter(User.id == message_request.recipient_id).first()
+    
+    if not recipient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipient not found"
+        )
+    
+    # Verify appointment exists if provided
+    if message_request.appointment_id:
+        appointment = db.query(Appointment).filter(
+            Appointment.id == message_request.appointment_id
+        ).first()
+        
+        if not appointment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Appointment not found"
+            )
+    
+    # Create message
+    message = ChatMessage(
+        sender_id=current_user.id,
+        recipient_id=message_request.recipient_id,
+        appointment_id=message_request.appointment_id,
+        message=message_request.message,
+        message_type=message_request.message_type
+    )
+    
+    try:
+        db.add(message)
+        db.commit()
+        db.refresh(message)
+        
+        # Update chat room's last_message_at if applicable
+        if message_request.appointment_id:
+            chat_room = db.query(ChatRoom).filter(
+                ChatRoom.appointment_id == message_request.appointment_id
+            ).first()
+            
+            if chat_room:
+                chat_room.last_message_at = message.created_at
+                db.commit()
+        
+        logger.info(f"Message sent from {current_user.id} to {message_request.recipient_id}")
+        return message
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error sending message: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send message"
+        )
+
+@app.get("/api/chat/messages/{recipient_id}", response_model=List[ChatMessageResponse])
+async def get_messages_with_user(
+    recipient_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get all messages between current user and specified recipient."""
+    # Verify recipient exists
+    recipient = db.query(User).filter(User.id == recipient_id).first()
+    
+    if not recipient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recipient not found"
+        )
+    
+    # Get messages between the two users
+    messages = db.query(ChatMessage).filter(
+        or_(
+            and_(ChatMessage.sender_id == current_user.id, ChatMessage.recipient_id == recipient_id),
+            and_(ChatMessage.sender_id == recipient_id, ChatMessage.recipient_id == current_user.id)
+        )
+    ).order_by(ChatMessage.created_at.asc()).all()
+    
+    # Mark messages as read if they were sent to current user
+    unread_messages = [msg for msg in messages if msg.recipient_id == current_user.id and not msg.is_read]
+    for msg in unread_messages:
+        msg.is_read = True
+    
+    if unread_messages:
+        db.commit()
+    
+    return messages
+
+@app.put("/api/chat/messages/{message_id}/read")
+async def mark_message_as_read(
+    message_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Mark a message as read."""
+    message = db.query(ChatMessage).filter(ChatMessage.id == message_id).first()
+    
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found"
+        )
+    
+    # Only recipient can mark message as read
+    if message.recipient_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only message recipient can mark as read"
+        )
+    
+    message.is_read = True
+    
+    try:
+        db.commit()
+        return {"message": "Message marked as read"}
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error marking message as read: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to mark message as read"
         )
 
 # ============================================================================

@@ -31,13 +31,17 @@ export const useUser = () => {
     setError(null);
     try {
       const response = await apiService.getCurrentUser();
-      setUser(response);
       console.log('Current user fetched:', response);
+      if (!response) {
+        throw new Error('No response from server');
+      }
+      setUser(response);
     } catch (err) {
       const axiosError = err as AxiosError<{ detail?: string }>;
       const errorMessage = axiosError.response?.data?.detail || 'Failed to fetch user profile';
       setError(errorMessage);
       console.error('Error fetching user:', errorMessage);
+      console.error('Full error:', err);
     } finally {
       setIsLoading(false);
     }

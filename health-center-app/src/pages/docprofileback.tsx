@@ -4,170 +4,259 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Mail, Phone, Edit3, Camera, Lock, MapPin, Building2,
   GraduationCap, Award, Clock, Calendar, Star, FileText,
-  Globe, Shield, CheckCircle, X, Plus, Trash2,
-  Video, MessageSquare, Users, TrendingUp, DollarSign, Settings, Save, AlertCircle
+  Globe, Stethoscope, Shield, CheckCircle, X, Plus, Trash2,
+  Video, MessageSquare, Users, TrendingUp, DollarSign,
+  Bell, Settings, ChevronRight, Save, AlertCircle
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Alert from '../components/ui/Alert';
 import { useUser } from '../services/useUser';
-import { useDoctorProfile } from '../hooks/useDoctorProfile';
-import { useAppointments } from '../services/useAppointment';
-import { useDashboardSummary } from '../services/useDashboardSummary';
-import { profileWebSocket } from '../services/profileWebSocket';
-import { DoctorEducation } from '../services/doctorProfileService';
+import { useAuth } from '../services/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
-// Types (keeping for compatibility with existing components)
-interface Appointment {
-  id: string | number;
-  patientId: string | number;
-  doctorId: string | number;
-  doctorName?: string;
-  patientName?: string;
-  patientImage?: string;
-  date: string;
-  time: string;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'upcoming';
-  type: 'in-person' | 'video';
-  paymentStatus: 'pending' | 'paid' | 'refunded';
-  reason?: string;
-  notes?: string;
-  duration?: number;
-  createdAt?: string;
-  updatedAt?: string;
+// Types
+interface Certification {
+  id: string;
+  title: string;
+  institution: string;
+  year: string;
+  type: 'degree' | 'certification' | 'license';
+  licenseNumber?: string;
+  expiryDate?: string;
 }
 
 interface AvailabilitySlot {
-  id: number;
-  doctor_id: number;
-  day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
-  is_open: boolean;
-  start_time?: string;
-  end_time?: string;
-  break_start?: string;
-  break_end?: string;
-  appointment_duration: number;
-  buffer_time: number;
-  max_appointments_per_day: number;
-  created_at: string;
+  day: string;
+  isOpen: boolean;
+  startTime: string;
+  endTime: string;
+  breakStart?: string;
+  breakEnd?: string;
+}
+
+interface Appointment {
+  id: string;
+  patientName: string;
+  patientImage: string;
+  date: string;
+  time: string;
+  type: 'in-person' | 'video' | 'phone';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  reason: string;
+  duration: number;
+}
+
+interface DoctorStats {
+  totalPatients: number;
+  appointmentsThisWeek: number;
+  rating: number;
+  reviewCount: number;
+  earnings: number;
 }
 
 const DoctorProfilePage: React.FC = () => {
-  const { user, isLoading, updateUser } = useUser();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  
-  // Use the doctor profile hook for API integration
-  const {
-    profile,
-    education,
-    contactInfo,
-    availability,
-    addEducation: addEducationFromHook,
-    updateEducation,
-    deleteEducation,
-    updateContactInfo,
-    updateAvailability
-  } = useDoctorProfile();
+  const { token } = useAuth();
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // State Management
   const [activeTab, setActiveTab] = useState<'profile' | 'appointments' | 'availability' | 'settings'>('profile');
   const [isEditing, setIsEditing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Local state for form inputs
+  // Profile Data
   const [profileData, setProfileData] = useState({
-    full_name: '',
-    email: '',
-    phone: '',
-    specialization: '',
-    specializations: [] as string[],
-    experience: '',
-    bio: '',
-    hospital: '',
-    department: '',
-    location: '',
-    consultationFee: '',
-    languages: [] as string[],
+    full_name: 'Dr. Sarah Johnson',
+    email: 'sarah.johnson@citymedical.com',
+    phone: '+1 (555) 123-4567',
+    specialization: 'Gastroenterology',
+    experience: '15',
+    bio: 'Board-certified gastroenterologist with over 15 years of experience in digestive health. Specializing in IBD, liver diseases, and advanced endoscopic procedures.',
+    hospital: 'City Medical Center',
+    department: 'Gastroenterology Department',
+    location: 'Main Building, Floor 3, Room 312',
+    consultationFee: '150',
+    languages: ['English', 'Spanish', 'French'],
     profile_picture: ''
   });
 
-  // Real-time appointments and stats
-  const { appointments, isLoading: appointmentsLoading, error: appointmentsError, fetchAppointments } = useAppointments();
-  const { summary, refreshSummary } = useDashboardSummary();
-
-  // Language management hooks
-  const [newLanguage, setNewLanguage] = useState('');
-  const [showLanguageInput, setShowLanguageInput] = useState(false);
-
-  // Specialization management hooks
-  const [newSpecialization, setNewSpecialization] = useState('');
-  const [showSpecializationInput, setShowSpecializationInput] = useState(false);
-
-  const addSpecialization = () => {
-    if (newSpecialization.trim() && !profileData.specializations.includes(newSpecialization.trim())) {
-      const updatedSpecializations = [...profileData.specializations, newSpecialization.trim()];
-      setProfileData({
-        ...profileData,
-        specializations: updatedSpecializations,
-        specialization: updatedSpecializations.join(', ') // Update the single specialization field for API
-      });
-      setNewSpecialization('');
-      setShowSpecializationInput(false);
+  // Certifications
+  const [certifications, setCertifications] = useState<Certification[]>([
+    {
+      id: '1',
+      title: 'Doctor of Medicine (MD)',
+      institution: 'Harvard Medical School',
+      year: '2008',
+      type: 'degree'
+    },
+    {
+      id: '2',
+      title: 'Board Certified - Gastroenterology',
+      institution: 'American Board of Internal Medicine',
+      year: '2012',
+      type: 'certification',
+      expiryDate: '2025-12'
+    },
+    {
+      id: '3',
+      title: 'State Medical License',
+      institution: 'State Medical Board',
+      year: '2008',
+      type: 'license',
+      licenseNumber: 'ML-2008-12345',
+      expiryDate: '2025-06'
     }
-  };
+  ]);
 
-  const removeSpecialization = (spec: string) => {
-    const updatedSpecializations = profileData.specializations.filter(s => s !== spec);
+  // Availability
+  const [availability, setAvailability] = useState<AvailabilitySlot[]>([
+    { day: 'Monday', isOpen: true, startTime: '09:00', endTime: '17:00', breakStart: '12:00', breakEnd: '13:00' },
+    { day: 'Tuesday', isOpen: true, startTime: '09:00', endTime: '17:00', breakStart: '12:00', breakEnd: '13:00' },
+    { day: 'Wednesday', isOpen: true, startTime: '09:00', endTime: '17:00', breakStart: '12:00', breakEnd: '13:00' },
+    { day: 'Thursday', isOpen: true, startTime: '09:00', endTime: '17:00', breakStart: '12:00', breakEnd: '13:00' },
+    { day: 'Friday', isOpen: true, startTime: '09:00', endTime: '15:00' },
+    { day: 'Saturday', isOpen: false, startTime: '', endTime: '' },
+    { day: 'Sunday', isOpen: false, startTime: '', endTime: '' }
+  ]);
+
+  // Appointments
+  const [appointments, setAppointments] = useState<Appointment[]>([
+    {
+      id: '1',
+      patientName: 'John Smith',
+      patientImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
+      date: '2024-01-15',
+      time: '09:00',
+      type: 'in-person',
+      status: 'pending',
+      reason: 'Follow-up consultation for digestive issues',
+      duration: 30
+    },
+    {
+      id: '2',
+      patientName: 'Emily Davis',
+      patientImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
+      date: '2024-01-15',
+      time: '10:00',
+      type: 'video',
+      status: 'confirmed',
+      reason: 'Initial consultation - stomach pain',
+      duration: 45
+    },
+    {
+      id: '3',
+      patientName: 'Michael Brown',
+      patientImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100',
+      date: '2024-01-15',
+      time: '11:00',
+      type: 'in-person',
+      status: 'confirmed',
+      reason: 'Endoscopy results review',
+      duration: 30
+    },
+    {
+      id: '4',
+      patientName: 'Sarah Wilson',
+      patientImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
+      date: '2024-01-16',
+      time: '09:30',
+      type: 'phone',
+      status: 'pending',
+      reason: 'Prescription renewal',
+      duration: 15
+    }
+  ]);
+
+  // Stats
+  const [stats] = useState<DoctorStats>({
+    totalPatients: 1247,
+    appointmentsThisWeek: 32,
+    rating: 4.9,
+    reviewCount: 328,
+    earnings: 12500
+  });
+
+  const { user, isLoading, updateUser } = useUser();
+
+  // Handlers
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setProfileData({
       ...profileData,
-      specializations: updatedSpecializations,
-      specialization: updatedSpecializations.join(', ') // Update the single specialization field for API
+      [e.target.name]: e.target.value
     });
   };
 
-  // Initialize profile data when API data loads
-  useEffect(() => {
-    if (profile && user) {
-      const specialization = profile.doctor?.specialization || '';
-      const specializations = specialization ? specialization.split(',').map(s => s.trim()).filter(s => s) : [];
-      
+  const handleSaveProfile = async () => {
+    try {
+      // API call to save profile
+      setSaveMessage({ type: 'success', message: 'Profile updated successfully!' });
+      setIsEditing(false);
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch (error) {
+      setSaveMessage({ type: 'error', message: 'Failed to update profile.' });
+    }
+  };
+
+  const handleAppointmentAction = async (appointmentId: string, action: 'confirm' | 'reschedule' | 'cancel' | 'complete') => {
+    setAppointments(prev =>
+      prev.map(apt =>
+        apt.id === appointmentId
+          ? { ...apt, status: action === 'confirm' ? 'confirmed' : action === 'cancel' ? 'cancelled' : action === 'complete' ? 'completed' : apt.status }
+          : apt
+      )
+    );
+    setSaveMessage({ type: 'success', message: `Appointment ${action}ed successfully!` });
+    setTimeout(() => setSaveMessage(null), 3000);
+  };
+
+  const handleAvailabilityChange = (index: number, field: keyof AvailabilitySlot, value: any) => {
+    setAvailability(prev =>
+      prev.map((slot, i) =>
+        i === index ? { ...slot, [field]: value } : slot
+      )
+    );
+  };
+
+  const addCertification = () => {
+    const newCert: Certification = {
+      id: Date.now().toString(),
+      title: '',
+      institution: '',
+      year: '',
+      type: 'certification'
+    };
+    setCertifications([...certifications, newCert]);
+  };
+
+  const removeCertification = (id: string) => {
+    setCertifications(certifications.filter(cert => cert.id !== id));
+  };
+
+  const updateCertification = (id: string, field: keyof Certification, value: string) => {
+    setCertifications(certifications.map(cert =>
+      cert.id === id ? { ...cert, [field]: value } : cert
+    ));
+  };
+
+  const addLanguage = () => {
+    const language = prompt('Enter language:');
+    if (language && !profileData.languages.includes(language)) {
       setProfileData({
-        full_name: user.full_name || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        specialization: specialization,
-        specializations: specializations,
-        experience: '', // This would come from profile when added
-        bio: profile.doctor?.bio || '',
-        hospital: contactInfo?.hospital || '',
-        department: contactInfo?.department || '',
-        location: contactInfo?.location || '',
-        consultationFee: contactInfo?.consultation_fee?.toString() || profile.doctor?.consultation_fee?.toString() || '',
-        languages: contactInfo?.languages || [],
-        profile_picture: user.profile_picture || ''
+        ...profileData,
+        languages: [...profileData.languages, language]
       });
     }
-  }, [profile, contactInfo, user]);
+  };
 
-  // Real-time WebSocket listeners
-  useEffect(() => {
-    // Listen for appointment updates
-    const unsubscribeAppointments = profileWebSocket.onAppointmentUpdate(() => {
-      fetchAppointments();
+  const removeLanguage = (lang: string) => {
+    setProfileData({
+      ...profileData,
+      languages: profileData.languages.filter(l => l !== lang)
     });
+  };
 
-    // Listen for profile/stats updates
-    const unsubscribeProfile = profileWebSocket.onProfileUpdate(() => {
-      refreshSummary();
-    });
-
-    return () => {
-      unsubscribeAppointments();
-      unsubscribeProfile();
-    };
-  }, [fetchAppointments, refreshSummary]);
-
-  // Show loading states
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -178,127 +267,6 @@ const DoctorProfilePage: React.FC = () => {
       </div>
     );
   }
-
-  if (appointmentsLoading) {
-    return <div>Loading appointments...</div>;
-  }
-  if (appointmentsError) {
-    return <div>Error loading appointments: {appointmentsError}</div>;
-  }
-
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setProfileData({
-      ...profileData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSaveProfile = async () => {
-    try {
-      // Update contact info with profile data
-      if (contactInfo) {
-        await updateContactInfo({
-          hospital: profileData.hospital,
-          department: profileData.department,
-          location: profileData.location,
-          consultation_fee: parseFloat(profileData.consultationFee) || undefined,
-          languages: profileData.languages
-        });
-      }
-      
-      // Update user profile data
-      if (user) {
-        await updateUser({
-          full_name: profileData.full_name,
-          phone: profileData.phone
-        });
-      }
-
-      setSaveMessage({ type: 'success', message: 'Profile updated successfully!' });
-      setIsEditing(false);
-      setTimeout(() => setSaveMessage(null), 3000);
-    } catch (error: any) {
-      setSaveMessage({ type: 'error', message: error.message || 'Failed to update profile.' });
-    }
-  };
-
-  const handleAppointmentAction = async (appointmentId: string, action: 'confirm' | 'reschedule' | 'cancel' | 'complete') => {
-    console.log(`Appointment ${appointmentId} ${action} action triggered`);
-    // This would need backend integration
-    setSaveMessage({ type: 'success', message: `Appointment ${action}ed successfully!` });
-    setTimeout(() => setSaveMessage(null), 3000);
-  };
-
-  const handleAvailabilityChange = async (index: number, field: keyof AvailabilitySlot, value: any) => {
-    if (!availability[index]) return;
-    
-    try {
-      await updateAvailability(availability[index].id, {
-        [field]: value
-      });
-    } catch (error: any) {
-      setSaveMessage({ type: 'error', message: error.message || 'Failed to update availability.' });
-    }
-  };
-
-  const addEducation = async () => {
-    try {
-      const newEducation = {
-        title: 'New Certification',
-        institution: 'Institution Name',
-        year: new Date().getFullYear().toString(),
-        type: 'certification' as const
-      };
-      
-      await addEducationFromHook(newEducation);
-      setSaveMessage({ type: 'success', message: 'Education added successfully!' });
-      setTimeout(() => setSaveMessage(null), 3000);
-    } catch (error: any) {
-      setSaveMessage({ type: 'error', message: error.message || 'Failed to add education.' });
-    }
-  };
-
-  const removeEducation = async (id: number) => {
-    try {
-      await deleteEducation(id);
-      setSaveMessage({ type: 'success', message: 'Education removed successfully!' });
-      setTimeout(() => setSaveMessage(null), 3000);
-    } catch (error: any) {
-      setSaveMessage({ type: 'error', message: error.message || 'Failed to remove education.' });
-    }
-  };
-
-  const updateEducationField = async (id: number, field: string, value: string) => {
-    try {
-      const educationItem = education.find(edu => edu.id === id);
-      if (!educationItem) return;
-      
-      await updateEducation(id, {
-        ...educationItem,
-        [field]: value
-      });
-    } catch (error: any) {
-      setSaveMessage({ type: 'error', message: error.message || 'Failed to update education.' });
-    }
-  };
-
-  const addLanguage = () => {
-    if (newLanguage.trim() && !profileData.languages.includes(newLanguage.trim())) {
-      setProfileData({
-        ...profileData,
-        languages: [...profileData.languages, newLanguage.trim()]
-      });
-      setNewLanguage('');
-      setShowLanguageInput(false);
-    }
-  };
-
-  const removeLanguage = (lang: string) => {
-    setProfileData({
-      ...profileData,
-      languages: profileData.languages.filter(l => l !== lang)
-    });
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -364,7 +332,7 @@ const DoctorProfilePage: React.FC = () => {
                 </span>
                 <span className="flex items-center gap-1">
                   <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  {(summary?.appointments || 0)} Active Patients
+                  {stats.rating} ({stats.reviewCount} reviews)
                 </span>
               </div>
             </div>
@@ -373,22 +341,22 @@ const DoctorProfilePage: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white/10 rounded-lg p-4 text-center">
                 <Users className="w-6 h-6 mx-auto mb-2" />
-                <div className="text-2xl font-bold">{summary?.users || 0}</div>
+                <div className="text-2xl font-bold">{stats.totalPatients}</div>
                 <div className="text-xs text-blue-100">Total Patients</div>
               </div>
               <div className="bg-white/10 rounded-lg p-4 text-center">
                 <Calendar className="w-6 h-6 mx-auto mb-2" />
-                <div className="text-2xl font-bold">{summary?.upcoming || 0}</div>
+                <div className="text-2xl font-bold">{stats.appointmentsThisWeek}</div>
                 <div className="text-xs text-blue-100">This Week</div>
               </div>
               <div className="bg-white/10 rounded-lg p-4 text-center">
                 <Star className="w-6 h-6 mx-auto mb-2" />
-                <div className="text-2xl font-bold">4.9</div>
+                <div className="text-2xl font-bold">{stats.rating}</div>
                 <div className="text-xs text-blue-100">Rating</div>
               </div>
               <div className="bg-white/10 rounded-lg p-4 text-center">
                 <TrendingUp className="w-6 h-6 mx-auto mb-2" />
-                <div className="text-2xl font-bold">KSH {(summary?.appointments || 0) * 12500}</div>
+                <div className="text-2xl font-bold">${stats.earnings}</div>
                 <div className="text-xs text-blue-100">This Month</div>
               </div>
             </div>
@@ -425,26 +393,16 @@ const DoctorProfilePage: React.FC = () => {
           {activeTab === 'profile' && (
             <ProfileTab
               profileData={profileData}
-              education={education}
+              certifications={certifications}
               isEditing={isEditing}
               setIsEditing={setIsEditing}
               handleProfileChange={handleProfileChange}
               handleSaveProfile={handleSaveProfile}
-              addEducation={addEducation}
-              removeEducation={removeEducation}
-              updateEducationField={updateEducationField}
+              addCertification={addCertification}
+              removeCertification={removeCertification}
+              updateCertification={updateCertification}
               addLanguage={addLanguage}
               removeLanguage={removeLanguage}
-              newLanguage={newLanguage}
-              setNewLanguage={setNewLanguage}
-              showLanguageInput={showLanguageInput}
-              setShowLanguageInput={setShowLanguageInput}
-              addSpecialization={addSpecialization}
-              removeSpecialization={removeSpecialization}
-              newSpecialization={newSpecialization}
-              setNewSpecialization={setNewSpecialization}
-              showSpecializationInput={showSpecializationInput}
-              setShowSpecializationInput={setShowSpecializationInput}
             />
           )}
           {activeTab === 'appointments' && (
@@ -470,53 +428,33 @@ const DoctorProfilePage: React.FC = () => {
   );
 };
 
-// Profile Tab Component Props Interface
+// Profile Tab Component
 interface ProfileTabProps {
   profileData: any;
-  education: DoctorEducation[];
+  certifications: Certification[];
   isEditing: boolean;
   setIsEditing: (value: boolean) => void;
   handleProfileChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   handleSaveProfile: () => void;
-  addEducation: () => void;
-  removeEducation: (id: number) => void;
-  updateEducationField: (id: number, field: string, value: string) => void;
+  addCertification: () => void;
+  removeCertification: (id: string) => void;
+  updateCertification: (id: string, field: keyof Certification, value: string) => void;
   addLanguage: () => void;
   removeLanguage: (lang: string) => void;
-  newLanguage: string;
-  setNewLanguage: (value: string) => void;
-  showLanguageInput: boolean;
-  setShowLanguageInput: (value: boolean) => void;
-  addSpecialization: () => void;
-  removeSpecialization: (spec: string) => void;
-  newSpecialization: string;
-  setNewSpecialization: (value: string) => void;
-  showSpecializationInput: boolean;
-  setShowSpecializationInput: (value: boolean) => void;
 }
 
 const ProfileTab: React.FC<ProfileTabProps> = ({
   profileData,
-  education,
+  certifications,
   isEditing,
   setIsEditing,
   handleProfileChange,
   handleSaveProfile,
-  addEducation,
-  removeEducation,
-  updateEducationField,
+  addCertification,
+  removeCertification,
+  updateCertification,
   addLanguage,
-  removeLanguage,
-  newLanguage,
-  setNewLanguage,
-  showLanguageInput,
-  setShowLanguageInput,
-  addSpecialization,
-  removeSpecialization,
-  newSpecialization,
-  setNewSpecialization,
-  showSpecializationInput,
-  setShowSpecializationInput
+  removeLanguage
 }) => {
   return (
     <motion.div
@@ -556,56 +494,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
 
           {/* Specializations */}
           <div className="mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium text-gray-900">Specializations</h4>
-              {isEditing && !showSpecializationInput && (
-                <button
-                  onClick={() => setShowSpecializationInput(true)}
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            
-            {/* Specialization Input Field */}
-            {isEditing && showSpecializationInput && (
-              <div className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={newSpecialization}
-                  onChange={(e) => setNewSpecialization(e.target.value)}
-                  placeholder="Enter specialization"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  onKeyPress={(e) => e.key === 'Enter' && addSpecialization()}
-                />
-                <Button onClick={addSpecialization} size="sm">
-                  Add
-                </Button>
-                <Button variant="outline" onClick={() => {
-                  setShowSpecializationInput(false);
-                  setNewSpecialization('');
-                }} size="sm">
-                  Cancel
-                </Button>
-              </div>
-            )}
-            
+            <h4 className="font-medium text-gray-900 mb-3">Specializations</h4>
             <div className="flex flex-wrap gap-2">
-              {profileData.specializations.map((spec: string) => (
+              {['Gastroenterology', 'Endoscopy', 'IBD Treatment', 'Liver Diseases', 'Colonoscopy'].map(spec => (
                 <span
                   key={spec}
-                  className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                  className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
                 >
                   {spec}
-                  {isEditing && (
-                    <button
-                      onClick={() => removeSpecialization(spec)}
-                      className="text-blue-600 hover:text-blue-700 ml-1"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
                 </span>
               ))}
             </div>
@@ -617,7 +513,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Education & Certifications</h3>
             {isEditing && (
-              <Button variant="outline" size="sm" onClick={addEducation}>
+              <Button variant="outline" size="sm" onClick={addCertification}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add
               </Button>
@@ -625,21 +521,21 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           </div>
 
           <div className="space-y-4">
-            {education.map((edu, index) => (
+            {certifications.map((cert, index) => (
               <motion.div
-                key={edu.id}
+                key={cert.id}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1 }}
                 className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg"
               >
                 <div className={`p-3 rounded-lg ${
-                  edu.type === 'degree' ? 'bg-purple-100 text-purple-600' :
-                  edu.type === 'certification' ? 'bg-green-100 text-green-600' :
+                  cert.type === 'degree' ? 'bg-purple-100 text-purple-600' :
+                  cert.type === 'certification' ? 'bg-green-100 text-green-600' :
                   'bg-blue-100 text-blue-600'
                 }`}>
-                  {edu.type === 'degree' ? <GraduationCap className="w-6 h-6" /> :
-                   edu.type === 'certification' ? <Award className="w-6 h-6" /> :
+                  {cert.type === 'degree' ? <GraduationCap className="w-6 h-6" /> :
+                   cert.type === 'certification' ? <Award className="w-6 h-6" /> :
                    <Shield className="w-6 h-6" />}
                 </div>
                 
@@ -647,39 +543,39 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                   <div className="flex-1 grid grid-cols-2 gap-3">
                     <input
                       type="text"
-                      value={edu.title}
-                      onChange={(e) => updateEducationField(edu.id, 'title', e.target.value)}
+                      value={cert.title}
+                      onChange={(e) => updateCertification(cert.id, 'title', e.target.value)}
                       placeholder="Title"
                       className="px-3 py-2 border border-gray-300 rounded-lg"
                     />
                     <input
                       type="text"
-                      value={edu.institution}
-                      onChange={(e) => updateEducationField(edu.id, 'institution', e.target.value)}
+                      value={cert.institution}
+                      onChange={(e) => updateCertification(cert.id, 'institution', e.target.value)}
                       placeholder="Institution"
                       className="px-3 py-2 border border-gray-300 rounded-lg"
                     />
                     <input
                       type="text"
-                      value={edu.year}
-                      onChange={(e) => updateEducationField(edu.id, 'year', e.target.value)}
+                      value={cert.year}
+                      onChange={(e) => updateCertification(cert.id, 'year', e.target.value)}
                       placeholder="Year"
                       className="px-3 py-2 border border-gray-300 rounded-lg"
                     />
                     <select
-                      value={edu.type}
-                      onChange={(e) => updateEducationField(edu.id, 'type', e.target.value)}
+                      value={cert.type}
+                      onChange={(e) => updateCertification(cert.id, 'type', e.target.value)}
                       className="px-3 py-2 border border-gray-300 rounded-lg"
                     >
                       <option value="degree">Degree</option>
                       <option value="certification">Certification</option>
                       <option value="license">License</option>
                     </select>
-                    {edu.type === 'license' && (
+                    {cert.type === 'license' && (
                       <input
                         type="text"
-                        value={edu.license_number || ''}
-                        onChange={(e) => updateEducationField(edu.id, 'license_number', e.target.value)}
+                        value={cert.licenseNumber || ''}
+                        onChange={(e) => updateCertification(cert.id, 'licenseNumber', e.target.value)}
                         placeholder="License Number"
                         className="px-3 py-2 border border-gray-300 rounded-lg col-span-2"
                       />
@@ -687,18 +583,18 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                   </div>
                 ) : (
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{edu.title}</h4>
-                    <p className="text-gray-600 text-sm">{edu.institution}</p>
+                    <h4 className="font-medium text-gray-900">{cert.title}</h4>
+                    <p className="text-gray-600 text-sm">{cert.institution}</p>
                     <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
-                      <span>{edu.year}</span>
-                      {edu.license_number && (
+                      <span>{cert.year}</span>
+                      {cert.licenseNumber && (
                         <span className="flex items-center gap-1">
                           <CheckCircle className="w-4 h-4 text-green-500" />
-                          {edu.license_number}
+                          {cert.licenseNumber}
                         </span>
                       )}
-                      {edu.expiry_date && (
-                        <span>Expires: {edu.expiry_date}</span>
+                      {cert.expiryDate && (
+                        <span>Expires: {cert.expiryDate}</span>
                       )}
                     </div>
                   </div>
@@ -706,7 +602,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
 
                 {isEditing && (
                   <button
-                    onClick={() => removeEducation(edu.id)}
+                    onClick={() => removeCertification(cert.id)}
                     className="text-red-500 hover:text-red-700 p-2"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -874,39 +770,15 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Languages</h3>
-            {isEditing && !showLanguageInput && (
+            {isEditing && (
               <button
-                onClick={() => setShowLanguageInput(true)}
+                onClick={addLanguage}
                 className="text-blue-600 hover:text-blue-700"
               >
                 <Plus className="w-5 h-5" />
               </button>
             )}
           </div>
-          
-          {/* Language Input Field */}
-          {isEditing && showLanguageInput && (
-            <div className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={newLanguage}
-                onChange={(e) => setNewLanguage(e.target.value)}
-                placeholder="Enter language"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                onKeyPress={(e) => e.key === 'Enter' && addLanguage()}
-              />
-              <Button onClick={addLanguage} size="sm">
-                Add
-              </Button>
-              <Button variant="outline" onClick={() => {
-                setShowLanguageInput(false);
-                setNewLanguage('');
-              }} size="sm">
-                Cancel
-              </Button>
-            </div>
-          )}
-          
           <div className="flex flex-wrap gap-2">
             {profileData.languages.map((lang: string) => (
               <span
@@ -947,6 +819,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div className="bg-blue-500 h-2 rounded-full" style={{ width: '95%' }}></div>
             </div>
+
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-gray-600">Patient Satisfaction</span>
+              <span className="font-medium text-purple-600">4.9/5</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-purple-500 h-2 rounded-full" style={{ width: '98%' }}></div>
+            </div>
           </div>
         </Card>
       </div>
@@ -972,13 +852,13 @@ const AppointmentsTab: React.FC<AppointmentsTabProps> = ({ appointments, handleA
   });
 
   const todayAppointments = appointments.filter(apt => apt.date === selectedDate);
-  const pendingCount = appointments.filter(apt => apt.status === 'scheduled').length;
+  const pendingCount = appointments.filter(apt => apt.status === 'pending').length;
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'bg-yellow-100 text-yellow-800';
-      case 'upcoming': return 'bg-blue-100 text-blue-800';
-      case 'completed': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'completed': return 'bg-blue-100 text-blue-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -1047,7 +927,7 @@ const AppointmentsTab: React.FC<AppointmentsTabProps> = ({ appointments, handleA
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Appointments</h3>
               <div className="flex gap-2 flex-wrap">
-                {['all', 'scheduled', 'upcoming', 'completed', 'cancelled'].map(status => (
+                {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map(status => (
                   <button
                     key={status}
                     onClick={() => setFilter(status as any)}
@@ -1080,15 +960,15 @@ const AppointmentsTab: React.FC<AppointmentsTabProps> = ({ appointments, handleA
                   >
                     <div className="flex items-start gap-4">
                       <img
-                        src={appointment.patientImage || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100"}
-                        alt={appointment.patientName || 'Patient'}
+                        src={appointment.patientImage}
+                        alt={appointment.patientName}
                         className="w-12 h-12 rounded-full object-cover"
                       />
                       <div className="flex-1">
                         <div className="flex items-start justify-between">
                           <div>
-                            <h4 className="font-medium text-gray-900">{appointment.patientName || 'Unknown Patient'}</h4>
-                            <p className="text-sm text-gray-500">{appointment.reason || appointment.notes || 'No reason provided'}</p>
+                            <h4 className="font-medium text-gray-900">{appointment.patientName}</h4>
+                            <p className="text-sm text-gray-500">{appointment.reason}</p>
                           </div>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
                             {appointment.status}
@@ -1107,17 +987,35 @@ const AppointmentsTab: React.FC<AppointmentsTabProps> = ({ appointments, handleA
                             {getTypeIcon(appointment.type)}
                             {appointment.type}
                           </span>
-                          <span>{appointment.duration || 30} min</span>
+                          <span>{appointment.duration} min</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    {appointment.status === 'scheduled' && (
+                    {appointment.status === 'pending' && (
                       <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
                         <Button
                           size="sm"
-                          onClick={() => handleAppointmentAction(String(appointment.id), 'confirm')}
+                          onClick={() => handleAppointmentAction(appointment.id, 'confirm')}
+                          className="flex-1"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Confirm
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowRescheduleModal(appointment.id)}
+                          className="flex-1"
+                        >
+                          <Clock className="w-4 h-4 mr-1" />
+                          Reschedule
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAppointmentAction(appointment.id, 'cancel')}
                           className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
                         >
                           <X className="w-4 h-4 mr-1" />
@@ -1126,11 +1024,11 @@ const AppointmentsTab: React.FC<AppointmentsTabProps> = ({ appointments, handleA
                       </div>
                     )}
 
-                    {appointment.status === 'upcoming' && (
+                    {appointment.status === 'confirmed' && (
                       <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
                         <Button
                           size="sm"
-                          onClick={() => handleAppointmentAction(String(appointment.id), 'complete')}
+                          onClick={() => handleAppointmentAction(appointment.id, 'complete')}
                           className="flex-1"
                         >
                           <CheckCircle className="w-4 h-4 mr-1" />
@@ -1145,7 +1043,7 @@ const AppointmentsTab: React.FC<AppointmentsTabProps> = ({ appointments, handleA
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setShowRescheduleModal(String(appointment.id))}
+                          onClick={() => setShowRescheduleModal(appointment.id)}
                         >
                           <Clock className="w-4 h-4 mr-1" />
                           Reschedule
@@ -1288,33 +1186,6 @@ const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
   const [appointmentDuration, setAppointmentDuration] = useState('30');
   const [bufferTime, setBufferTime] = useState('10');
   const [maxAppointmentsPerDay, setMaxAppointmentsPerDay] = useState('20');
-  const [timeOffEntries, setTimeOffEntries] = useState([
-    { id: 1, title: 'Conference', startDate: '2024-01-20', endDate: '2024-01-22' }
-  ]);
-  const [showAddTimeOff, setShowAddTimeOff] = useState(false);
-  const [newTimeOff, setNewTimeOff] = useState({
-    title: '',
-    startDate: '',
-    endDate: ''
-  });
-
-  const handleAddTimeOff = () => {
-    if (newTimeOff.title && newTimeOff.startDate && newTimeOff.endDate) {
-      const entry = {
-        id: Date.now(),
-        title: newTimeOff.title,
-        startDate: newTimeOff.startDate,
-        endDate: newTimeOff.endDate
-      };
-      setTimeOffEntries([...timeOffEntries, entry]);
-      setNewTimeOff({ title: '', startDate: '', endDate: '' });
-      setShowAddTimeOff(false);
-    }
-  };
-
-  const handleRemoveTimeOff = (id: number) => {
-    setTimeOffEntries(timeOffEntries.filter(entry => entry.id !== id));
-  };
 
   return (
     <motion.div
@@ -1332,15 +1203,15 @@ const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
               <div
                 key={slot.day}
                 className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-lg ${
-                  slot.is_open ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
+                  slot.isOpen ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-[140px]">
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={slot.is_open}
-                      onChange={(e) => handleAvailabilityChange(index, 'is_open', e.target.checked)}
+                      checked={slot.isOpen}
+                      onChange={(e) => handleAvailabilityChange(index, 'isOpen', e.target.checked)}
                       className="sr-only peer"
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -1348,14 +1219,14 @@ const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                   <span className="font-medium text-gray-900">{slot.day}</span>
                 </div>
 
-                {slot.is_open ? (
+                {slot.isOpen ? (
                   <div className="flex flex-wrap items-center gap-4 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-500">From</span>
                       <input
                         type="time"
-                        value={slot.start_time}
-                        onChange={(e) => handleAvailabilityChange(index, 'start_time', e.target.value)}
+                        value={slot.startTime}
+                        onChange={(e) => handleAvailabilityChange(index, 'startTime', e.target.value)}
                         className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
@@ -1363,8 +1234,8 @@ const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                       <span className="text-sm text-gray-500">To</span>
                       <input
                         type="time"
-                        value={slot.end_time}
-                        onChange={(e) => handleAvailabilityChange(index, 'end_time', e.target.value)}
+                        value={slot.endTime}
+                        onChange={(e) => handleAvailabilityChange(index, 'endTime', e.target.value)}
                         className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
@@ -1372,16 +1243,16 @@ const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                       <span className="text-sm text-gray-500">Break</span>
                       <input
                         type="time"
-                        value={slot.break_start || ''}
-                        onChange={(e) => handleAvailabilityChange(index, 'break_start', e.target.value)}
+                        value={slot.breakStart || ''}
+                        onChange={(e) => handleAvailabilityChange(index, 'breakStart', e.target.value)}
                         placeholder="Start"
                         className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28"
                       />
                       <span className="text-gray-400">-</span>
                       <input
                         type="time"
-                        value={slot.break_end || ''}
-                        onChange={(e) => handleAvailabilityChange(index, 'break_end', e.target.value)}
+                        value={slot.breakEnd || ''}
+                        onChange={(e) => handleAvailabilityChange(index, 'breakEnd', e.target.value)}
                         placeholder="End"
                         className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28"
                       />
@@ -1414,7 +1285,7 @@ const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Consultation Fee (KSH)
+                Consultation Fee ($)
               </label>
               <input
                 type="number"
@@ -1472,10 +1343,10 @@ const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
           <h3 className="font-semibold text-gray-900 mb-4">Consultation Types</h3>
           <div className="space-y-3">
             {[
-              { type: 'In-Person', icon: User, enabled: true, fee: 'KSH 15,000' },
-              { type: 'Video Call', icon: Video, enabled: true, fee: 'KSH 12,000' },
-              { type: 'Phone Call', icon: Phone, enabled: true, fee: 'KSH 8,000' },
-              { type: 'Chat', icon: MessageSquare, enabled: false, fee: 'KSH 5,000' }
+              { type: 'In-Person', icon: User, enabled: true, fee: '$150' },
+              { type: 'Video Call', icon: Video, enabled: true, fee: '$120' },
+              { type: 'Phone Call', icon: Phone, enabled: true, fee: '$80' },
+              { type: 'Chat', icon: MessageSquare, enabled: false, fee: '$50' }
             ].map(item => (
               <div key={item.type} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3">
@@ -1498,89 +1369,21 @@ const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
         <Card className="p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Upcoming Time Off</h3>
           <div className="space-y-3">
-            {timeOffEntries.map(entry => (
-              <div key={entry.id} className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-900">{entry.title}</span>
-                  <button 
-                    className="text-red-500 hover:text-red-700"
-                    onClick={() => handleRemoveTimeOff(entry.id)}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-sm text-gray-500">
-                  {new Date(entry.startDate).toLocaleDateString()} - {new Date(entry.endDate).toLocaleDateString()}
-                </p>
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-gray-900">Conference</span>
+                <button className="text-red-500 hover:text-red-700">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-            ))}
+              <p className="text-sm text-gray-500">Jan 20-22, 2024</p>
+            </div>
           </div>
-          <Button variant="outline" className="w-full mt-4" onClick={() => setShowAddTimeOff(true)}>
+          <Button variant="outline" className="w-full mt-4">
             <Plus className="w-4 h-4 mr-2" />
             Add Time Off
           </Button>
         </Card>
-
-        {/* Add Time Off Modal */}
-        <AnimatePresence>
-          {showAddTimeOff && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-              onClick={() => setShowAddTimeOff(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-white rounded-xl p-6 max-w-md w-full mx-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Time Off</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                    <input
-                      type="text"
-                      value={newTimeOff.title}
-                      onChange={(e) => setNewTimeOff({ ...newTimeOff, title: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      placeholder="e.g., Conference, Vacation"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      value={newTimeOff.startDate}
-                      onChange={(e) => setNewTimeOff({ ...newTimeOff, startDate: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                    <input
-                      type="date"
-                      value={newTimeOff.endDate}
-                      onChange={(e) => setNewTimeOff({ ...newTimeOff, endDate: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <Button onClick={handleAddTimeOff} className="flex-1">
-                      Add Time Off
-                    </Button>
-                    <Button variant="outline" onClick={() => setShowAddTimeOff(false)} className="flex-1">
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </motion.div>
   );
@@ -1588,21 +1391,6 @@ const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
 
 // Settings Tab Component
 const SettingsTab: React.FC = () => {
-  const handleBlockTimeSlot = () => {
-    console.log('Block Time Slot clicked');
-    // TODO: Implement time slot blocking modal
-  };
-
-  const handleSetVacation = () => {
-    console.log('Set Vacation clicked');
-    // TODO: Implement vacation scheduling modal
-  };
-
-  const handleExportSchedule = () => {
-    console.log('Export Schedule clicked');
-    // TODO: Implement schedule export functionality
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -1683,25 +1471,6 @@ const SettingsTab: React.FC = () => {
         </div>
       </Card>
 
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">Quick Actions</h3>
-        <div className="space-y-4">
-          <Button variant="outline" className="w-full justify-start" onClick={handleBlockTimeSlot}>
-            <Calendar className="w-4 h-4 mr-2" />
-            Block Time Slot
-          </Button>
-          <Button variant="outline" className="w-full justify-start" onClick={handleSetVacation}>
-            <Clock className="w-4 h-4 mr-2" />
-            Set Vacation
-          </Button>
-          <Button variant="outline" className="w-full justify-start" onClick={handleExportSchedule}>
-            <FileText className="w-4 h-4 mr-2" />
-            Export Schedule
-          </Button>
-        </div>
-      </Card>
-
       {/* Data & Export */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-6">Data & Export</h3>
@@ -1725,4 +1494,3 @@ const SettingsTab: React.FC = () => {
 };
 
 export default DoctorProfilePage;
-

@@ -311,6 +311,8 @@ def create_access_token(full_name: str, user_id: int, role: str, expires_delta: 
     encode.update({"exp": expires})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
+from activity_logger import create_activity_log
+
 @router.post("/login", response_model=Token)
 async def login(form_data: LoginUserRequest, db: Session = Depends(get_db)):
     logger.info(f"Login attempt for email: {form_data.email}")
@@ -319,6 +321,15 @@ async def login(form_data: LoginUserRequest, db: Session = Depends(get_db)):
     # Token expiration (must match Token.expires_in)
     token_expires = timedelta(hours=1)
     token = create_access_token(user.full_name, user.id, user.role.value, token_expires)
+
+    # Log successful login
+    create_activity_log(
+        user_id=user.id,
+        action="Login",
+        device="Web Application",  # Could be enhanced with user agent parsing
+        ip_address=None,  # Could be extracted from request headers
+        db=db
+    )
 
     logger.info(f"User {user.full_name} logged in successfully")
     return {
@@ -346,7 +357,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], db: Se
     except jwt.ExpiredSignatureError:
         logger.warning("Token expired")
         raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.DecodeError:
+    except jwt.JWTError:
         logger.warning("Invalid token")
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -370,7 +381,7 @@ async def get_current_active_user(token: Annotated[str, Depends(oauth2_bearer)],
     except jwt.ExpiredSignatureError:
         logger.warning("Token expired")
         raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.DecodeError:
+    except jwt.JWTError:
         logger.warning("Invalid token")
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -386,7 +397,7 @@ async def verify_token(request_body: TokenVerifyRequest):
             raise HTTPException(status_code=401, detail="Token expired")
         logger.info(f"Token verified for user: {username}")
         return {"username": username, "tokenverification": "success"}
-    except jwt.DecodeError:
+    except jwt.JWTError:
         logger.warning("Invalid token during verification")
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -433,10 +444,19 @@ async def reset_password(token: str, reset_password_request: ResetPasswordReques
         db.commit()
         db.refresh(user)
         logger.info(f"Password reset successfully for user: {user.full_name}")
+        
+        # Log password reset
+        create_activity_log(
+            user_id=user.id,
+            action="Password Reset",
+            device="Web Application",
+            db=db
+        )
+        
         return {"message": "Password has been reset successfully"}
     except jwt.ExpiredSignatureError:
         logger.warning("Expired reset token")
         raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.DecodeError:
+    except jwt.JWTError:
         logger.warning("Invalid reset token")
         raise HTTPException(status_code=401, detail="Invalid token")

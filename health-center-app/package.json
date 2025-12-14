@@ -27,6 +27,7 @@
     "react-router-dom": "^7.9.6",
     "recharts": "^3.5.0",
     "simple-peer": "^9.11.1",
+    "socket.io-client": "^4.8.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {

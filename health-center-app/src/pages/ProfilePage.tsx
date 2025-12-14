@@ -67,6 +67,10 @@ const ProfilePage: React.FC = () => {
         phone: formData.phone,
         date_of_birth: formData.date_of_birth,
         gender: formData.gender,
+        address: formData.address,
+        emergencyContact: formData.emergencyContact,
+        bloodType: formData.bloodType,
+        allergies: formData.allergies
       });
       setSaveMessage({ type: 'success', message: 'Profile updated successfully!' });
       setIsEditing(false);

@@ -11,7 +11,7 @@ export interface AppointmentRecord {
   patientName?: string;
   date: string;
   time: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'completed' | 'cancelled' | 'upcoming';
   type: 'in-person' | 'video';
   notes?: string;
   paymentStatus: 'pending' | 'paid' | 'refunded';
@@ -30,7 +30,7 @@ export interface AppointmentCreateRequest {
 }
 
 export interface AppointmentUpdateRequest extends Partial<AppointmentCreateRequest> {
-  status?: 'scheduled' | 'completed' | 'cancelled';
+  status?: 'scheduled' | 'completed' | 'cancelled' | 'upcoming';
   payment_status?: 'pending' | 'paid' | 'refunded';
 }
 

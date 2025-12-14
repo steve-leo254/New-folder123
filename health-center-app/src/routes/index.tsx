@@ -1,19 +1,18 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-
+import DoctorProfilePage from '@/pages/DashboardPage';
+import ProfilePage from '@/pages/ProfilePage';
 // Page Imports
 import HomePage from '../pages/HomePage';
 import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import NotFoundPage from '../pages/NotFoundPage';
-import DashboardPage from '../pages/DashboardPage';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
 import WishlistPage from '../pages/WishlistPage';
 import MedicationDetailPage from '../pages/MedicationDetailPage';
 import PatientProfile from '../pages/PatientProfile';
 import AppointmentsPage from '../pages/AppointmentsPage';
-import PrescriptionPage from '../pages/PrescriptionPage';
-import ProfilePage from '../pages/ProfilePage';
+import PrescriptionPage from '../pages/PrescriptionPage'; // Using test component temporarily
 import DoctorsPage from '../pages/DoctorsPage';
 import VideoChatPage from '../pages/VideoChatPage';
 import CheckoutPage from '../pages/CheckoutPage';
@@ -98,7 +97,7 @@ export const adminRoutes: RouteConfig[] = [
 export const staffRoutes: RouteConfig[] = [
   {
     path: '/dashboard',
-    element: <DashboardPage />,
+    element: <DoctorProfilePage />,
     allowedRoles: STAFF_ROLES,
   },
   {

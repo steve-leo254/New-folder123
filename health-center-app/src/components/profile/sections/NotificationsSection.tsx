@@ -1,17 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Bell } from 'lucide-react';
+import { Bell, AlertCircle } from 'lucide-react';
 import Card from '../../ui/Card';
-import { PatientProfile } from '../../../services/api/patientApi';
+import { useNotifications, NotificationSettings } from '../../../services/useNotifications';
 
 interface NotificationsSectionProps {
-  formData: PatientProfile;
   isEditing: boolean;
-  onToggle: (field: keyof PatientProfile) => void;
 }
 
 interface NotificationItem {
-  key: keyof PatientProfile;
+  key: keyof NotificationSettings;
   label: string;
   description: string;
 }
@@ -39,11 +37,51 @@ const notificationItems: NotificationItem[] = [
   },
 ];
 
-export const NotificationsSection: React.FC<NotificationsSectionProps> = ({
-  formData,
-  isEditing,
-  onToggle,
-}) => {
+export const NotificationsSection: React.FC<NotificationsSectionProps> = ({ isEditing }) => {
+  const { notifications, loading, error, updateNotifications } = useNotifications();
+  const [formData, setFormData] = useState<NotificationSettings>({
+    emailNotifications: true,
+    smsNotifications: true,
+    appointmentReminders: true,
+    labResultsNotifications: true,
+  });
+
+  // Update local form data when notifications changes
+  useEffect(() => {
+    if (notifications) {
+      setFormData(notifications);
+    }
+  }, [notifications]);
+
+  // Handle toggle changes
+  const handleToggle = (key: keyof NotificationSettings) => {
+    const newValue = !formData[key];
+    setFormData(prev => ({
+      ...prev,
+      [key]: newValue,
+    }));
+
+    // Save immediately for toggles
+    updateNotifications({ [key]: newValue });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-12 text-center">
+        <AlertCircle className="h-16 w-16 text-red-300 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Notification Settings</h3>
+        <p className="text-gray-600">{error}</p>
+      </Card>
+    );
+  }
   return (
     <motion.div
       key="notifications"
@@ -75,7 +113,7 @@ export const NotificationsSection: React.FC<NotificationsSectionProps> = ({
               </div>
               <ToggleSwitch
                 enabled={Boolean(formData[item.key])}
-                onChange={() => onToggle(item.key)}
+                onChange={() => handleToggle(item.key)}
                 disabled={!isEditing}
               />
             </div>

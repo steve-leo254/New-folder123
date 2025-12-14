@@ -373,3 +373,244 @@ class VideoConsultation(Base):
     doctor = relationship("User", foreign_keys=[doctor_id])
     patient = relationship("User", foreign_keys=[patient_id])
 
+
+# ============================================================================
+# Patient Profile Models
+# ============================================================================
+
+class MedicalInfo(Base):
+    """Medical information model for patient health details."""
+    __tablename__ = "medical_info"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    blood_type = Column(String(10), nullable=True)  # A+, A-, B+, B-, AB+, AB-, O+, O-
+    height = Column(String(20), nullable=True)  # e.g., "5'10\"", "178cm"
+    weight = Column(String(20), nullable=True)  # e.g., "175 lbs", "79kg"
+    allergies = Column(JSON, nullable=True)  # ["Peanuts", "Shellfish", "Penicillin"]
+    conditions = Column(JSON, nullable=True)  # ["Diabetes", "Hypertension", "Asthma"]
+    medications = Column(JSON, nullable=True)  # ["Aspirin 81mg", "Metformin 500mg", "Lisinopril 10mg"]
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    patient = relationship("User", backref="medical_info")
+
+
+class EmergencyContact(Base):
+    """Emergency contact information for patients."""
+    __tablename__ = "emergency_contacts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    name = Column(String(120), nullable=False)
+    phone = Column(String(20), nullable=False)
+    relation = Column(String(50), nullable=False)  # Spouse, Parent, Child, Sibling, Friend, Other
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    patient = relationship("User", backref="emergency_contact")
+
+
+class Insurance(Base):
+    """Insurance information for patients."""
+    __tablename__ = "insurance"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    provider = Column(String(120), nullable=False)  # e.g., "Blue Cross Blue Shield"
+    policy_number = Column(String(100), nullable=False)
+    group_number = Column(String(100), nullable=True)
+    holder_name = Column(String(120), nullable=False)  # Policy holder's name
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    patient = relationship("User", backref="insurance")
+
+
+class DoctorEducation(Base):
+    """Doctor education and certifications."""
+    __tablename__ = "doctor_education"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)  # e.g., "Doctor of Medicine"
+    institution = Column(String(200), nullable=False)  # e.g., "Harvard Medical School"
+    year = Column(String(4), nullable=False)  # Graduation year
+    type = Column(Enum('degree', 'certification', 'license', name='education_type'), nullable=False)
+    license_number = Column(String(50), nullable=True)
+    expiry_date = Column(String(10), nullable=True)  # YYYY-MM-DD format
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    doctor = relationship("Doctor", backref="education")
+
+
+class DoctorContactInfo(Base):
+    """Doctor contact and professional information."""
+    __tablename__ = "doctor_contact_info"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, unique=True, index=True)
+    hospital = Column(String(200), nullable=True)
+    department = Column(String(100), nullable=True)
+    location = Column(String(300), nullable=True)  # Office location
+    languages = Column(JSON, nullable=True)  # List of languages
+    consultation_fee = Column(Numeric(precision=10, scale=2), nullable=True)
+    response_rate = Column(Numeric(precision=5, scale=2), default=98.0)
+    on_time_rate = Column(Numeric(precision=5, scale=2), default=95.0)
+    patient_satisfaction = Column(Numeric(precision=3, scale=2), default=4.9)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    doctor = relationship("Doctor", backref="contact_info")
+
+
+class DoctorAvailability(Base):
+    """Doctor weekly availability schedule."""
+    __tablename__ = "doctor_availability"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
+    day = Column(Enum('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', name='week_day'), nullable=False)
+    is_open = Column(Boolean, default=True)
+    start_time = Column(String(5), nullable=True)  # HH:MM format
+    end_time = Column(String(5), nullable=True)    # HH:MM format
+    break_start = Column(String(5), nullable=True)  # HH:MM format
+    break_end = Column(String(5), nullable=True)    # HH:MM format
+    appointment_duration = Column(Integer, default=30)  # minutes
+    buffer_time = Column(Integer, default=10)  # minutes between appointments
+    max_appointments_per_day = Column(Integer, default=20)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    doctor = relationship("Doctor", backref="availability")
+
+
+class DoctorSettings(Base):
+    """Doctor profile and notification settings."""
+    __tablename__ = "doctor_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, unique=True, index=True)
+    # Profile visibility settings
+    show_profile_to_patients = Column(Boolean, default=True)
+    show_rating_reviews = Column(Boolean, default=True)
+    allow_online_booking = Column(Boolean, default=True)
+    show_availability = Column(Boolean, default=True)
+    
+    # Notification settings
+    email_notifications = Column(Boolean, default=True)
+    sms_notifications = Column(Boolean, default=True)
+    appointment_reminders = Column(Boolean, default=True)
+    new_appointment_requests = Column(Boolean, default=True)
+    cancellation_alerts = Column(Boolean, default=True)
+    patient_messages = Column(Boolean, default=True)
+    weekly_summary = Column(Boolean, default=False)
+    marketing_emails = Column(Boolean, default=False)
+    
+    # Consultation types enabled
+    in_person_consultations = Column(Boolean, default=True)
+    video_consultations = Column(Boolean, default=True)
+    phone_consultations = Column(Boolean, default=True)
+    chat_consultations = Column(Boolean, default=False)
+    
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    doctor = relationship("Doctor", backref="settings")
+
+
+class NotificationSettings(Base):
+    """Notification preferences for patients."""
+    __tablename__ = "notification_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    email_notifications = Column(Boolean, default=True)
+    sms_notifications = Column(Boolean, default=True)
+    appointment_reminders = Column(Boolean, default=True)
+    lab_results_notifications = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    patient = relationship("User", backref="notification_settings")
+
+
+class SecuritySettings(Base):
+    """Security settings for patient accounts."""
+    __tablename__ = "security_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    two_factor_enabled = Column(Boolean, default=False)
+    login_alerts = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    patient = relationship("User", backref="security_settings")
+
+
+class ActivityLog(Base):
+    """Activity logs for tracking user account activity."""
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    action = Column(String(200), nullable=False)  # e.g., "Login", "Password Change", "Profile Update"
+    device = Column(String(200), nullable=True)  # e.g., "Chrome on Windows", "iPhone Safari"
+    location = Column(String(200), nullable=True)  # e.g., "Nairobi, Kenya", "New York, USA"
+    ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6
+    timestamp = Column(DateTime, default=func.now(), index=True)
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationships
+    user = relationship("User", backref="activity_logs")
+
+
+class ChatMessage(Base):
+    """Chat messages between patients and doctors."""
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    recipient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True, index=True)
+    message = Column(Text, nullable=False)
+    message_type = Column(String(20), default="text")  # text, image, file
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now(), index=True)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    sender = relationship("User", foreign_keys=[sender_id], backref="sent_messages")
+    recipient = relationship("User", foreign_keys=[recipient_id], backref="received_messages")
+    appointment = relationship("Appointment", backref="chat_messages")
+
+
+class ChatRoom(Base):
+    """Chat rooms for ongoing conversations."""
+    __tablename__ = "chat_rooms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True, index=True)
+    is_active = Column(Boolean, default=True)
+    last_message_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    patient = relationship("User", foreign_keys=[patient_id], backref="patient_chat_rooms")
+    doctor = relationship("User", foreign_keys=[doctor_id], backref="doctor_chat_rooms")
+    appointment = relationship("Appointment", backref="chat_room")
+
