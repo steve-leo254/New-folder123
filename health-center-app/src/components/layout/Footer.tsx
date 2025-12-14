@@ -67,8 +67,8 @@ const Footer: React.FC = () => {
               <li><span className="text-gray-400">General Practice</span></li>
               <li><span className="text-gray-400">Emergency Care</span></li>
               <li><span className="text-gray-400">Specialized Treatments</span></li>
-              <li><span className="text-gray-400">Health Checkups</span></li>
-              <li><span className="text-gray-400">Mental Health</span></li>
+              <li><Link to="/health-checkup" className="text-gray-400">Health Checkups</Link></li>
+              <li><Link to="/mental-health"className="text-gray-400">Mental Health</Link></li>
             </ul>
           </div>
 

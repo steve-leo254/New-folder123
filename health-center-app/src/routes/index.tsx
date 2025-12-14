@@ -20,6 +20,9 @@ import CartPage from '../pages/CartPage';
 import PharmacyPage from '../pages/PharmacyPage';
 import DoctorPrescriptionPage from '../pages/DoctorPrescriptionPage';
 import LabTestPage from '../pages/LabTestPage';
+import MentalHealthPage from '@/pages/MentalHealthPage';
+import HealthCheckupsPage from '@/pages/HealthCheckupsPage';
+
 import SettingsPage from '../pages/SettingsPage';
 // import LabResultsPage from '../pages/LabResultsPage';
 
@@ -69,6 +72,14 @@ export const publicRoutes: RouteConfig[] = [
     path: '/register',
     element: <RegisterPage />,
   },
+   {
+    path: '/mental-health',
+    element: <MentalHealthPage />,
+  }, {
+    path: '/health-checkup',
+    element: <HealthCheckupsPage />,
+  },
+
   {
     path: '/404',
     element: <NotFoundPage />,
