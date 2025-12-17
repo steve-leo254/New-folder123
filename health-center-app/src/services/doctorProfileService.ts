@@ -133,7 +133,20 @@ export const doctorProfileService = {
   },
 
   async updateAvailability(id: number, availability: Partial<DoctorAvailability>): Promise<DoctorAvailability> {
-    const { data } = await api.put(`/api/doctor/profile/availability/${id}`, availability);
+    // Ensure all required fields are included for the backend
+    const updateData = {
+      day: availability.day,
+      is_open: availability.is_open ?? true,
+      start_time: availability.start_time,
+      end_time: availability.end_time,
+      break_start: availability.break_start,
+      break_end: availability.break_end,
+      appointment_duration: availability.appointment_duration || 30,
+      buffer_time: availability.buffer_time || 10,
+      max_appointments_per_day: availability.max_appointments_per_day || 20,
+    };
+    
+    const { data } = await api.put(`/api/doctor/profile/availability/${id}`, updateData);
     return data;
   },
 

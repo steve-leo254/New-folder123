@@ -14,125 +14,26 @@ import {
   Calendar,
   Tag,
   X,
-  Plus,
 } from 'lucide-react';
+import { formatCurrency } from '@/services/formatCurrency';
 import { useNavigate } from 'react-router-dom';
-
-interface WishlistItem {
-  id: string;
-  name: string;
-  genericName: string;
-  dosage: string;
-  price: number;
-  originalPrice?: number;
-  category: string;
-  imageUrl: string;
-  inStock: boolean;
-  requiresPrescription: boolean;
-  rating: number;
-  reviews: number;
-  addedDate: string;
-  availability: 'in-stock' | 'low-stock' | 'out-of-stock';
-  stockCount: number;
-}
+import { useWishlist, type WishlistItem } from '../services/useWishlist';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 const WishlistPage = () => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [sortBy, setSortBy] = useState('recent');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('recent');
 
-  // Mock wishlist data
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([
-    {
-      id: '1',
-      name: 'Amoxicillin',
-      genericName: 'Amoxicillin Trihydrate',
-      dosage: '500mg Capsules',
-      price: 12.99,
-      originalPrice: 15.99,
-      category: 'Antibiotics',
-      imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400',
-      inStock: true,
-      requiresPrescription: true,
-      rating: 4.5,
-      reviews: 1247,
-      addedDate: '2024-01-15',
-      availability: 'in-stock',
-      stockCount: 45,
-    },
-    {
-      id: '2',
-      name: 'Vitamin D3',
-      genericName: 'Cholecalciferol',
-      dosage: '1000 IU Softgels',
-      price: 9.99,
-      category: 'Vitamins',
-      imageUrl: 'https://images.unsplash.com/photo-1550572017-4e3e2e0c6f39?w=400',
-      inStock: true,
-      requiresPrescription: false,
-      rating: 4.8,
-      reviews: 892,
-      addedDate: '2024-01-10',
-      availability: 'in-stock',
-      stockCount: 120,
-    },
-    {
-      id: '3',
-      name: 'Lisinopril',
-      genericName: 'Lisinopril Dihydrate',
-      dosage: '10mg Tablets',
-      price: 15.99,
-      originalPrice: 18.99,
-      category: 'Blood Pressure',
-      imageUrl: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=400',
-      inStock: true,
-      requiresPrescription: true,
-      rating: 4.6,
-      reviews: 543,
-      addedDate: '2024-01-08',
-      availability: 'low-stock',
-      stockCount: 8,
-    },
-    {
-      id: '4',
-      name: 'Omega-3 Fish Oil',
-      genericName: 'EPA & DHA',
-      dosage: '1000mg Softgels',
-      price: 19.99,
-      category: 'Supplements',
-      imageUrl: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400',
-      inStock: false,
-      requiresPrescription: false,
-      rating: 4.7,
-      reviews: 2341,
-      addedDate: '2024-01-05',
-      availability: 'out-of-stock',
-      stockCount: 0,
-    },
-    {
-      id: '5',
-      name: 'Metformin',
-      genericName: 'Metformin Hydrochloride',
-      dosage: '500mg Extended-Release',
-      price: 18.99,
-      category: 'Diabetes',
-      imageUrl: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=400',
-      inStock: true,
-      requiresPrescription: true,
-      rating: 4.4,
-      reviews: 1789,
-      addedDate: '2024-01-03',
-      availability: 'in-stock',
-      stockCount: 67,
-    },
-  ]);
+  // Use real wishlist service
+  const { wishlistItems, isLoading, error, removeFromWishlist, clearWishlist } = useWishlist();
 
-  const categories = ['all', ...new Set(wishlistItems.map((item) => item.category))];
+  const categories: string[] = ['all', ...new Set(wishlistItems.map((item: WishlistItem) => item.category))];
 
-  const filteredItems = wishlistItems
-    .filter((item) => selectedCategory === 'all' || item.category === selectedCategory)
-    .sort((a, b) => {
+  const filteredItems: WishlistItem[] = wishlistItems
+    .filter((item: WishlistItem) => selectedCategory === 'all' || item.category === selectedCategory)
+    .sort((a: WishlistItem, b: WishlistItem) => {
       switch (sortBy) {
         case 'recent':
           return new Date(b.addedDate).getTime() - new Date(a.addedDate).getTime();
@@ -147,15 +48,23 @@ const WishlistPage = () => {
       }
     });
 
-  const removeFromWishlist = (id: string) => {
-    setWishlistItems(wishlistItems.filter((item) => item.id !== id));
+  const removeFromWishlistHandler = async (id: string | number) => {
+    try {
+      await removeFromWishlist(id);
+    } catch (err) {
+      console.error('Failed to remove item from wishlist:', err);
+    }
   };
 
-  const clearWishlist = () => {
-    setWishlistItems([]);
+  const clearWishlistHandler = async () => {
+    try {
+      await clearWishlist();
+    } catch (err) {
+      console.error('Failed to clear wishlist:', err);
+    }
   };
 
-  const getAvailabilityColor = (availability: string) => {
+  const getAvailabilityColor = (availability: string): string => {
     switch (availability) {
       case 'in-stock':
         return 'text-emerald-600 bg-emerald-50';
@@ -168,7 +77,7 @@ const WishlistPage = () => {
     }
   };
 
-  const getAvailabilityText = (availability: string, stockCount: number) => {
+  const getAvailabilityText = (availability: string, stockCount: number): string => {
     switch (availability) {
       case 'in-stock':
         return `${stockCount} in stock`;
@@ -181,13 +90,41 @@ const WishlistPage = () => {
     }
   };
 
-  const getTotalValue = () => {
-    return wishlistItems.reduce((total, item) => total + item.price, 0);
+  const getInStockCount = (): number => {
+    return wishlistItems.filter((item: WishlistItem) => item.inStock).length;
   };
 
-  const getInStockCount = () => {
-    return wishlistItems.filter((item) => item.inStock).length;
+  const getTotalValue = (): number => {
+    return wishlistItems.reduce((total: number, item: WishlistItem) => total + item.price, 0);
   };
+
+  // Show loading state while fetching wishlist
+  if (isLoading && wishlistItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <LoadingSpinner message="Loading your wishlist..." />
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow p-8 text-center max-w-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Wishlist</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -211,8 +148,8 @@ const WishlistPage = () => {
 
             <div className="flex items-center gap-3">
               <button
-                onClick={clearWishlist}
-                disabled={wishlistItems.length === 0}
+                onClick={clearWishlistHandler}
+                disabled={wishlistItems.length === 0 || isLoading}
                 className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -267,7 +204,7 @@ const WishlistPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Total Value</p>
-                <p className="text-2xl font-bold text-gray-900">${getTotalValue().toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(getTotalValue())}</p>
               </div>
               <div className="p-3 bg-purple-100 rounded-xl">
                 <Tag className="h-6 w-6 text-purple-600" />
@@ -333,22 +270,20 @@ const WishlistPage = () => {
               <div className="flex gap-2">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors flex items-center justify-center ${
-                    viewMode === 'grid'
+                  className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors flex items-center justify-center ${viewMode === 'grid'
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <Grid className="h-4 w-4 mr-2" />
                   Grid
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors flex items-center justify-center ${
-                    viewMode === 'list'
+                  className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors flex items-center justify-center ${viewMode === 'list'
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <List className="h-4 w-4 mr-2" />
                   List
@@ -391,8 +326,9 @@ const WishlistPage = () => {
                         />
                         {/* Remove Button */}
                         <button
-                          onClick={() => removeFromWishlist(item.id)}
-                          className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-lg hover:bg-red-50 transition-colors"
+                          onClick={() => removeFromWishlistHandler(item.id)}
+                          disabled={isLoading}
+                          className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-lg hover:bg-red-50 transition-colors disabled:opacity-50"
                         >
                           <X className="h-4 w-4 text-red-600" />
                         </button>
@@ -563,8 +499,9 @@ const WishlistPage = () => {
                                   Add to Cart
                                 </button>
                                 <button
-                                  onClick={() => removeFromWishlist(item.id)}
-                                  className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center"
+                                  onClick={() => removeFromWishlistHandler(item.id)}
+                                  disabled={isLoading}
+                                  className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center disabled:opacity-50"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Remove
@@ -581,28 +518,84 @@ const WishlistPage = () => {
             </AnimatePresence>
           </motion.div>
         ) : (
-          /* Empty State */
+          /* Creative Empty State */
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow p-12 text-center"
+            className="relative bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-lg p-12 text-center overflow-hidden"
           >
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Heart className="h-12 w-12 text-gray-400" />
+            {/* Background decorative elements */}
+            <div className="absolute top-0 left-0 w-32 h-32 bg-purple-200 rounded-full opacity-20 -translate-x-16 -translate-y-16"></div>
+            <div className="absolute bottom-0 right-0 w-48 h-48 bg-pink-200 rounded-full opacity-20 translate-x-24 translate-y-24"></div>
+            <div className="absolute top-1/2 left-1/2 w-24 h-24 bg-blue-200 rounded-full opacity-10 -translate-x-12 -translate-y-12"></div>
+
+            {/* Main content */}
+            <div className="relative z-10">
+              {/* Animated heart icon */}
+              <motion.div
+                animate={{
+                  scale: [1, 1.1, 1],
+                  rotate: [0, 5, -5, 0]
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="w-32 h-32 bg-gradient-to-br from-red-400 to-pink-400 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg"
+              >
+                <Heart className="h-16 w-16 text-white fill-current" />
+              </motion.div>
+
+              <h3 className="text-3xl font-bold text-gray-900 mb-4">
+                Your wishlist feels lonely
+              </h3>
+              <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">
+                {selectedCategory !== 'all'
+                  ? 'No items in this category. Try changing the filter to discover more medications.'
+                  : 'Start adding medications you love and build your personal health collection!'}
+              </p>
+
+              {/* Action buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate('/medications')}
+                  className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg inline-flex items-center font-semibold"
+                >
+                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  Browse Medications
+                  <ChevronRight className="h-5 w-5 ml-2" />
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate('/dashboard')}
+                  className="px-8 py-4 bg-white text-gray-700 rounded-xl hover:bg-gray-50 transition-all shadow-lg inline-flex items-center font-semibold border border-gray-200"
+                >
+                  <Package className="h-5 w-5 mr-2" />
+                  Explore Dashboard
+                </motion.button>
+              </div>
+
+              {/* Fun suggestions */}
+              <div className="mt-8 flex flex-wrap justify-center gap-2">
+                <span className="text-sm text-gray-500">Popular categories:</span>
+                {['Antibiotics', 'Pain Relief', 'Vitamins', 'Heart Health'].map((category, index) => (
+                  <motion.span
+                    key={category}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 + index * 0.1 }}
+                    className="px-3 py-1 bg-white rounded-full text-xs text-gray-600 shadow-sm border border-gray-100"
+                  >
+                    {category}
+                  </motion.span>
+                ))}
+              </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Your wishlist is empty</h3>
-            <p className="text-gray-600 mb-8">
-              {selectedCategory !== 'all'
-                ? 'No items in this category. Try changing the filter.'
-                : 'Start adding medications you want to save for later!'}
-            </p>
-            <button
-              onClick={() => navigate('/pharmacy')}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center"
-            >
-              Browse Medications
-              <ChevronRight className="h-5 w-5 ml-2" />
-            </button>
           </motion.div>
         )}
       </div>

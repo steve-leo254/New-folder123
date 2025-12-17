@@ -72,7 +72,7 @@ const DoctorProfilePage: React.FC = () => {
   // State Management
   const [activeTab, setActiveTab] = useState<'profile' | 'appointments' | 'availability' | 'settings'>('profile');
   const [isEditing, setIsEditing] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
   // Local state for form inputs
   const [profileData, setProfileData] = useState({
@@ -92,7 +92,7 @@ const DoctorProfilePage: React.FC = () => {
   });
 
   // Real-time appointments and stats
-  const { appointments, isLoading: appointmentsLoading, error: appointmentsError, fetchAppointments } = useAppointments();
+  const { appointments, isLoading: appointmentsLoading, error: appointmentsError, fetchAppointments, cancelAppointment, updateAppointment } = useAppointments();
   const { summary, refreshSummary } = useDashboardSummary();
 
   // Language management hooks
@@ -223,9 +223,28 @@ const DoctorProfilePage: React.FC = () => {
   };
 
   const handleAppointmentAction = async (appointmentId: string, action: 'confirm' | 'reschedule' | 'cancel' | 'complete') => {
-    console.log(`Appointment ${appointmentId} ${action} action triggered`);
-    // This would need backend integration
-    setSaveMessage({ type: 'success', message: `Appointment ${action}ed successfully!` });
+    try {
+      switch (action) {
+        case 'cancel':
+          await cancelAppointment(appointmentId);
+          setSaveMessage({ type: 'success', message: 'Appointment cancelled successfully!' });
+          break;
+        case 'confirm':
+          await updateAppointment(appointmentId, { status: 'scheduled' });
+          setSaveMessage({ type: 'success', message: 'Appointment confirmed successfully!' });
+          break;
+        case 'complete':
+          await updateAppointment(appointmentId, { status: 'completed' });
+          setSaveMessage({ type: 'success', message: 'Appointment marked as completed!' });
+          break;
+        case 'reschedule':
+          // This would open a reschedule modal
+          setSaveMessage({ type: 'info', message: 'Reschedule feature coming soon!' });
+          break;
+      }
+    } catch (error: any) {
+      setSaveMessage({ type: 'error', message: error.message || `Failed to ${action} appointment` });
+    }
     setTimeout(() => setSaveMessage(null), 3000);
   };
 

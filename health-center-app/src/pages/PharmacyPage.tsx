@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
-  ShoppingCart,
   Plus,
   Package,
   Truck,
@@ -10,7 +9,6 @@ import {
   CheckCircle,
   AlertCircle,
   Star,
-  Heart,
   Pill,
   X,
   Zap,
@@ -23,6 +21,7 @@ import { formatCurrency } from '../services/formatCurrency';
 import { useShoppingCart } from '../services/CartContext';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Card from '../components/ui/Card';
+import WishlistButton from '../components/ui/WishlistButton';
 
 interface Medication {
   id: string;
@@ -32,6 +31,7 @@ interface Medication {
   form: string;
   strength: string;
   quantity: number;
+  stock: number;
   price: number;
   category: string;
   description: string;
@@ -54,7 +54,6 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSort, setSelectedSort] = useState('name');
-  const [wishlist, setWishlist] = useState<Medication[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showCheckout, setShowCheckout] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
@@ -171,6 +170,7 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
             return strength;
           })(),
           quantity: med.stock || 0,
+          stock: med.stock || 0,
           // Handle malformed price data - extract price from strings like "Ibuprofen$1200.00500mg"
           price: (() => {
             let parsedPrice = 0;
@@ -255,25 +255,25 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
     showNotificationMessage(`${medication.name} added to cart`);
   };
 
-  // Wishlist functions
-  const addToWishlist = (medication: Medication) => {
-    const isInWishlist = wishlist.some((item) => item.id === medication.id);
-    if (!isInWishlist) {
-      setWishlist([...wishlist, medication]);
-      showNotificationMessage(`${medication.name} added to wishlist`);
-    } else {
-      removeFromWishlist(medication.id);
-      showNotificationMessage(`${medication.name} removed from wishlist`);
-    }
-  };
+  // Local wishlist functions (legacy - can be removed if not needed)
+  // const addToWishlist = (medication: Medication) => {
+  //   const isInWishlist = wishlist.some((item) => item.id === medication.id);
+  //   if (!isInWishlist) {
+  //     setWishlist([...wishlist, medication]);
+  //     showNotificationMessage(`${medication.name} added to wishlist`);
+  //   } else {
+  //     removeFromWishlist(medication.id);
+  //     showNotificationMessage(`${medication.name} removed from wishlist`);
+  //   }
+  // };
 
-  const removeFromWishlist = (medicationId: string) => {
-    setWishlist(wishlist.filter((item) => item.id !== medicationId));
-  };
+  // const removeFromWishlist = (medicationId: string) => {
+  //   setWishlist(wishlist.filter((item) => item.id !== medicationId));
+  // };
 
-  const isInWishlist = (medicationId: string) => {
-    return wishlist.some((item) => item.id === medicationId);
-  };
+  // const isInWishlist = (medicationId: string) => {
+  //   return wishlist.some((item) => item.id === medicationId);
+  // };
 
   // Notification function
   const showNotificationMessage = (message: string) => {
@@ -606,7 +606,7 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
             <Truck className="h-5 w-5 text-amber-600 mr-3" />
             <div>
               <div className="text-lg font-bold text-gray-900">Free</div>
-              <div className="text-sm text-gray-600">Delivery Over $50</div>
+              <div className="text-sm text-gray-600">Delivery Over Ksh 2500</div>
             </div>
           </div>
         </div>
@@ -808,16 +808,10 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                             )}
                           </button>
                         )}
-                        <button 
-                          onClick={() => addToWishlist(medication)}
-                          className={`p-2 rounded-lg transition-colors ${
-                            isInWishlist(medication.id)
-                              ? 'text-red-500 bg-red-50 hover:bg-red-100'
-                              : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-                          }`}
-                        >
-                          <Heart className={`h-5 w-5 ${isInWishlist(medication.id) ? 'fill-current' : ''}`} />
-                        </button>
+                        <WishlistButton 
+                          medication={medication}
+                          size="md"
+                        />
                       </div>
                     </div>
                   </div>
@@ -948,16 +942,10 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                                   )}
                                 </button>
                               )}
-                              <button 
-                                onClick={() => addToWishlist(medication)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  isInWishlist(medication.id)
-                                    ? 'text-red-500 bg-red-50 hover:bg-red-100'
-                                    : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-                                }`}
-                              >
-                                <Heart className={`h-5 w-5 ${isInWishlist(medication.id) ? 'fill-current' : ''}`} />
-                              </button>
+                              <WishlistButton 
+                                medication={medication}
+                                size="md"
+                              />
                             </div>
                           </div>
                         </div>

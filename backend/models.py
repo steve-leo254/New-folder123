@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     String,
     DateTime,
+    Date,
     Numeric,
     ForeignKey,
     Enum,
@@ -216,7 +217,39 @@ class Pharmacist(Base):
     # Relationships
     user = relationship("User", back_populates="pharmacist_profile")
 
- 
+
+class MoodEntry(Base):
+    """Mood entry model for tracking user's daily mood."""
+    __tablename__ = "mood_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
+    mood = Column(Integer, nullable=False)  # 1-10 scale
+    energy = Column(Integer, nullable=False)  # 1-10 scale
+    anxiety = Column(Integer, nullable=False)  # 1-10 scale
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationships
+    user = relationship("User", backref="mood_entries")
+
+
+class GameResult(Base):
+    """Game result model for tracking mental health game performance."""
+    __tablename__ = "game_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    game = Column(String(50), nullable=False)  # memory, reaction, color, focus
+    score = Column(Integer, nullable=False)
+    level = Column(Integer, nullable=False)
+    metrics = Column(JSON, nullable=True)  # Additional game-specific metrics
+    timestamp = Column(DateTime, default=func.now(), index=True)
+
+    # Relationships
+    user = relationship("User", backref="game_results")
+
 
 class Appointment(Base):
     """Appointment model representing patient-clinician appointments."""

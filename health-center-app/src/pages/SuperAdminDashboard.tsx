@@ -1253,13 +1253,13 @@ const SuperDashboardPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Last Updated</span>
-                    <span className="text-sm font-medium">Jan 10, 2024</span>
+                    <span className="text-sm font-medium">Dec 17, 2025</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">
                       Database Version
                     </span>
-                    <span className="text-sm font-medium">MySQL 8.0</span>
+                    <span className="text-sm font-medium">MySQL </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">API Version</span>
@@ -1267,7 +1267,7 @@ const SuperDashboardPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">License</span>
-                    <span className="text-sm font-medium">Enterprise</span>
+                    <span className="text-sm font-medium">Steve-oh</span>
                   </div>
                 </div>
               </Card>
@@ -1340,7 +1340,7 @@ const SuperDashboardPage: React.FC = () => {
                     <p className="text-sm text-gray-900">
                       Database backup completed successfully
                     </p>
-                    <p className="text-xs text-gray-500">2024-01-15 03:00:12</p>
+                    <p className="text-xs text-gray-500">2025-12-15 03:00:12</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
@@ -1349,7 +1349,7 @@ const SuperDashboardPage: React.FC = () => {
                     <p className="text-sm text-gray-900">
                       High memory usage detected on server-02
                     </p>
-                    <p className="text-xs text-gray-500">2024-01-15 02:45:33</p>
+                    <p className="text-xs text-gray-500">2025-12-15 02:45:33</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
@@ -1358,7 +1358,7 @@ const SuperDashboardPage: React.FC = () => {
                     <p className="text-sm text-gray-900">
                       System update available: v2.4.2
                     </p>
-                    <p className="text-xs text-gray-500">2024-01-14 18:20:15</p>
+                    <p className="text-xs text-gray-500">2025-12-14 18:20:15</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
@@ -1367,7 +1367,7 @@ const SuperDashboardPage: React.FC = () => {
                     <p className="text-sm text-gray-900">
                       Failed login attempt from IP 192.168.1.105
                     </p>
-                    <p className="text-xs text-gray-500">2024-01-14 15:12:08</p>
+                    <p className="text-xs text-gray-500">2025-12-14 15:12:08</p>
                   </div>
                 </div>
               </div>

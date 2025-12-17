@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import { useMentalHealth } from '../hooks/useMentalHealth';
 
 // Types
 interface MoodEntry {
@@ -1083,81 +1084,20 @@ const FocusTimer: React.FC<{ onComplete: (result: GameResult) => void }> = ({ on
 // ============================================
 // MENTAL HEALTH SCORE CARD COMPONENT
 // ============================================
-const MentalHealthScoreCard: React.FC<{ gameResults: GameResult[]; moodEntries: MoodEntry[] }> = ({ 
-  gameResults, 
-  moodEntries 
-}) => {
-  const calculateScore = (): MentalHealthScore => {
-    let focusScore = 50;
-    let stressScore = 50;
-    let moodScore = 50;
-    let anxietyScore = 50;
-    const recommendations: string[] = [];
-
-    // Calculate from game results
-    const memoryGames = gameResults.filter(g => g.game === 'memory');
-    const reactionGames = gameResults.filter(g => g.game === 'reaction');
-    const breathingGames = gameResults.filter(g => g.game === 'breathing');
-    const colorGames = gameResults.filter(g => g.game === 'colorMatch');
-
-    if (memoryGames.length > 0) {
-      const avgMemoryScore = memoryGames.reduce((a, b) => a + b.score, 0) / memoryGames.length;
-      focusScore = Math.min(100, focusScore + avgMemoryScore * 0.3);
-    }
-
-    if (reactionGames.length > 0) {
-      const avgReactionScore = reactionGames.reduce((a, b) => a + b.score, 0) / reactionGames.length;
-      focusScore = Math.min(100, focusScore + avgReactionScore * 0.2);
-    }
-
-    if (breathingGames.length > 0) {
-      stressScore = Math.min(100, stressScore + breathingGames.length * 10);
-    }
-
-    if (colorGames.length > 0) {
-      const avgColorScore = colorGames.reduce((a, b) => a + b.score, 0) / colorGames.length;
-      focusScore = Math.min(100, focusScore + avgColorScore * 0.2);
-    }
-
-    // Calculate from mood entries
-    if (moodEntries.length > 0) {
-      const avgMood = moodEntries.reduce((a, b) => a + b.mood, 0) / moodEntries.length;
-      const avgAnxiety = moodEntries.reduce((a, b) => a + b.anxiety, 0) / moodEntries.length;
-      
-      moodScore = avgMood * 10;
-      anxietyScore = 100 - (avgAnxiety * 10);
-    }
-
-    const overall = Math.round((focusScore + stressScore + moodScore + anxietyScore) / 4);
-
-    // Generate recommendations
-    if (focusScore < 60) {
-      recommendations.push('Try more memory and reaction games to improve focus');
-    }
-    if (stressScore < 60) {
-      recommendations.push('Practice breathing exercises daily to reduce stress');
-    }
-    if (moodScore < 60) {
-      recommendations.push('Consider activities that bring you joy and track your mood regularly');
-    }
-    if (anxietyScore < 60) {
-      recommendations.push('Try mindfulness exercises and breathing techniques to manage anxiety');
-    }
-    if (recommendations.length === 0) {
-      recommendations.push('Great job! Keep up your mental wellness routine');
-    }
-
-    return {
-      overall,
-      stress: Math.round(stressScore),
-      anxiety: Math.round(anxietyScore),
-      focus: Math.round(focusScore),
-      mood: Math.round(moodScore),
-      recommendations
-    };
-  };
-
-  const score = calculateScore();
+const MentalHealthScoreCard: React.FC<{ score: any }> = ({ score }) => {
+  if (!score) {
+    return (
+      <Card className="p-6">
+        <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+          <BarChart3 className="w-6 h-6 mr-2 text-purple-600" />
+          Mental Health Score
+        </h3>
+        <div className="text-center py-8">
+          <p className="text-gray-500">Complete activities to see your mental health score</p>
+        </div>
+      </Card>
+    );
+  }
 
   const getScoreColor = (value: number) => {
     if (value >= 80) return 'text-green-600';
@@ -1221,7 +1161,7 @@ const MentalHealthScoreCard: React.FC<{ gameResults: GameResult[]; moodEntries: 
           Recommendations
         </h4>
         <ul className="space-y-2">
-          {score.recommendations.map((rec, index) => (
+          {score.recommendations.map((rec: string, index: number) => (
             <li key={index} className="flex items-start text-sm text-gray-700">
               <ChevronRight className="w-4 h-4 mr-2 mt-0.5 text-blue-500 flex-shrink-0" />
               {rec}
@@ -1238,8 +1178,15 @@ const MentalHealthScoreCard: React.FC<{ gameResults: GameResult[]; moodEntries: 
 // ============================================
 const MentalHealthPage: React.FC = () => {
   const [activeGame, setActiveGame] = useState<string | null>(null);
-  const [gameResults, setGameResults] = useState<GameResult[]>([]);
-  const [moodEntries, setMoodEntries] = useState<MoodEntry[]>([]);
+  const { 
+    gameResults, 
+    moodEntries, 
+    mentalHealthScore, 
+    loading, 
+    error, 
+    createMoodEntry, 
+    createGameResult 
+  } = useMentalHealth();
 
   const games = [
     {
@@ -1292,12 +1239,30 @@ const MentalHealthPage: React.FC = () => {
     }
   ];
 
-  const handleGameComplete = (result: GameResult) => {
-    setGameResults(prev => [...prev, result]);
+  const handleGameComplete = async (result: GameResult) => {
+    try {
+      await createGameResult({
+        game: result.game,
+        score: result.score,
+        level: result.level,
+        metrics: result.metrics
+      });
+    } catch (error) {
+      console.error('Failed to save game result:', error);
+    }
   };
 
-  const handleMoodSubmit = (entry: MoodEntry) => {
-    setMoodEntries(prev => [...prev, entry]);
+  const handleMoodSubmit = async (entry: MoodEntry) => {
+    try {
+      await createMoodEntry({
+        mood: entry.mood,
+        energy: entry.energy,
+        anxiety: entry.anxiety,
+        notes: entry.notes
+      });
+    } catch (error) {
+      console.error('Failed to save mood entry:', error);
+    }
   };
 
   const renderGame = () => {
@@ -1419,7 +1384,7 @@ const MentalHealthPage: React.FC = () => {
                         <div>
                           <p className="font-medium text-gray-900 capitalize">{result.game}</p>
                           <p className="text-sm text-gray-500">
-                            {result.timestamp.toLocaleTimeString()}
+                            {new Date(result.timestamp).toLocaleTimeString()}
                           </p>
                         </div>
                       </div>
@@ -1437,7 +1402,7 @@ const MentalHealthPage: React.FC = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Mental Health Score */}
-            <MentalHealthScoreCard gameResults={gameResults} moodEntries={moodEntries} />
+            <MentalHealthScoreCard score={mentalHealthScore} />
 
             {/* Quick Tips */}
             <Card className="p-6">

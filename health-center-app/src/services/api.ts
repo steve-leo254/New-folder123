@@ -213,6 +213,23 @@ export const apiService = {
     const { data } = await api.get('/api/patient/activity-logs');
     return data;
   },
+  // Wishlist endpoints
+  getWishlist: async (params?: Record<string, unknown>) => {
+    const { data } = await api.get('/api/patient/wishlist', { params });
+    return data;
+  },
+  addToWishlist: async (payload: { medication_id: string | number }) => {
+    const { data } = await api.post('/api/patient/wishlist', payload);
+    return data;
+  },
+  removeFromWishlist: async (wishlistItemId: string | number) => {
+    const { data } = await api.delete(`/api/patient/wishlist/${wishlistItemId}`);
+    return data;
+  },
+  clearWishlist: async () => {
+    const { data } = await api.delete('/api/patient/wishlist');
+    return data;
+  },
 };
 
 export default api;

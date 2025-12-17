@@ -424,15 +424,12 @@ const MedicationDetailPage = () => {
     </div>
   );
 };
-
-// ============================================================================
 // Sub-Components
 // ============================================================================
 
 const ProductSection = ({
   medication,
-  selectedImage,
-  setSelectedImage,
+  
   quantity,
   onQuantityChange,
   onAddToCart,
@@ -442,11 +439,11 @@ const ProductSection = ({
   <div className="grid lg:grid-cols-2 gap-8 mb-12">
     {/* Images */}
     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
-      {/* Main Image */}
+      {/* Single Product Image */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="relative h-96 bg-gray-100">
+        <div className="relative h-96 bg-gray-100 rounded-xl overflow-hidden">
           <img
-            src={medication.images[selectedImage]}
+            src={medication.image || medication.images?.[0] || '/api/placeholder/400/300'}
             alt={medication.name}
             className="w-full h-full object-cover"
           />
@@ -456,21 +453,6 @@ const ProductSection = ({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Thumbnails */}
-      <div className="grid grid-cols-4 gap-4">
-        {medication.images.map((image: string, index: number) => (
-          <button
-            key={index}
-            onClick={() => setSelectedImage(index)}
-            className={`relative h-20 rounded-lg overflow-hidden border-2 transition-all ${
-              selectedImage === index ? 'border-blue-600 scale-105' : 'border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            <img src={image} alt={`View ${index + 1}`} className="w-full h-full object-cover" />
-          </button>
-        ))}
       </div>
     </motion.div>
 
@@ -601,7 +583,7 @@ const ProductSection = ({
 
       {/* Features */}
       <div className="grid grid-cols-3 gap-4 pt-6 border-t">
-        <FeatureItem icon={Truck} title="Free Delivery" subtitle="On orders $50+" color="blue" />
+        <FeatureItem icon={Truck} title="Free Delivery" subtitle="On orders ksh2500+" color="blue" />
         <FeatureItem icon={Shield} title="Secure Payment" subtitle="100% Protected" color="emerald" />
         <FeatureItem icon={Package} title="Quality" subtitle="Guaranteed" color="amber" />
       </div>

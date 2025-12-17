@@ -1009,7 +1009,7 @@ const HealthCheckupsPage: React.FC = () => {
                   <Download className="w-4 h-4 mr-2" />
                   Download Report
                 </Button>
-                <Button>
+                <Button onClick={() => window.location.href = '/appointments'}>
                   <Calendar className="w-4 h-4 mr-2" />
                   Book Consultation
                 </Button>

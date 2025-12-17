@@ -31,6 +31,8 @@ from auth_router import (
     bcrypt_context
 )
 from doctor_profile_router import router as doctor_profile_router
+from mental_health_router import router as mental_health_router
+from patient_router import router as patient_router
 from pgfunc import (
     dashboard_snapshot,
     get_appointments_for_user,
@@ -139,6 +141,8 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Include routers
 app.include_router(auth_router)
 app.include_router(doctor_profile_router)
+app.include_router(mental_health_router)
+app.include_router(patient_router)
 
 
 def require_admin(*allowed_roles: Role):
