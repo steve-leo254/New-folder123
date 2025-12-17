@@ -471,7 +471,7 @@ class DoctorEducation(Base):
     doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
     title = Column(String(200), nullable=False)  # e.g., "Doctor of Medicine"
     institution = Column(String(200), nullable=False)  # e.g., "Harvard Medical School"
-    year = Column(String(4), nullable=False)  # Graduation year
+    year = Column(String(4), nullable=True)  # Graduation year (optional)
     type = Column(Enum('degree', 'certification', 'license', name='education_type'), nullable=False)
     license_number = Column(String(50), nullable=True)
     expiry_date = Column(String(10), nullable=True)  # YYYY-MM-DD format

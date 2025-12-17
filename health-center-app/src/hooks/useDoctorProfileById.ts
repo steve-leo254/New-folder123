@@ -21,8 +21,8 @@ export const useDoctorProfileById = (doctorId: string | number) => {
       setLoading(true);
       setError(null);
       
-      // Fetch complete profile
-      const profileData = await doctorProfileService.getCompleteProfile();
+      // Fetch complete profile for specific doctor
+      const profileData = await doctorProfileService.getCompleteProfile(doctorId);
       setProfile(profileData);
       setEducation(profileData.education || []);
       setContactInfo(profileData.contact_info || null);

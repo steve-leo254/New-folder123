@@ -76,12 +76,7 @@ const PatientProfile: React.FC = () => {
   } | null>(null);
 
   const [formData, setFormData] = useState<PatientProfileType | null>(null);
-  const [newItems, setNewItems] = useState({
-    allergy: '',
-    condition: '',
-    medication: '',
-  });
-
+  
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -120,16 +115,6 @@ const PatientProfile: React.FC = () => {
     setFormData({
       ...formData,
       [name]: newValue,
-    });
-  };
-
-  // Handle toggle changes for notifications
-  const handleToggleChange = (field: keyof PatientProfileType) => {
-    if (!formData) return;
-
-    setFormData({
-      ...formData,
-      [field]: !formData[field],
     });
   };
 
@@ -231,31 +216,6 @@ const PatientProfile: React.FC = () => {
     } else {
       showErrorMessage(result.error || 'Failed to change password');
     }
-  };
-
-  // Add item to array fields
-  const addItem = (type: 'allergies' | 'conditions' | 'medications', value: string) => {
-    if (!formData || !value.trim()) return;
-
-    setFormData({
-      ...formData,
-      [type]: [...formData[type], value.trim()],
-    });
-
-    setNewItems((prev) => ({
-      ...prev,
-      [type === 'allergies' ? 'allergy' : type === 'conditions' ? 'condition' : 'medication']: '',
-    }));
-  };
-
-  // Remove item from array fields
-  const removeItem = (type: 'allergies' | 'conditions' | 'medications', index: number) => {
-    if (!formData) return;
-
-    setFormData({
-      ...formData,
-      [type]: formData[type].filter((_, i) => i !== index),
-    });
   };
 
   // Download records handler

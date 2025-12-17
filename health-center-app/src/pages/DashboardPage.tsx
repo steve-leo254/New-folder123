@@ -222,12 +222,13 @@ const DoctorProfilePage: React.FC = () => {
     }
   };
 
-  const handleAppointmentAction = async (appointmentId: string, action: 'confirm' | 'reschedule' | 'cancel' | 'complete') => {
+  const handleAppointmentAction = async (appointmentId: string, action: 'confirm' | 'reschedule' | 'cancel' | 'complete' | 'decline') => {
     try {
       switch (action) {
         case 'cancel':
+        case 'decline':
           await cancelAppointment(appointmentId);
-          setSaveMessage({ type: 'success', message: 'Appointment cancelled successfully!' });
+          setSaveMessage({ type: 'success', message: action === 'decline' ? 'Appointment declined successfully!' : 'Appointment cancelled successfully!' });
           break;
         case 'confirm':
           await updateAppointment(appointmentId, { status: 'scheduled' });
@@ -243,7 +244,8 @@ const DoctorProfilePage: React.FC = () => {
           break;
       }
     } catch (error: any) {
-      setSaveMessage({ type: 'error', message: error.message || `Failed to ${action} appointment` });
+      console.error('Appointment action error:', error);
+      setSaveMessage({ type: 'error', message: error.message || `Failed to ${action} appointment.` });
     }
     setTimeout(() => setSaveMessage(null), 3000);
   };
@@ -265,8 +267,10 @@ const DoctorProfilePage: React.FC = () => {
       const newEducation = {
         title: 'New Certification',
         institution: 'Institution Name',
-        year: new Date().getFullYear().toString(),
-        type: 'certification' as const
+        year: '',
+        type: 'certification' as const,
+        license_number: '',
+        doctor_id: user?.id || 1
       };
       
       await addEducationFromHook(newEducation);
@@ -292,10 +296,18 @@ const DoctorProfilePage: React.FC = () => {
       const educationItem = education.find(edu => edu.id === id);
       if (!educationItem) return;
       
-      await updateEducation(id, {
+      // For year field, allow typing digits up to 4 digits
+      if (field === 'year' && value !== '' && !value.match(/^\d{1,4}$/)) {
+        return; // Don't update if not digits or more than 4 digits
+      }
+      
+      // Handle year field specially to ensure it's always a string
+      const updateData = {
         ...educationItem,
-        [field]: value
-      });
+        [field]: field === 'year' ? String(value) : value
+      };
+      
+      await updateEducation(id, updateData);
     } catch (error: any) {
       setSaveMessage({ type: 'error', message: error.message || 'Failed to update education.' });
     }
@@ -680,10 +692,15 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                     />
                     <input
                       type="text"
-                      value={edu.year}
-                      onChange={(e) => updateEducationField(edu.id, 'year', e.target.value)}
-                      placeholder="Year"
+                      value={edu.year || ''}
+                      onChange={(e) => {
+                        // Only allow numbers and limit to 4 digits
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        updateEducationField(edu.id, 'year', value);
+                      }}
+                      placeholder="YYYY"
                       className="px-3 py-2 border border-gray-300 rounded-lg"
+                      maxLength={4}
                     />
                     <select
                       value={edu.type}
@@ -976,7 +993,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
 // Appointments Tab Component
 interface AppointmentsTabProps {
   appointments: Appointment[];
-  handleAppointmentAction: (id: string, action: 'confirm' | 'reschedule' | 'cancel' | 'complete') => void;
+  handleAppointmentAction: (id: string, action: 'confirm' | 'reschedule' | 'cancel' | 'complete' | 'decline') => void;
 }
 
 const AppointmentsTab: React.FC<AppointmentsTabProps> = ({ appointments, handleAppointmentAction }) => {
@@ -1136,7 +1153,7 @@ const AppointmentsTab: React.FC<AppointmentsTabProps> = ({ appointments, handleA
                       <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
                         <Button
                           size="sm"
-                          onClick={() => handleAppointmentAction(String(appointment.id), 'confirm')}
+                          onClick={() => handleAppointmentAction(String(appointment.id), 'decline')}
                           className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
                         >
                           <X className="w-4 h-4 mr-1" />

@@ -108,13 +108,39 @@ const SuperDashboardPage: React.FC = () => {
     { name: "Jun", revenue: 23800, appointments: 210, patients: 85 },
   ];
 
-  const departmentData = [
-    { name: "Cardiology", value: 35, color: "#3b82f6" },
-    { name: "Pediatrics", value: 25, color: "#10b981" },
-    { name: "Dermatology", value: 20, color: "#f59e0b" },
-    { name: "Orthopedics", value: 15, color: "#ef4444" },
-    { name: "Other", value: 5, color: "#8b5cf6" },
-  ];
+  // Dynamic department data based on staff specializations
+  const departmentData = useMemo(() => {
+    const departmentCounts: { [key: string]: number } = {};
+    
+    // Count doctors by specialization
+    staff.forEach(staffMember => {
+      if (staffMember.role === 'doctor' && staffMember.doctor?.specialization) {
+        const specialization = staffMember.doctor.specialization;
+        departmentCounts[specialization] = (departmentCounts[specialization] || 0) + 1;
+      }
+    });
+
+    // Convert to array format and add colors
+    const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4"];
+    const departments = Object.entries(departmentCounts).map(([name, value], index) => ({
+      name,
+      value,
+      color: colors[index % colors.length]
+    }));
+
+    // If no departments found, show default data
+    if (departments.length === 0) {
+      return [
+        { name: "Cardiology", value: 35, color: "#3b82f6" },
+        { name: "Pediatrics", value: 25, color: "#10b981" },
+        { name: "Dermatology", value: 20, color: "#f59e0b" },
+        { name: "Orthopedics", value: 15, color: "#ef4444" },
+        { name: "Other", value: 5, color: "#8b5cf6" },
+      ];
+    }
+
+    return departments;
+  }, [staff]);
 
   const userActivityData = [
     { time: "00:00", activeUsers: 12 },
@@ -270,6 +296,15 @@ const SuperDashboardPage: React.FC = () => {
   useEffect(() => {
     fetchStaff();
   }, []);
+
+  // Real-time update for department data - refresh staff data periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchStaff();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchStaff]);
 
   const staffMembers: StaffMember[] = useMemo(
     () =>

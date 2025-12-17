@@ -101,12 +101,15 @@ export const doctorProfileService = {
   },
 
   async addEducation(education: Omit<DoctorEducation, 'id' | 'doctor_id' | 'created_at'>): Promise<DoctorEducation> {
-    const { data } = await api.post('/api/doctor/profile/education', education);
+    const preparedData = prepareEducationData(education);
+    console.log('Sending education data:', preparedData);
+    const { data } = await api.post('/api/doctor/profile/education', preparedData);
     return data;
   },
 
   async updateEducation(id: number, education: Omit<DoctorEducation, 'id' | 'doctor_id' | 'created_at'>): Promise<DoctorEducation> {
-    const { data } = await api.put(`/api/doctor/profile/education/${id}`, education);
+    const preparedData = prepareEducationData(education);
+    const { data } = await api.put(`/api/doctor/profile/education/${id}`, preparedData);
     return data;
   },
 
@@ -167,8 +170,9 @@ export const doctorProfileService = {
   },
 
   // Complete Profile
-  async getCompleteProfile(): Promise<DoctorProfile> {
-    const { data } = await api.get('/api/doctor/profile/complete');
+  async getCompleteProfile(doctorId?: string | number): Promise<DoctorProfile> {
+    const url = doctorId ? `/api/doctor/profile/complete/${doctorId}` : '/api/doctor/profile/complete';
+    const { data } = await api.get(url);
     return data;
   }
 };
@@ -176,17 +180,46 @@ export const doctorProfileService = {
 // Helper function to handle API errors
 export const handleProfileError = (error: any, defaultMessage: string) => {
   console.error('Profile API Error:', error);
-  const message = error.response?.data?.detail || defaultMessage;
+  console.error('Error response data:', JSON.stringify(error.response?.data, null, 2));
+  console.error('Error status:', error.response?.status);
+  const message = error.response?.data?.detail || error.response?.data?.message || defaultMessage;
   throw new Error(message);
+};
+
+// Helper function to prepare education data for API
+export const prepareEducationData = (education: any) => {
+  const prepared = { ...education };
+  
+  // Handle year field - if empty, don't send it to avoid backend validation
+  if (!prepared.year || prepared.year.trim() === '') {
+    delete prepared.year;
+  }
+  
+  // Handle expiry_date - if empty, don't send it
+  if (!prepared.expiry_date || prepared.expiry_date.trim() === '') {
+    delete prepared.expiry_date;
+  }
+  
+  return prepared;
 };
 
 // Validation helpers
 export const validateEducation = (education: any): string[] => {
   const errors: string[] = [];
   
+  // Debug logging
+  console.log('Validating education:', education);
+  console.log('Year value:', education.year);
+  console.log('Year type:', typeof education.year);
+  
   if (!education.title?.trim()) errors.push('Title is required');
   if (!education.institution?.trim()) errors.push('Institution is required');
-  if (!education.year?.match(/^\d{4}$/)) errors.push('Valid year is required');
+  const yearStr = String(education.year || '').trim();
+  // Allow empty year, but if provided, must be 1-4 digits (allows typing)
+  if (yearStr !== '' && (!yearStr.match(/^\d{1,4}$/) || yearStr.length > 4)) {
+    console.log('Year validation failed. Year:', education.year, 'Type:', typeof education.year);
+    errors.push('Year must be 1-4 digits if provided');
+  }
   if (!['degree', 'certification', 'license'].includes(education.type)) errors.push('Invalid type');
   
   return errors;

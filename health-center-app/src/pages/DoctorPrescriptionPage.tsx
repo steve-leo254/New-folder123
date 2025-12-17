@@ -75,7 +75,7 @@ const DoctorPrescriptionPage: React.FC = () => {
       const med = medications.find((m: any) => m.id === value);
       if (med) {
         updated[index].medicationName = med.name;
-        updated[index].price = med.price;
+        updated[index].price = Number(med.price) || 0;
       }
     }
 

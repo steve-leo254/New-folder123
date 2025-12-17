@@ -406,6 +406,27 @@ async def get_complete_profile(
             detail="Doctor profile not found. Please create your profile first."
         )
     
+    return build_complete_profile_response(doctor, db)
+
+@router.get("/complete/{doctor_id}", response_model=dict)
+async def get_doctor_profile_by_id(
+    doctor_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get complete doctor profile by doctor ID (for public viewing)."""
+    doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+    
+    if not doctor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Doctor not found"
+        )
+    
+    return build_complete_profile_response(doctor, db)
+
+def build_complete_profile_response(doctor: Doctor, db: Session) -> dict:
+    """Build complete profile response for a doctor."""
+    
     # Get all sections
     education = db.query(DoctorEducation).filter(
         DoctorEducation.doctor_id == doctor.id

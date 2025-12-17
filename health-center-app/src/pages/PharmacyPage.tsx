@@ -21,7 +21,6 @@ import { formatCurrency } from '../services/formatCurrency';
 import { useShoppingCart } from '../services/CartContext';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Card from '../components/ui/Card';
-import WishlistButton from '../components/ui/WishlistButton';
 
 interface Medication {
   id: string;
@@ -689,75 +688,6 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                         {medication.description}
                       </p>
 
-                      {/* Details Grid */}
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div>
-                          <p className="text-xs text-gray-500">Form</p>
-                          <p className="text-sm font-medium text-gray-900">{medication.form}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Strength</p>
-                          <p className="text-sm font-medium text-gray-900">{medication.strength}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Stock</p>
-                          <p
-                            className={`text-sm font-medium ${
-                              isInStock(medication) ? 'text-emerald-600' : 'text-red-600'
-                            }`}
-                          >
-                            {isInStock(medication)
-                              ? `${medication.quantity} units`
-                              : 'Out of Stock'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Expires</p>
-                          <p className="text-sm font-medium text-gray-900">
-                            {new Date(medication.expiryDate).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Rating and Manufacturer */}
-                      <div className="flex items-center justify-between mb-4 pb-4 border-b">
-                        <div className="flex items-center">
-                          <Star className="h-4 w-4 text-amber-500 fill-current" />
-                          <span className="ml-1 text-sm font-medium text-gray-900">
-                            {medication.rating}
-                          </span>
-                          <span className="ml-1 text-sm text-gray-500">
-                            ({medication.reviews})
-                          </span>
-                        </div>
-                        <div className="flex items-center text-xs text-gray-500">
-                          <Shield className="h-3 w-3 text-blue-600 mr-1" />
-                          <span className="line-clamp-1">{medication.manufacturer}</span>
-                        </div>
-                      </div>
-
-                      {/* Side Effects */}
-                      {medication.sideEffects.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-xs text-gray-500 mb-2">Common Side Effects</p>
-                          <div className="flex flex-wrap gap-1">
-                            {medication.sideEffects.slice(0, 3).map((effect, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full"
-                              >
-                                {effect}
-                              </span>
-                            ))}
-                            {medication.sideEffects.length > 3 && (
-                              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-                                +{medication.sideEffects.length - 3} more
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
                       {/* Actions */}
                       <div className="flex items-center gap-2">
                         <button
@@ -808,10 +738,6 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                             )}
                           </button>
                         )}
-                        <WishlistButton 
-                          medication={medication}
-                          size="md"
-                        />
                       </div>
                     </div>
                   </div>
@@ -867,31 +793,6 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                             )}
                             <p className="text-sm text-gray-600 mb-3 line-clamp-2">{medication.description}</p>
 
-                            {/* Details Row */}
-                            <div className="flex flex-wrap gap-4 mb-3">
-                              <div className="flex items-center text-sm">
-                                <Star className="h-4 w-4 text-amber-500 fill-current mr-1" />
-                                <span className="font-medium">{medication.rating}</span>
-                                <span className="text-gray-500 ml-1">({medication.reviews})</span>
-                              </div>
-                              <div className="flex items-center text-sm">
-                                <Shield className="h-4 w-4 text-blue-600 mr-1" />
-                                <span className="text-gray-600">{medication.manufacturer}</span>
-                              </div>
-                              <div className="flex items-center text-sm">
-                                <Package className="h-4 w-4 text-gray-400 mr-1" />
-                                <span
-                                  className={`font-medium ${
-                                    isInStock(medication) ? 'text-emerald-600' : 'text-red-600'
-                                  }`}
-                                >
-                                  {isInStock(medication)
-                                    ? `${medication.quantity} in stock`
-                                    : 'Out of Stock'}
-                                </span>
-                              </div>
-                            </div>
-
                             {/* Actions */}
                             <div className="flex items-center gap-2 pt-3 border-t">
                               <button
@@ -942,10 +843,6 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
                                   )}
                                 </button>
                               )}
-                              <WishlistButton 
-                                medication={medication}
-                                size="md"
-                              />
                             </div>
                           </div>
                         </div>

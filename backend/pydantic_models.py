@@ -324,7 +324,7 @@ class DoctorEducationRequest(BaseModel):
     """Doctor education/certification request."""
     title: str = Field(..., min_length=1, max_length=200)
     institution: str = Field(..., min_length=1, max_length=200)
-    year: str = Field(..., min_length=4, max_length=4, pattern=r'^\d{4}$')
+    year: Optional[str] = Field(None, min_length=1, max_length=4, pattern=r'^\d{1,4}$')
     type: str = Field(..., enum=['degree', 'certification', 'license'])
     license_number: Optional[str] = Field(None, max_length=50)
     expiry_date: Optional[str] = Field(None, pattern=r'^\d{4}-\d{2}-\d{2}$')
@@ -335,7 +335,7 @@ class DoctorEducationResponse(BaseModel):
     doctor_id: int
     title: str
     institution: str
-    year: str
+    year: Optional[str] = None
     type: str
     license_number: Optional[str] = None
     expiry_date: Optional[str] = None

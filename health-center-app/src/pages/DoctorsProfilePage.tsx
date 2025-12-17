@@ -1,42 +1,43 @@
   // DoctorProfilePage.tsx
-  import { useState, useRef, useEffect } from 'react';
-  import { useParams, useNavigate } from 'react-router-dom';
-  import {
-    User,
-    Calendar,
-    Clock,
-    Star,
-    MapPin,
-    Phone,
-    Mail,
-    Award,
-    CheckCircle,
-    Video,
-    MessageSquare,
-    Send,
-    Paperclip,
-    FileText,
-    Pill,
-    Plus,
-    X,
-    ChevronLeft,
-    Shield,
-    Heart,
-    Activity,
-    Stethoscope,
-    GraduationCap,
-    Building,
-    Languages,
-    DollarSign,
-    Image,
-    Mic,
-    MoreVertical,
-    Download,
-    Printer,
-  } from 'lucide-react';
-  import { motion, AnimatePresence } from 'framer-motion';
-  import type { Doctor } from '../types';
-  import { formatCurrency } from '../services/formatCurrency';
+import { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  User,
+  Calendar,
+  Clock,
+  Star,
+  MapPin,
+  Phone,
+  Mail,
+  Award,
+  CheckCircle,
+  Video,
+  MessageSquare,
+  Send,
+  Paperclip,
+  FileText,
+  Plus,
+  X,
+  ChevronLeft,
+  Shield,
+  Heart,
+  Activity,
+  Stethoscope,
+  GraduationCap,
+  Building,
+  Languages,
+  DollarSign,
+  Image,
+  Mic,
+  MoreVertical,
+  Download,
+  Printer,
+  Pill,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { Doctor } from '../types';
+import { formatCurrency } from '../services/formatCurrency';
+import { useDoctorProfileById } from '../hooks/useDoctorProfileById';
 
   interface Message {
     id: string;
@@ -119,6 +120,14 @@
 
     // Find the doctor - handle case where no doctors are available
     const doctor = doctors.find((d) => d.id === id);
+
+    // Use real-time doctor profile data for specific doctor
+    const { 
+      education, 
+      contactInfo, 
+      availability, 
+      loading: profileLoading 
+    } = useDoctorProfileById(id || '');
 
     if (!doctor || doctors.length === 0) {
       return (
@@ -432,7 +441,6 @@
                       <span>{doctor.experience} experience</span>
                     </div>
                     <div className="flex items-center">
-                      <DollarSign className="h-5 w-5 mr-1" />
                       <span>{formatCurrency(doctor.consultationFee)} consultation</span>
                     </div>
                   </div>
@@ -512,35 +520,71 @@
                       Education & Certifications
                     </h2>
                     <div className="space-y-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <GraduationCap className="h-5 w-5 text-blue-600" />
+                      {profileLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">Medical Degree</h3>
-                          <p className="text-sm text-gray-600">
-                            {doctor.education || 'Harvard Medical School'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <Award className="h-5 w-5 text-emerald-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">Board Certified</h3>
-                          <p className="text-sm text-gray-600">{doctor.specialty}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                          <Shield className="h-5 w-5 text-purple-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">Licensed Practitioner</h3>
-                          <p className="text-sm text-gray-600">State Medical License #12345</p>
-                        </div>
-                      </div>
+                      ) : education && education.length > 0 ? (
+                        education.map((edu) => (
+                          <div key={edu.id} className="flex items-start gap-4">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                              edu.type === 'degree' ? 'bg-blue-100' :
+                              edu.type === 'certification' ? 'bg-emerald-100' : 'bg-purple-100'
+                            }`}>
+                              {edu.type === 'degree' ? (
+                                <GraduationCap className="h-5 w-5 text-blue-600" />
+                              ) : edu.type === 'certification' ? (
+                                <Award className="h-5 w-5 text-emerald-600" />
+                              ) : (
+                                <Shield className="h-5 w-5 text-purple-600" />
+                              )}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900">{edu.title}</h3>
+                              <p className="text-sm text-gray-600">{edu.institution}</p>
+                              <p className="text-xs text-gray-500">
+                                {edu.year || 'N/A'}
+                              </p>
+                              {edu.license_number && (
+                                <p className="text-xs text-gray-500">License: {edu.license_number}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        // Fallback to hardcoded data if no real data available
+                        <>
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <GraduationCap className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900">Medical Degree</h3>
+                              <p className="text-sm text-gray-600">
+                                {doctor.education || 'Harvard Medical School'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                              <Award className="h-5 w-5 text-emerald-600" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900">Board Certified</h3>
+                              <p className="text-sm text-gray-600">{doctor.specialty}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                              <Shield className="h-5 w-5 text-purple-600" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900">Licensed Practitioner</h3>
+                              <p className="text-sm text-gray-600">State Medical License #12345</p>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -568,59 +612,128 @@
                   <div className="bg-white rounded-xl shadow p-6">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">Contact Information</h2>
                     <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Building className="h-5 w-5 text-gray-600" />
+                      {profileLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Hospital</p>
-                          <p className="font-medium text-gray-900">
-                            {doctor.hospital || 'City Medical Center'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <MapPin className="h-5 w-5 text-gray-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Location</p>
-                          <p className="font-medium text-gray-900">
-                            {doctor.location || '123 Medical Drive'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Phone className="h-5 w-5 text-gray-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Phone</p>
-                          <p className="font-medium text-gray-900">{doctor.phone || '+1 234 567 890'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Mail className="h-5 w-5 text-gray-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Email</p>
-                          <p className="font-medium text-gray-900">
-                            {doctor.email || 'doctor@hospital.com'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Languages className="h-5 w-5 text-gray-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Languages</p>
-                          <p className="font-medium text-gray-900">
-                            {(doctor.languages || ['English', 'Spanish']).join(', ')}
-                          </p>
-                        </div>
-                      </div>
+                      ) : contactInfo ? (
+                        <>
+                          {contactInfo.hospital && (
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <Building className="h-5 w-5 text-gray-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">Hospital</p>
+                                <p className="font-medium text-gray-900">{contactInfo.hospital}</p>
+                              </div>
+                            </div>
+                          )}
+                          {contactInfo.location && (
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <MapPin className="h-5 w-5 text-gray-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">Location</p>
+                                <p className="font-medium text-gray-900">{contactInfo.location}</p>
+                              </div>
+                            </div>
+                          )}
+                          {doctor.phone && (
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <Phone className="h-5 w-5 text-gray-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">Phone</p>
+                                <p className="font-medium text-gray-900">{doctor.phone}</p>
+                              </div>
+                            </div>
+                          )}
+                          {doctor.email && (
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <Mail className="h-5 w-5 text-gray-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">Email</p>
+                                <p className="font-medium text-gray-900">{doctor.email}</p>
+                              </div>
+                            </div>
+                          )}
+                          {contactInfo.languages && contactInfo.languages.length > 0 && (
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <Languages className="h-5 w-5 text-gray-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">Languages</p>
+                                <p className="font-medium text-gray-900">
+                                  {contactInfo.languages.join(', ')}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        // Fallback to hardcoded data if no real data available
+                        <>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                              <Building className="h-5 w-5 text-gray-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Hospital</p>
+                              <p className="font-medium text-gray-900">
+                                {doctor.hospital || 'City Medical Center'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                              <MapPin className="h-5 w-5 text-gray-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Location</p>
+                              <p className="font-medium text-gray-900">
+                                {doctor.location || '123 Medical Drive'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                              <Phone className="h-5 w-5 text-gray-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Phone</p>
+                              <p className="font-medium text-gray-900">{doctor.phone || '+1 234 567 890'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                              <Mail className="h-5 w-5 text-gray-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Email</p>
+                              <p className="font-medium text-gray-900">
+                                {doctor.email || 'doctor@hospital.com'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                              <Languages className="h-5 w-5 text-gray-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Languages</p>
+                              <p className="font-medium text-gray-900">
+                                {(doctor.languages || ['English', 'Spanish']).join(', ')}
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -628,20 +741,43 @@
                   <div className="bg-white rounded-xl shadow p-6">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">Availability</h2>
                     <div className="space-y-3">
-                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => (
-                        <div key={day} className="flex justify-between items-center">
-                          <span className="text-gray-600">{day}</span>
-                          <span className="font-medium text-gray-900">9:00 AM - 5:00 PM</span>
+                      {profileLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
-                      ))}
-                      <div className="flex justify-between items-center text-gray-400">
-                        <span>Saturday</span>
-                        <span>Closed</span>
-                      </div>
-                      <div className="flex justify-between items-center text-gray-400">
-                        <span>Sunday</span>
-                        <span>Closed</span>
-                      </div>
+                      ) : availability && availability.length > 0 ? (
+                        availability.map((avail) => (
+                          <div key={avail.id} className="flex justify-between items-center">
+                            <span className={`text-gray-600 ${!avail.is_open ? 'text-gray-400' : ''}`}>
+                              {avail.day}
+                            </span>
+                            <span className={`font-medium ${!avail.is_open ? 'text-gray-400' : 'text-gray-900'}`}>
+                              {avail.is_open 
+                                ? `${avail.start_time || '9:00 AM'} - ${avail.end_time || '5:00 PM'}`
+                                : 'Closed'
+                              }
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        // Fallback to hardcoded data if no real data available
+                        <>
+                          {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => (
+                            <div key={day} className="flex justify-between items-center">
+                              <span className="text-gray-600">{day}</span>
+                              <span className="font-medium text-gray-900">9:00 AM - 5:00 PM</span>
+                            </div>
+                          ))}
+                          <div className="flex justify-between items-center text-gray-400">
+                            <span>Saturday</span>
+                            <span>Closed</span>
+                          </div>
+                          <div className="flex justify-between items-center text-gray-400">
+                            <span>Sunday</span>
+                            <span>Closed</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

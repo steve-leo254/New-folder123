@@ -112,7 +112,7 @@ export const apiService = {
     return data;
   },
   cancelAppointment: async (appointmentId: string | number) => {
-    const { data } = await api.put(`/appointments/${appointmentId}/cancel`, {});
+    const { data } = await api.put(`/appointments/${appointmentId}`, { status: 'cancelled' });
     return data;
   },
   getMedications: async (params?: Record<string, unknown>) => {
