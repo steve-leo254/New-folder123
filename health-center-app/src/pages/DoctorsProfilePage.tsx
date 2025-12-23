@@ -15,18 +15,18 @@ import {
   MessageSquare,
   Send,
   Paperclip,
-  FileText,
+ 
   Plus,
   X,
   ChevronLeft,
   Shield,
-  Heart,
+
   Activity,
-  Stethoscope,
+
   GraduationCap,
   Building,
   Languages,
-  DollarSign,
+
   Image,
   Mic,
   MoreVertical,

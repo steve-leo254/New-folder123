@@ -1012,7 +1012,7 @@ const SuperDashboardPage: React.FC = () => {
                       <h3 className="text-sm font-medium text-gray-600">
                         Monthly Sales
                       </h3>
-                      <DollarSign className="w-5 h-5 text-green-500" />
+                      
                     </div>
                     <p className="text-2xl font-bold text-gray-900">
                       {formatCurrency(
@@ -1123,7 +1123,7 @@ const SuperDashboardPage: React.FC = () => {
                   Export Report
                 </Button>
                 <Button>
-                  <DollarSign className="w-4 h-4 mr-2" />
+                  
                   Generate Invoice
                 </Button>
               </div>
