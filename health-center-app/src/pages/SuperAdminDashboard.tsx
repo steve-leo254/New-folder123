@@ -18,7 +18,7 @@ import {
   Filter,
   Database,
   Bell,
-  Shield,
+  
 } from "lucide-react";
 import DropdownMenu from "../components/ui/DropdownMenu";
 import Card from "../components/ui/Card";
@@ -164,14 +164,14 @@ const SuperDashboardPage: React.FC = () => {
   const recentActivities = [
     {
       id: 1,
-      user: "Dr. Sarah Johnson",
+      user: "Dr. Rama Karim",
       action: "Completed video consultation",
       time: "2 minutes ago",
       type: "appointment",
     },
     {
       id: 2,
-      user: "John Doe",
+      user: " Andriano Murimi",
       action: "Registered new account",
       time: "15 minutes ago",
       type: "user",
@@ -185,7 +185,7 @@ const SuperDashboardPage: React.FC = () => {
     },
     {
       id: 4,
-      user: "Dr. Michael Chen",
+      user: "Dr. Lovett May",
       action: "Updated availability schedule",
       time: "2 hours ago",
       type: "doctor",

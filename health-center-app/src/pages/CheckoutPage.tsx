@@ -58,28 +58,34 @@ const CheckoutPage: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Delivery Information</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Address</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="delivery-address">Delivery Address</label>
                 <input
                   type="text"
+                  id="delivery-address"
+                  name="delivery-address"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   placeholder="Enter your delivery address"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="city">City</label>
                   <input
                     type="text"
+                    id="city"
+                    name="city"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="City"
+                    placeholder="Enter your city"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="postal-code">Postal Code</label>
                   <input
                     type="text"
+                    id="postal-code"
+                    name="postal-code"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="Postal Code"
+                    placeholder="Enter postal code"
                   />
                 </div>
               </div>

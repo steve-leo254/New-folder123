@@ -152,17 +152,6 @@ const AppointmentsPage: React.FC = () => {
                           Dr. {doctor.firstName} {doctor.lastName}
                         </h3>
                         <p className="text-sm text-gray-600">{doctor.specialization}</p>
-                        <div className="flex items-center mt-1">
-                          <div className="flex text-yellow-400">
-                            {[...Array(5)].map((_, i) => (
-                              <span key={i} className={i < Math.floor(doctor.rating) ? 'text-yellow-400' : 'text-gray-300'}>
-                                ★
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-sm text-gray-600 ml-1">{doctor.rating}</span>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-2">{doctor.experience} years experience</p>
                         <div className="flex items-center justify-between mt-3">
                           <span className="text-primary-600 font-semibold">{formatCurrency(doctor.consultationFee)}</span>
                           <Button

@@ -70,6 +70,10 @@ export const apiService = {
     const { data } = await api.get('/users/me');
     return data;
   },
+  getAllUsers: async () => {
+    const { data } = await api.get('/users');
+    return data;
+  },
   updateCurrentUser: async (payload: {
     full_name?: string;
     phone?: string;
@@ -178,6 +182,11 @@ export const apiService = {
     insurance_policy_number?: string;
     insurance_group_number?: string;
     insurance_holder_name?: string;
+    insurance_type?: string;
+    quarterly_limit?: number;
+    quarterly_used?: number;
+    coverage_start_date?: string;
+    coverage_end_date?: string;
   }) => {
     const { data } = await api.put('/api/patient/insurance', payload);
     return data;

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { X, Calendar, Clock, Video, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, Clock, Video, MapPin, User } from 'lucide-react';
 import Button from '../ui/Button';
 import Alert from '../ui/Alert';
 import { StaffMember } from '../../types';
+import { formatCurrency } from '@/services/formatCurrency';
+import { apiService } from '../../services/api';
 
 interface BookAppointmentModalProps {
   isOpen: boolean;
@@ -35,12 +37,39 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>(patientId.toString());
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!isOpen) return;
+      
+      setUsersLoading(true);
+      try {
+        const usersData = await apiService.getAllUsers();
+        setUsers(usersData);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [isOpen]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    if (name === 'patient_id') {
+      setSelectedUserId(value);
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+    
     if (errors[name]) {
       setErrors((prev) => {
         const copy = { ...prev };
@@ -53,6 +82,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
+    if (!selectedUserId.trim()) newErrors.patient_id = 'Patient selection is required';
     if (!formData.date.trim()) newErrors.date = 'Date is required';
     if (!formData.time.trim()) newErrors.time = 'Time is required';
 
@@ -69,7 +99,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     setLoading(true);
     try {
       await onSubmit({
-        patient_id: patientId,
+        patient_id: selectedUserId,
         doctor_id: doctor.id,
         date: formData.date,
         time: formData.time,
@@ -82,6 +112,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         type: 'video',
         notes: '',
       });
+      setSelectedUserId(patientId.toString());
       onClose();
     } catch (error: any) {
       setServerError(
@@ -134,7 +165,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
             </div>
             {doctor.consultationFee && (
               <p className="mt-3 text-sm text-gray-700">
-                <span className="font-medium">Fee:</span> ${doctor.consultationFee}
+                <span className="font-medium">Fee:</span> {formatCurrency(doctor.consultationFee)}
               </p>
             )}
           </div>
@@ -148,6 +179,34 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Patient Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <User className="w-4 h-4 inline mr-2" />
+                Select Patient
+              </label>
+              <select
+                name="patient_id"
+                value={selectedUserId}
+                onChange={handleChange}
+                disabled={usersLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100"
+              >
+                <option value="">Select a patient...</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.first_name} {user.last_name} ({user.email})
+                  </option>
+                ))}
+              </select>
+              {usersLoading && (
+                <p className="text-gray-500 text-xs mt-1">Loading users...</p>
+              )}
+              {errors.patient_id && (
+                <p className="text-red-500 text-xs mt-1">{errors.patient_id}</p>
+              )}
+            </div>
+
             {/* Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

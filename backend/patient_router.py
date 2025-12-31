@@ -24,6 +24,7 @@ logger.info("Patient router initialized with wishlist endpoints")
 # Pydantic Models
 class WishlistItemCreate(BaseModel):
     medication_id: str | int
+    medication: Optional[Dict[str, Any]] = None  # Add medication data from frontend
 
 class WishlistItemResponse(BaseModel):
     id: int
@@ -139,12 +140,43 @@ async def add_to_wishlist(
     patient_id = current_user.id
     medication_id = request.medication_id
     
-    # Check if medication exists
-    if medication_id not in MOCK_MEDICATIONS:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Medication not found"
-        )
+    # Use medication data from frontend if provided, otherwise use mock data
+    medication_info = None
+    
+    if request.medication:
+        # Use frontend medication data
+        med = request.medication
+        medication_info = {
+            "name": med.get("name", f"Medication {medication_id}"),
+            "dosage": med.get("dosage", "Standard Dosage"),
+            "price": float(med.get("price", 15.99)),
+            "category": med.get("category", "general"),
+            "image_url": med.get("image", "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop"),
+            "in_stock": med.get("inStock", True),
+            "requires_prescription": med.get("prescriptionRequired", False),
+            "rating": float(med.get("rating", 4.5)),
+            "reviews": int(med.get("reviews", 100)),
+            "availability": "in-stock" if med.get("inStock", True) else "out-of-stock",
+            "stock_count": int(med.get("stock", 50))
+        }
+    else:
+        # Use mock medication data
+        medication_info = MOCK_MEDICATIONS.get(medication_id)
+        if not medication_info:
+            # Create default medication info if not found in mock data
+            medication_info = {
+                "name": f"Medication {medication_id}",
+                "dosage": "Standard Dosage",
+                "price": 15.99,
+                "category": "general",
+                "image_url": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop",
+                "in_stock": True,
+                "requires_prescription": False,
+                "rating": 4.5,
+                "reviews": 100,
+                "availability": "in-stock",
+                "stock_count": 50
+            }
     
     # Initialize patient wishlist if not exists
     if patient_id not in wishlist_storage:
@@ -168,7 +200,6 @@ async def add_to_wishlist(
     wishlist_storage[patient_id].append(new_item)
     
     # Return the created item
-    medication_info = MOCK_MEDICATIONS[medication_id]
     return {
         "id": new_item["id"],
         "patient_id": patient_id,

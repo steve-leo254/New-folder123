@@ -98,6 +98,15 @@ const WishlistPage = () => {
     return wishlistItems.reduce((total: number, item: WishlistItem) => total + item.price, 0);
   };
 
+  const getImageUrl = (imageUrl?: string) => {
+    if (imageUrl && imageUrl.trim() !== '') return imageUrl;
+    return 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop'; // Pharmacy/pills placeholder
+  };
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.src = 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop';
+  };
+
   // Show loading state while fetching wishlist
   if (isLoading && wishlistItems.length === 0) {
     return (
@@ -320,9 +329,10 @@ const WishlistPage = () => {
                       {/* Image */}
                       <div className="relative h-48 bg-gray-100 overflow-hidden">
                         <img
-                          src={item.imageUrl}
+                          src={getImageUrl(item.imageUrl)}
                           alt={item.name}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          onError={handleImageError}
                         />
                         {/* Remove Button */}
                         <button
@@ -363,10 +373,10 @@ const WishlistPage = () => {
 
                         {/* Price */}
                         <div className="flex items-center gap-2 mb-3">
-                          <span className="text-2xl font-bold text-gray-900">${item.price}</span>
+                          <span className="text-2xl font-bold text-gray-900">{formatCurrency(item.price)}</span>
                           {item.originalPrice && (
                             <span className="text-sm text-gray-400 line-through">
-                              ${item.originalPrice}
+                              {formatCurrency(item.originalPrice)}
                             </span>
                           )}
                         </div>
@@ -394,7 +404,7 @@ const WishlistPage = () => {
                         {/* Actions */}
                         <div className="flex gap-2">
                           <button
-                            onClick={() => navigate(`/medication/${item.id}`)}
+                            onClick={() => navigate(`/medication/${item.medicationId}`)}
                             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
                           >
                             View Details
@@ -416,9 +426,10 @@ const WishlistPage = () => {
                         {/* Image */}
                         <div className="md:w-48 h-48 md:h-auto relative bg-gray-100 flex-shrink-0">
                           <img
-                            src={item.imageUrl}
+                            src={getImageUrl(item.imageUrl)}
                             alt={item.name}
                             className="w-full h-full object-cover"
+                            onError={handleImageError}
                           />
                           {/* Badges */}
                           <div className="absolute top-3 left-3 flex flex-col gap-2">
@@ -452,11 +463,11 @@ const WishlistPage = () => {
                                 {/* Price */}
                                 <div className="flex items-center gap-2">
                                   <span className="text-2xl font-bold text-gray-900">
-                                    ${item.price}
+                                    {formatCurrency(item.price)}
                                   </span>
                                   {item.originalPrice && (
                                     <span className="text-sm text-gray-400 line-through">
-                                      ${item.originalPrice}
+                                      {formatCurrency(item.originalPrice)}
                                     </span>
                                   )}
                                 </div>
@@ -485,7 +496,7 @@ const WishlistPage = () => {
                               {/* Actions */}
                               <div className="flex gap-3">
                                 <button
-                                  onClick={() => navigate(`/medication/${item.id}`)}
+                                  onClick={() => navigate(`/medication/${item.medicationId}`)}
                                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
                                 >
                                   View Details

@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
 import { Heart } from 'lucide-react';
 import { useWishlist } from '../../services/useWishlist';
-import { useMedications, type MedicationRecord } from '../../services/useMedication';
 
 interface WishlistButtonProps {
-  medication: MedicationRecord;
+  medication: {
+    id: string | number;
+    name: string;
+    category: string;
+    dosage?: string;
+    price: number | string;
+    stock: number;
+    inStock: boolean;
+    prescriptionRequired?: boolean;
+    image?: string;
+  };
   className?: string;
   size?: 'sm' | 'md' | 'lg';
   showText?: boolean;
@@ -34,10 +43,28 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
         // Note: This would need the actual wishlist item ID, for now we'll use medication ID
         await removeFromWishlist(medication.id);
       } else {
-        await addToWishlist({ medication_id: medication.id });
+        await addToWishlist({ 
+          medication_id: medication.id,
+          medication: {
+            name: medication.name,
+            dosage: medication.dosage,
+            price: medication.price,
+            category: medication.category,
+            image: medication.image, // Use the correct 'image' property from MedicationRecord
+            stock: medication.stock,
+            inStock: medication.inStock,
+            prescriptionRequired: medication.prescriptionRequired,
+          }
+        });
       }
     } catch (error) {
-      console.error('Failed to toggle wishlist:', error);
+      // Don't log 404 and 400 errors since they're expected (404 = backend not running, 400 = duplicate item)
+      const axiosError = error as any;
+      if (axiosError?.response?.status !== 404 && axiosError?.response?.status !== 400) {
+        console.error('Failed to toggle wishlist:', error);
+      }
+      // Don't show error to user since localStorage fallback should handle it
+      // The user will see the wishlist state update even if backend fails
     } finally {
       setIsProcessing(false);
     }

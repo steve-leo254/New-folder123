@@ -77,6 +77,43 @@ export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
               { value: 'prefer-not-to-say', label: 'Prefer not to say' },
             ]}
           />
+          <InputField
+            label="Years of Experience"
+            name="yearsOfExperience"
+            type="number"
+            value={formData.yearsOfExperience || ''}
+            onChange={onChange}
+            disabled={!isEditing}
+            placeholder="Enter years of experience"
+          />
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-6">Professional Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <InputField
+            label="Education Completion Year"
+            name="educationCompletionYear"
+            type="number"
+            value={formData.educationCompletionYear || ''}
+            onChange={onChange}
+            disabled={!isEditing}
+            placeholder="Year of graduation/completion"
+          />
+          <div className="flex items-center">
+            <div className="text-sm text-gray-600">
+              {formData.educationCompletionYear ? (
+                <span className="font-medium">
+                  {new Date().getFullYear() - parseInt(formData.educationCompletionYear) >= 5 
+                    ? `${new Date().getFullYear() - parseInt(formData.educationCompletionYear)}+ years experience` 
+                    : `${Math.max(0, new Date().getFullYear() - parseInt(formData.educationCompletionYear))} years experience`}
+                </span>
+              ) : (
+                <span>Enter completion year to calculate experience</span>
+              )}
+            </div>
+          </div>
         </div>
       </Card>
 

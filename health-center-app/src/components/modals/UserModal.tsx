@@ -4,12 +4,30 @@ import { X } from 'lucide-react';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 
-interface UserModalProps {
-  user?: any;
-  onClose: () => void;
-  onSubmit: (userData: any) => void;
+interface User {
+  full_name: string;
+  email: string;
+  phone: string;
+  role: 'patient' | 'clinician_admin' | 'super_admin';
+  is_active: boolean;
+  id?: string;
 }
 
+interface UserFormData {
+  full_name: string;
+  email: string;
+  phone: string;
+  role: string;
+  is_active: boolean;
+  password: string;
+  confirm_password: string;
+}
+
+interface UserModalProps {
+  user?: User;
+  onClose: () => void;
+  onSubmit: (userData: Partial<UserFormData>) => void;
+}
 const UserModal: React.FC<UserModalProps> = ({ user, onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     full_name: '',

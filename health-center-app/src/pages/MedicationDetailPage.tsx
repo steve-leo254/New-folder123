@@ -30,6 +30,7 @@ import { useMedications } from '../services/useMedication';
 import { useShoppingCart } from '../services/CartContext';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Card from '../components/ui/Card';
+import WishlistButton from '../components/ui/WishlistButton';
 
 // ============================================================================
 // Types & Interfaces
@@ -180,7 +181,6 @@ const MedicationDetailPage = () => {
   // State
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [quantity, setQuantity] = useState(1);
-  const [isWishlisted, setIsWishlisted] = useState(false);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
   const [notification, setNotification] = useState<string | null>(null);
@@ -219,8 +219,8 @@ const MedicationDetailPage = () => {
         strength: medication.dosage || 'N/A',
         packSize: '1 Pack',
         price: extractPrice(medication.price),
-        originalPrice: extractPrice(medication.price) * 1.2,
-        discount: 20,
+        originalPrice: null,
+        discount: 0,
         inStock: medication.inStock && medication.stock > 0,
         stockCount: medication.stock,
         requiresPrescription: medication.prescriptionRequired || false,
@@ -330,11 +330,6 @@ const MedicationDetailPage = () => {
     setNotification(`${med.name} added to cart!`);
   };
 
-  const handleWishlistToggle = () => {
-    setIsWishlisted(!isWishlisted);
-    setNotification(isWishlisted ? 'Removed from wishlist' : 'Added to wishlist!');
-  };
-
   // Loading state
   if (isLoading) {
     return (
@@ -403,8 +398,6 @@ const MedicationDetailPage = () => {
           quantity={quantity}
           onQuantityChange={handleQuantityChange}
           onAddToCart={handleAddToCart}
-          isWishlisted={isWishlisted}
-          onWishlistToggle={handleWishlistToggle}
         />
 
         {/* Tabs Section */}
@@ -424,17 +417,17 @@ const MedicationDetailPage = () => {
     </div>
   );
 };
+
 // Sub-Components
 // ============================================================================
 
 const ProductSection = ({
   medication,
-  
+  selectedImage,
+  setSelectedImage,
   quantity,
   onQuantityChange,
   onAddToCart,
-  isWishlisted,
-  onWishlistToggle,
 }: any) => (
   <div className="grid lg:grid-cols-2 gap-8 mb-12">
     {/* Images */}
@@ -447,11 +440,6 @@ const ProductSection = ({
             alt={medication.name}
             className="w-full h-full object-cover"
           />
-          {medication.discount > 0 && (
-            <div className="absolute top-4 left-4 px-3 py-1 bg-red-500 text-white font-bold rounded-full">
-              {medication.discount}% OFF
-            </div>
-          )}
         </div>
       </div>
     </motion.div>
@@ -488,16 +476,6 @@ const ProductSection = ({
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6">
         <div className="flex items-baseline gap-3 mb-2">
           <span className="text-4xl font-bold text-gray-900">KSH {medication.price.toFixed(2).toLocaleString()}</span>
-          {medication.originalPrice && (
-            <span className="text-xl text-gray-400 line-through">
-              KSH {medication.originalPrice.toFixed(2).toLocaleString()}
-            </span>
-          )}
-          {medication.discount > 0 && (
-            <span className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full">
-              Save {medication.discount}%
-            </span>
-          )}
         </div>
         <p className="text-sm text-gray-600">Price per {medication.packSize}</p>
       </div>
@@ -566,16 +544,20 @@ const ProductSection = ({
           <ShoppingCart className="h-5 w-5 mr-2" />
           Add to Cart
         </button>
-        <button
-          onClick={onWishlistToggle}
-          className={`px-6 py-4 rounded-xl border-2 transition-all ${
-            isWishlisted
-              ? 'border-red-500 bg-red-50 text-red-600'
-              : 'border-gray-300 hover:border-red-500 hover:bg-red-50 hover:text-red-600'
-          }`}
-        >
-          <Heart className={`h-6 w-6 ${isWishlisted ? 'fill-current' : ''}`} />
-        </button>
+        <WishlistButton 
+          medication={{
+            id: parseInt(medication.id),
+            name: medication.name,
+            price: medication.price,
+            category: medication.category,
+            dosage: medication.dosage,
+            inStock: medication.inStock,
+            stock: medication.stockCount,
+            prescriptionRequired: medication.requiresPrescription,
+            image: medication.images[0]
+          }} 
+          size="lg"
+        />
         <button className="px-6 py-4 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-all">
           <Share2 className="h-6 w-6" />
         </button>

@@ -319,6 +319,8 @@ const VideoChatPage: React.FC = () => {
               <div className="flex space-x-2">
                 <input
                   type="text"
+                  id="chat-message"
+                  name="chat-message"
                   placeholder="Type a message..."
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
