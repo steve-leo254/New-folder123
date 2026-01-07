@@ -39,6 +39,7 @@ export interface RouteConfig {
 // Role Constants - Import from centralized constants
 import { ROLE_TYPES } from '../utils/constants';
 
+
 export const ROLES = ROLE_TYPES;
 
 // Role Groups
@@ -225,11 +226,7 @@ export const protectedRoutes: RouteConfig[] = [
     element: <LabTestPage />,
     allowedRoles: ALL_AUTHENTICATED_ROLES,
   },
-  // {
-  //   path: '/lab-results',
-  //   element: <LabResultsPage />,
-  //   allowedRoles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ...ADMIN_ROLES],
-  // },
+ 
 ];
 
 // Export all routes combined

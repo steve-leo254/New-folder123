@@ -69,32 +69,8 @@ const toArrayResponse = async (response: any): Promise<AppointmentRecord[]> => {
     appointments = [response];
   }
 
-  // First normalize all appointments
+  // Normalize all appointments - patient names are now included from backend
   const normalizedAppointments = appointments.map(normalizeAppointment);
-  
-  // For appointments without patient names, try to fetch patient details
-  const appointmentsWithoutPatientNames = normalizedAppointments.filter(apt => !apt.patientName && apt.patientId);
-  
-  if (appointmentsWithoutPatientNames.length > 0) {
-    try {
-      // Fetch all users to get patient names
-      const users = await apiService.getAllUsers();
-      const userMap = new Map();
-      
-      users.forEach((user: any) => {
-        userMap.set(user.id.toString(), `${user.first_name} ${user.last_name}`);
-      });
-      
-      // Update appointments with patient names
-      normalizedAppointments.forEach(apt => {
-        if (!apt.patientName && apt.patientId && userMap.has(apt.patientId.toString())) {
-          apt.patientName = userMap.get(apt.patientId.toString());
-        }
-      });
-    } catch (error) {
-      console.error('Failed to fetch user details for patient names:', error);
-    }
-  }
   
   return normalizedAppointments;
 };

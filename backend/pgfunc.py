@@ -5,7 +5,7 @@ Models and database configuration are in models.py and database.py.
 
 import logging
 from typing import Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import aliased, Session
 
 from models import User, Appointment, Prescription, Doctor, Role, AppointmentStatus
 
@@ -47,7 +47,15 @@ def get_appointments_for_user(db: Session, current_user, status_filter: Optional
     
     logger.info(f"Getting appointments for user role: {user_role}, user_id: {user_id}")
     
-    query = db.query(Appointment).join(User, Appointment.clinician_id == User.id)
+    # Create aliases for the User table to join both clinician and patient
+    ClinicianUser = aliased(User)
+    PatientUser = aliased(User)
+    
+    query = db.query(
+        Appointment,
+        ClinicianUser.full_name.label('clinician_full_name'),
+        PatientUser.full_name.label('patient_full_name')
+    ).join(ClinicianUser, Appointment.clinician_id == ClinicianUser.id).join(PatientUser, Appointment.patient_id == PatientUser.id)
     if user_role == Role.PATIENT:
         query = query.filter(Appointment.patient_id == user_id)
         logger.info(f"Filtering for PATIENT {user_id}")
@@ -63,16 +71,17 @@ def get_appointments_for_user(db: Session, current_user, status_filter: Optional
     appointments = query.order_by(Appointment.scheduled_at.desc()).all()
     logger.info(f"Found {len(appointments)} appointments")
     
-    # Add doctor names to appointments
+    # Add doctor and patient names to appointments
     result = []
-    for apt in appointments:
+    for apt, clinician_full_name, patient_full_name in appointments:
         appointment_dict = {
             'id': apt.id,
             'patient_id': apt.patient_id,
             'clinician_id': apt.clinician_id,
             'doctor_id': apt.clinician_id,  # Add for frontend compatibility
-            'doctor_name': apt.clinician.full_name if apt.clinician else '',
-            'clinician_name': apt.clinician.full_name if apt.clinician else '',
+            'doctor_name': clinician_full_name or '',
+            'clinician_name': clinician_full_name or '',
+            'patient_name': patient_full_name or '',
             'visit_type': apt.visit_type,
             'scheduled_at': apt.scheduled_at,
             'status': apt.status.value if apt.status else 'scheduled',

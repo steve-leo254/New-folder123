@@ -1,5 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import api from '../../services/api';
 import { FileText, Download, Calendar, AlertCircle } from 'lucide-react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -11,6 +13,27 @@ interface PrescriptionCardProps {
 }
 
 const PrescriptionCard: React.FC<PrescriptionCardProps> = ({ prescription }) => {
+  const navigate = useNavigate();
+
+  const handleDownloadPdf = async () => {
+    try {
+      const { data } = await api.get(`/prescriptions/${prescription.id}/pdf`, { responseType: 'blob' });
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `prescription-${prescription.id}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download prescription PDF', err);
+      alert('Unable to download PDF. Please try again later.');
+    }
+  };
+
+  const handleOrderMedications = () => {
+    navigate('/medications');
+  };
   const isActive = new Date(prescription.expiryDate) > new Date();
 
   return (
@@ -26,7 +49,9 @@ const PrescriptionCard: React.FC<PrescriptionCardProps> = ({ prescription }) => 
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">Prescription #{prescription.id}</h3>
-              <p className="text-sm text-gray-600">Dr. Sarah Johnson</p>
+              <p className="text-sm text-gray-600">
+                {prescription.doctorName ? `Dr. ${prescription.doctorName}` : `Doctor ID: ${prescription.doctorId}`}
+              </p>
             </div>
           </div>
           <Badge variant={isActive ? 'success' : 'error'}>
@@ -51,10 +76,10 @@ const PrescriptionCard: React.FC<PrescriptionCardProps> = ({ prescription }) => 
             {prescription.medications.map((medication) => (
               <div key={medication.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                 <div>
-                  <p className="font-medium text-gray-900">{medication.name}</p>
+                  <p className="font-medium text-gray-900">{medication.name || (medication as any).medicine || (medication as any).drug || 'Medication'}</p>
                   <p className="text-sm text-gray-600">{medication.dosage} - {medication.frequency}</p>
                 </div>
-                <span className="text-primary-600 font-semibold">${medication.price}</span>
+                <span className="text-primary-600 font-semibold">KSH{medication.price}</span>
               </div>
             ))}
           </div>
@@ -68,11 +93,11 @@ const PrescriptionCard: React.FC<PrescriptionCardProps> = ({ prescription }) => 
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1">
+          <Button variant="outline" className="flex-1" onClick={handleDownloadPdf}>
             <Download className="w-4 h-4 mr-2" />
             Download PDF
           </Button>
-          <Button className="flex-1">
+          <Button className="flex-1" onClick={handleOrderMedications}>
             Order Medications
           </Button>
         </div>

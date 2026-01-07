@@ -284,9 +284,10 @@ class Prescription(Base):
         Integer,
         ForeignKey("appointments.id"),
         unique=True,
-        nullable=False,
+        nullable=True,  # Made nullable for direct prescription creation
         index=True
     )
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Added for direct prescription
     issued_by_doctor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     pharmacy_name = Column(String(120), nullable=True)
     medications_json = Column(JSON, nullable=True)
@@ -294,12 +295,18 @@ class Prescription(Base):
     qr_code_path = Column(String(255), nullable=True)
     issued_date = Column(DateTime, default=func.now())
     expiry_date = Column(DateTime, nullable=True)
-    verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
     appointment = relationship("Appointment", back_populates="prescription")
+    patient = relationship("User", foreign_keys=[patient_id])
+    issued_by_doctor = relationship("User", foreign_keys=[issued_by_doctor_id])
+
+    @property
+    def doctor_name(self):
+        """Convenience property for the issuing doctor's full name."""
+        return self.issued_by_doctor.full_name if self.issued_by_doctor else None
 
 
 class Payment(Base):

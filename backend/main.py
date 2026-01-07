@@ -4,7 +4,10 @@ Healthcare management system with appointments, prescriptions, and payments.
 """
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+import io
+from starlette.responses import StreamingResponse
+from reportlab.pdfgen import canvas
 from typing import Annotated, List, Optional
 from pathlib import Path
 
@@ -41,17 +44,9 @@ from pgfunc import (
     get_doctors_by_specialization,
 )
 from pydantic_models import (
-    AppointmentCreateRequest,
-    AppointmentRescheduleRequest,
-    DoctorCreateRequest,
-    DoctorResponse,
-    PaymentRequest,
-    PaymentResponse,
-    UserProfileResponse,
-    CreateUserRequest,
-    MessageResponse,
-    PrescriptionCreateRequest,
-    PrescriptionUpdateRequest,
+    CreateUserRequest, UserProfileResponse, Token, LoginUserRequest, 
+    AppointmentCreateRequest, AppointmentUpdateRequest, AppointmentResponse, AppointmentRescheduleRequest,
+    PrescriptionCreateRequest, PrescriptionUpdateRequest, PrescriptionResponse,
     PrescriptionStatus,
     MedicationCreateRequest,
     MedicationUpdateRequest,
@@ -61,12 +56,17 @@ from pydantic_models import (
     StaffRoleResponse,
     StaffCreateRequest,
     StaffResponse,
+    DoctorCreateRequest,
+    DoctorResponse,
+    PaymentRequest,
+    PaymentResponse,
     VideoConsultationCreateRequest,
     VideoConsultationUpdateRequest,
     VideoTokenRequest,
     VideoTokenResponse,
     VideoConsultationResponse,
     ImageResponse,
+    MessageResponse,
     # Patient Profile Models
     MedicalInfoRequest,
     MedicalInfoResponse,
@@ -619,78 +619,98 @@ def cancel_appointment(
 # Prescription Routes
 # ============================================================================
 
-@app.post(
-    "/prescriptions",
-    response_model=UserProfileResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_admin(Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN))],
-)
-def create_prescription(
-    payload: PrescriptionCreateRequest,
-    db: Session = Depends(get_db)
-) -> Prescription:
-    """Create prescription for appointment (admin/clinician only)."""
-    appointment = db.query(Appointment).filter(
-        Appointment.id == payload.appointment_id
-    ).first()
-    
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Appointment not found."
-        )
-
-    # Check if prescription already exists
-    if appointment.prescription:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Prescription already exists for this appointment."
-        )
-
-    prescription = Prescription(
-        appointment_id=payload.appointment_id,
-        pharmacy_name=payload.pharmacy_name,
-        medications_json=payload.medications_json,
-        status=payload.status or PrescriptionStatus.PENDING,
-        qr_code_path=payload.qr_code_path,
-    )
-
-    try:
-        db.add(prescription)
-        db.commit()
-        db.refresh(prescription)
-        logger.info(f"Prescription created: ID {prescription.id}")
-        return prescription
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error creating prescription: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create prescription."
-        )
 
 
-@app.get("/prescriptions", response_model=List[UserProfileResponse])
+@app.get("/prescriptions", response_model=List[PrescriptionResponse])
 def list_prescriptions(
     status_filter: Optional[PrescriptionStatus] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> List[Prescription]:
     """List prescriptions (filtered by user role)."""
-    query = db.query(Prescription).join(Appointment)
+    # Use LEFT OUTER JOIN so prescriptions without an appointment are still returned
+    query = db.query(Prescription).outerjoin(Appointment, Prescription.appointment_id == Appointment.id)
 
     if current_user.role == Role.PATIENT:
-        query = query.filter(Appointment.patient_id == current_user.id)
+        # Prescriptions can either be linked directly to the patient or via an appointment
+        query = query.filter(
+            or_(
+                Prescription.patient_id == current_user.id,
+                Appointment.patient_id == current_user.id
+            )
+        )
     elif current_user.role == Role.CLINICIAN_ADMIN:
-        query = query.filter(Appointment.clinician_id == current_user.id)
+        # Clinicians should see prescriptions they issued directly or through appointments
+        query = query.filter(
+            or_(
+                Appointment.clinician_id == current_user.id,
+                Prescription.issued_by_doctor_id == current_user.id
+            )
+        )
 
     if status_filter:
         query = query.filter(Prescription.status == status_filter)
 
-    return query.all()
+    prescriptions = query.all()
+    return [prescription_to_response(prescription, db) for prescription in prescriptions]
 
 
-@app.get("/prescriptions/{prescription_id}", response_model=UserProfileResponse)
+def enrich_prescription_medications(medications: Optional[list], db: Session) -> list:
+    if not medications:
+        return []
+
+    enriched: list = []
+    for idx, item in enumerate(medications):
+        if not isinstance(item, dict):
+            enriched.append(item)
+            continue
+
+        medication_id = item.get("medicationId") or item.get("medication_id") or item.get("id")
+        name = item.get("name") or item.get("medicine") or item.get("drug") or item.get("medication_name")
+        price = item.get("price") or item.get("cost") or item.get("unit_price")
+
+        if medication_id and (not name or price is None):
+            med = db.query(Medication).filter(Medication.id == int(medication_id)).first()
+            if med:
+                if not name:
+                    name = med.name
+                if price is None:
+                    # Decimal -> float for JSON serialization
+                    price = float(med.price) if med.price is not None else 0
+
+        enriched.append(
+            {
+                **item,
+                "id": item.get("id") or medication_id or idx,
+                "name": name,
+                "price": price,
+            }
+        )
+
+    return enriched
+
+
+def prescription_to_response(prescription: Prescription, db: Session) -> PrescriptionResponse:
+    return PrescriptionResponse.model_validate(
+        {
+            "id": prescription.id,
+            "appointment_id": prescription.appointment_id,
+            "patient_id": prescription.patient_id,
+            "issued_by_doctor_id": prescription.issued_by_doctor_id,
+            "doctor_name": getattr(prescription, "doctor_name", None),
+            "pharmacy_name": prescription.pharmacy_name,
+            "medications_json": enrich_prescription_medications(prescription.medications_json, db),
+            "status": str(prescription.status) if prescription.status is not None else None,
+            "qr_code_path": prescription.qr_code_path,
+            "issued_date": prescription.issued_date,
+            "expiry_date": prescription.expiry_date,
+            "created_at": prescription.created_at,
+            "updated_at": prescription.updated_at,
+        }
+    )
+
+
+@app.get("/prescriptions/{prescription_id}", response_model=PrescriptionResponse)
 def get_prescription(
     prescription_id: int,
     db: Session = Depends(get_db),
@@ -709,21 +729,96 @@ def get_prescription(
 
     # Check permissions
     appointment = prescription.appointment
-    if current_user.role == Role.PATIENT and appointment.patient_id != current_user.id:
+    if current_user.role == Role.PATIENT:
+        # allow direct prescriptions (no appointment) via patient_id
+        if appointment and appointment.patient_id != current_user.id:
+            if prescription.patient_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to view this prescription"
+                )
+        elif not appointment and prescription.patient_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view this prescription"
+            )
+    elif current_user.role == Role.CLINICIAN_ADMIN and appointment and appointment.clinician_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this prescription"
         )
-    elif current_user.role == Role.CLINICIAN_ADMIN and appointment.clinician_id != current_user.id:
+
+    return prescription_to_response(prescription, db)
+
+
+@app.post("/prescriptions", response_model=PrescriptionResponse)
+def create_prescription(
+    payload: PrescriptionCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Prescription:
+    """Create new prescription (doctor/clinician only)."""
+    logger.info("--- CREATE PRESCRIPTION ENDPOINT HIT ---")
+    logger.info(f"Prescription creation request from user {current_user.id}")
+    logger.info(f"Payload: {payload}")
+    
+    # Check permissions - only doctors, nurses, and admins can create prescriptions
+    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+        logger.warning(f"Unauthorized prescription creation attempt by user {current_user.id} with role {current_user.role}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this prescription"
+            detail="Not authorized to create prescriptions"
+        )
+    
+    try:
+        enriched_meds = enrich_prescription_medications(payload.medications, db)
+
+        # Create the prescription
+        prescription = Prescription(
+            appointment_id=payload.appointment_id,
+            issued_by_doctor_id=payload.doctor_id,
+            patient_id=payload.patient_id,
+            pharmacy_name=payload.pharmacy_name or "Main Pharmacy",
+            medications_json=enriched_meds,  # Store enriched list so UI can show medication names
+            status=models.PrescriptionStatus.PENDING,
+            issued_date=datetime.utcnow()
         )
 
-    return prescription
+        # Handle expiry date if provided
+        if payload.expiry_date:
+            try:
+                prescription.expiry_date = datetime.fromisoformat(payload.expiry_date.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                try:
+                    # Try alternative date formats
+                    prescription.expiry_date = datetime.strptime(payload.expiry_date, '%Y-%m-%d')
+                except ValueError:
+                    prescription.expiry_date = datetime.utcnow() + timedelta(days=30)  # Default to 30 days
+        
+        db.add(prescription)
+        db.commit()
+        db.refresh(prescription)
+        
+        logger.info(f"Prescription created: ID {prescription.id} by user {current_user.id}")
+        return prescription
+        
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"SQLAlchemy Error creating prescription: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"General Error creating prescription: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error: {str(e)}"
+        )
 
 
-@app.patch("/prescriptions/{prescription_id}", response_model=UserProfileResponse)
+@app.patch("/prescriptions/{prescription_id}", response_model=PrescriptionResponse)
 def update_prescription(
     prescription_id: int,
     payload: PrescriptionUpdateRequest,
@@ -756,6 +851,127 @@ def update_prescription(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update prescription."
+        )
+
+
+
+@app.get("/prescriptions/{prescription_id}/pdf")
+def download_prescription_pdf(
+    prescription_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Generate and stream a simple PDF of the prescription."""
+    prescription = db.query(Prescription).filter(Prescription.id == prescription_id).first()
+    if not prescription:
+        raise HTTPException(status_code=404, detail="Prescription not found")
+
+    # permission check – reuse logic similar to get_prescription
+    appointment = prescription.appointment
+    if current_user.role == Role.PATIENT and appointment and appointment.patient_id != current_user.id:
+        if prescription.patient_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this prescription")
+    if current_user.role == Role.CLINICIAN_ADMIN and appointment and appointment.clinician_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this prescription")
+
+    # generate pdf
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=(595, 842))  # A4 points
+    y = 800
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, y, f"Prescription #{prescription.id}")
+    y -= 30
+    c.setFont("Helvetica", 12)
+    c.drawString(40, y, f"Doctor: {prescription.doctor_name or prescription.issued_by_doctor_id}")
+    y -= 20
+    c.drawString(40, y, f"Patient ID: {prescription.patient_id}")
+    y -= 20
+    c.drawString(40, y, f"Issued: {prescription.issued_date}")
+    y -= 20
+    c.drawString(40, y, f"Expires: {prescription.expiry_date}")
+    y -= 30
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(40, y, "Medications:")
+    y -= 20
+    c.setFont("Helvetica", 12)
+    meds = enrich_prescription_medications(prescription.medications_json or [], db)
+    for med in meds:
+        line = f"- {med.get('name', 'Medication')} {med.get('dosage', '')} {med.get('frequency', '')} {med.get('duration', '')}"
+        c.drawString(50, y, line)
+        y -= 18
+        if y < 50:
+            c.showPage()
+            y = 800
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    headers = {"Content-Disposition": f"attachment; filename=prescription-{prescription.id}.pdf"}
+    return StreamingResponse(buffer, media_type="application/pdf", headers=headers)
+
+
+@app.delete("/prescriptions/{prescription_id}")
+def delete_prescription(
+    prescription_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete prescription (admin/clinician only)."""
+    # Check permissions - only doctors, nurses, and admins can delete prescriptions
+    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete prescriptions"
+        )
+    
+    prescription = db.query(Prescription).filter(
+        Prescription.id == prescription_id
+    ).first()
+    
+    if not prescription:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prescription not found"
+        )
+    
+    try:
+        db.delete(prescription)
+        db.commit()
+        logger.info(f"Prescription deleted: ID {prescription_id} by user {current_user.id}")
+        return {"detail": "Prescription deleted successfully"}
+        
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error deleting prescription: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete prescription."
+        )
+
+
+@app.get("/patients", response_model=List[UserProfileResponse])
+def list_patients(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """List all patients (staff/admin only)."""
+    # Check permissions - only staff and admins can view patient list
+    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST, Role.PHARMACIST, Role.LAB_TECHNICIAN, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view patient list"
+        )
+    
+    try:
+        # Return only users with PATIENT role
+        patients = db.query(User).filter(User.role == Role.PATIENT).order_by(User.created_at.desc()).all()
+        logger.info(f"Retrieved {len(patients)} patients for user {current_user.id}")
+        return patients
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Error fetching patients: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch patients."
         )
 
 

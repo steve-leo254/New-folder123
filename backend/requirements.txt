@@ -23,6 +23,9 @@ email-validator==2.1.0
 # Testing (optional but recommended)
 pytest==7.4.4
 pytest-asyncio==0.23.3
+
+# PDF generation
+reportlab==4.0.4
 httpx==0.26.0
 
 # Code quality (optional but recommended)

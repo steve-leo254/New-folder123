@@ -70,8 +70,8 @@ export const apiService = {
     const { data } = await api.get('/users/me');
     return data;
   },
-  getAllUsers: async () => {
-    const { data } = await api.get('/users');
+  getPatients: async () => {
+    const { data } = await api.get('/patients');
     return data;
   },
   updateCurrentUser: async (payload: {
@@ -123,12 +123,16 @@ export const apiService = {
     const { data } = await api.get('/medications', { params });
     return data;
   },
-  createMedication: async (payload: unknown) => {
-    const { data } = await api.post('/medications', payload);
+  createMedicine: async (payload: unknown) => {
+    const { data } = await api.post('/medicines', payload);
     return data;
   },
-  updateMedication: async (medicationId: string | number, payload: unknown) => {
-    const { data } = await api.put(`/medications/${medicationId}`, payload);
+  createPrescription: async (payload: unknown) => {
+    const { data } = await api.post('/prescriptions', payload);
+    return data;
+  },
+  updateMedicine: async (medicineId: string | number, payload: unknown) => {
+    const { data } = await api.put(`/medicines/${medicineId}`, payload);
     return data;
   },
   getBilling: async (params?: Record<string, unknown>) => {

@@ -60,6 +60,7 @@ export interface Prescription {
   id: string;
   patientId: string;
   doctorId: string;
+  doctorName?: string;
   medications: Medication[];
   issuedDate: string;
   expiryDate: string;

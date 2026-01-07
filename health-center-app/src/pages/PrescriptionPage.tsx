@@ -23,6 +23,7 @@ const PrescriptionPage: React.FC = () => {
     id: p.id.toString(),
     patientId: p.patientId.toString(),
     doctorId: p.doctorId.toString(),
+    doctorName: p.doctorName ?? undefined,
     medications: p.medications,
     issuedDate: p.issuedDate,
     expiryDate: p.expiryDate,

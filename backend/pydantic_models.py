@@ -247,6 +247,31 @@ class AppointmentRescheduleRequest(BaseModel):
     scheduled_at: Optional[datetime] = None
 
 
+class AppointmentUpdateRequest(BaseModel):
+    """Update appointment request."""
+    status: Optional[AppointmentStatus] = None
+    triage_notes: Optional[str] = None
+    cost: Optional[Decimal] = None
+
+
+class AppointmentResponse(BaseModel):
+    """Appointment response model."""
+    id: int
+    patient_id: int
+    clinician_id: int
+    visit_type: Optional[str] = None
+    specialization: Optional[str] = None
+    scheduled_at: datetime
+    status: AppointmentStatus
+    triage_notes: Optional[str] = None
+    cost: Decimal
+    cancellation_reason: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AppointmentCancelRequest(BaseModel):
     """Cancel appointment request."""
     cancellation_reason: Optional[str] = None
@@ -258,11 +283,32 @@ class AppointmentCancelRequest(BaseModel):
 
 class PrescriptionCreateRequest(BaseModel):
     """Create prescription request."""
-    appointment_id: int
+    appointment_id: Optional[int] = None
+    patient_id: int
+    doctor_id: int
+    medications: List[dict]  # List of medication objects
+    instructions: Optional[str] = None
+    expiry_date: Optional[str] = None
     pharmacy_name: Optional[str] = None
-    medications_json: Optional[str] = None
+
+
+class PrescriptionResponse(BaseModel):
+    """Prescription response model."""
+    id: int
+    appointment_id: Optional[int] = None
+    patient_id: Optional[int] = None
+    issued_by_doctor_id: Optional[int] = None
+    doctor_name: Optional[str] = None
+    pharmacy_name: Optional[str] = None
+    medications_json: Optional[Any] = None
     status: Optional[str] = None
     qr_code_path: Optional[str] = None
+    issued_date: datetime
+    expiry_date: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PrescriptionUpdateRequest(BaseModel):
