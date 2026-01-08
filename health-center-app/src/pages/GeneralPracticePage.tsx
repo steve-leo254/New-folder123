@@ -1,5 +1,5 @@
 // pages/GeneralPracticePage.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Video,
   Phone,
@@ -9,130 +9,92 @@ import {
   Star,
   Search,
   Filter,
-  ChevronRight,
-  ChevronLeft,
-  Heart,
   Shield,
   Award,
   Users,
   Stethoscope,
-  Activity,
-  Thermometer,
-  Brain,
-  Pill,
-  AlertCircle,
   CheckCircle,
   X,
-  Play,
   Mic,
   MicOff,
   VideoOff,
   PhoneOff,
   Maximize2,
-  MinusCircle,
   Send,
   Paperclip,
   MoreVertical,
   Globe,
-  GraduationCap,
-  BadgeCheck,
   Zap,
-  Headphones,
-  FileText,
-  Download,
-  Share2,
-  Bell,
   Settings,
   HelpCircle,
   ArrowRight,
   Sparkles,
-  TrendingUp,
-  UserCheck,
   CalendarCheck,
-  ClipboardList,
   HeartPulse,
   Smile,
   Frown,
   Meh,
   ThumbsUp,
-  MapPin,
   CreditCard,
   Lock,
-  RefreshCw,
 } from 'lucide-react';
-import type { Doctor, TimeSlot, Symptom, Appointment, ConsultationType } from '../types/telemedicine';
+import { useDoctors } from '../services/useDoctors';
+import { useConsultationPricing } from '../services/useConsultationPricing';
+import { useDoctorAvailability } from '../services/useDoctorAvailability';
+import { formatCurrency } from '../services/formatCurrency';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { getFullImageUrl } from '../utils/imageUtils';
+import type { Doctor } from '../types';
 
-// Mock Data
-const mockDoctors: Doctor[] = [
-  {
-    id: '1',
-    name: 'Dr. Sarah Mitchell',
-    specialization: 'General Practitioner',
-    avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face',
-    rating: 4.9,
-    reviewCount: 847,
-    experience: 12,
-    languages: ['English', 'Spanish'],
-    availability: 'available',
-    nextAvailable: 'Now',
-    consultationFee: 49,
-    bio: 'Dedicated GP with over 12 years of experience in family medicine and preventive care.',
-    education: ['MD - Harvard Medical School', 'Residency - Johns Hopkins Hospital'],
-    badges: ['Top Rated', 'Quick Responder'],
-    totalConsultations: 5420,
-  },
-  {
-    id: '2',
-    name: 'Dr. James Chen',
-    specialization: 'Internal Medicine',
-    avatar: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face',
-    rating: 4.8,
-    reviewCount: 623,
-    experience: 15,
-    languages: ['English', 'Mandarin', 'Cantonese'],
-    availability: 'busy',
-    nextAvailable: '2:30 PM',
-    consultationFee: 59,
-    bio: 'Specializing in chronic disease management and holistic patient care.',
-    education: ['MD - Stanford University', 'Fellowship - Mayo Clinic'],
-    badges: ['Expert', 'Most Experienced'],
-    totalConsultations: 7830,
-  },
-  {
-    id: '3',
-    name: 'Dr. Emily Rodriguez',
-    specialization: 'Family Medicine',
-    avatar: 'https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=150&h=150&fit=crop&crop=face',
-    rating: 4.9,
-    reviewCount: 512,
-    experience: 8,
-    languages: ['English', 'Spanish', 'Portuguese'],
-    availability: 'available',
-    nextAvailable: 'Now',
-    consultationFee: 45,
-    bio: 'Passionate about preventive medicine and building lasting patient relationships.',
-    education: ['MD - UCLA', 'Residency - UCSF Medical Center'],
-    badges: ['Patient Favorite', 'Multilingual'],
-    totalConsultations: 3200,
-  },
-  {
-    id: '4',
-    name: 'Dr. Michael Thompson',
-    specialization: 'General Practitioner',
-    avatar: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&h=150&fit=crop&crop=face',
-    rating: 4.7,
-    reviewCount: 389,
-    experience: 20,
-    languages: ['English'],
-    availability: 'offline',
-    nextAvailable: 'Tomorrow 9:00 AM',
-    consultationFee: 55,
-    bio: 'Veteran physician with expertise in geriatric care and complex medical conditions.',
-    education: ['MD - Yale School of Medicine', 'MPH - Columbia University'],
-    badges: ['Senior Expert', 'Highly Recommended'],
-    totalConsultations: 12500,
-  },
-];
+// Local type definitions specific to this page
+interface GPDoctor {
+  id: string;
+  name: string;
+  specialization: string;
+  avatar: string;
+  rating: number;
+  reviewCount: number;
+  experience: number;
+  languages: string[];
+  availability: 'available' | 'busy' | 'offline';
+  nextAvailable: string;
+  consultationFee: number;
+  bio: string;
+  education: string[];
+  badges: string[];
+  totalConsultations: number;
+}
+
+interface Symptom {
+  id: string;
+  name: string;
+  icon: string;
+  category: string;
+}
+interface TimeSlot {
+  id: string;
+  time: string;
+  available: boolean;
+}
+interface Appointment {
+  id: string;
+  doctor: GPDoctor;
+  date: string;
+  time: string;
+  type: 'video' | 'phone' | 'chat';
+  status: 'upcoming' | 'completed' | 'cancelled';
+  symptoms: string[];
+  notes?: string;
+}
+interface ConsultationType {
+  id: string;
+  type: 'video' | 'phone' | 'chat';
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  price: number;
+  duration: string;
+}
 
 const symptoms: Symptom[] = [
   { id: '1', name: 'Headache', icon: '🤕', category: 'Pain' },
@@ -147,55 +109,13 @@ const symptoms: Symptom[] = [
   { id: '10', name: 'Stomach Pain', icon: '🤮', category: 'Digestive' },
   { id: '11', name: 'Dizziness', icon: '💫', category: 'Neurological' },
   { id: '12', name: 'Insomnia', icon: '🌙', category: 'Sleep' },
-];
-
-const timeSlots: TimeSlot[] = [
-  { id: '1', time: '9:00 AM', available: true },
-  { id: '2', time: '9:30 AM', available: true },
-  { id: '3', time: '10:00 AM', available: false },
-  { id: '4', time: '10:30 AM', available: true },
-  { id: '5', time: '11:00 AM', available: true },
-  { id: '6', time: '11:30 AM', available: false },
-  { id: '7', time: '2:00 PM', available: true },
-  { id: '8', time: '2:30 PM', available: true },
-  { id: '9', time: '3:00 PM', available: true },
-  { id: '10', time: '3:30 PM', available: false },
-  { id: '11', time: '4:00 PM', available: true },
-  { id: '12', time: '4:30 PM', available: true },
-];
-
-const consultationTypes: ConsultationType[] = [
-  {
-    id: 'video',
-    type: 'video',
-    name: 'Video Call',
-    description: 'Face-to-face consultation via HD video',
-    icon: <Video className="w-6 h-6" />,
-    price: 49,
-    duration: '15-30 min',
-  },
-  {
-    id: 'audio',
-    type: 'audio',
-    name: 'Voice Call',
-    description: 'Phone consultation with your doctor',
-    icon: <Phone className="w-6 h-6" />,
-    price: 39,
-    duration: '10-20 min',
-  },
-  {
-    id: 'chat',
-    type: 'chat',
-    name: 'Chat',
-    description: 'Text-based consultation with attachments',
-    icon: <MessageCircle className="w-6 h-6" />,
-    price: 29,
-    duration: '24h response',
-  },
+  { id: '13', name: 'Diarrhea', icon: '💩', category: 'Digestive' },
+  { id: '14', name: 'Vomiting', icon: '🤢', category: 'Digestive' },
+  { id: '15', name: 'Abdominal Pain', icon: '🤕', category: 'Pain' },
 ];
 
 // Utility Components
-const AvailabilityBadge: React.FC<{ status: Doctor['availability'] }> = ({ status }) => {
+const AvailabilityBadge: React.FC<{ status: GPDoctor['availability'] }> = ({ status }) => {
   const config = {
     available: { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500', label: 'Available Now' },
     busy: { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-500', label: 'In Session' },
@@ -222,22 +142,22 @@ const RatingStars: React.FC<{ rating: number; showValue?: boolean }> = ({ rating
         />
       ))}
     </div>
-    {showValue && <span className="text-sm font-medium text-gray-700">{rating.toFixed(1)}</span>}
+    {showValue && <span className="text-sm font-medium text-gray-700">{typeof rating === 'number' ? rating.toFixed(1) : rating}</span>}
   </div>
 );
 
-// Doctor Card Component
+// GPDoctor Card Component
 const DoctorCard: React.FC<{
-  doctor: Doctor;
-  onSelect: (doctor: Doctor) => void;
+  doctor: GPDoctor;
+  onSelect: (doctor: GPDoctor) => void;
   isSelected?: boolean;
 }> = ({ doctor, onSelect, isSelected }) => {
   return (
     <div
       onClick={() => onSelect(doctor)}
       className={`relative bg-white rounded-2xl p-5 cursor-pointer transition-all duration-300 hover:shadow-xl ${
-        isSelected 
-          ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-100' 
+        isSelected
+          ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-100'
           : 'shadow-md hover:shadow-lg border border-gray-100'
       }`}
     >
@@ -281,7 +201,7 @@ const DoctorCard: React.FC<{
             <Stethoscope className="w-3.5 h-3.5" />
             {doctor.specialization}
           </p>
-          
+
           <div className="flex items-center gap-3 mt-2">
             <RatingStars rating={doctor.rating} />
             <span className="text-xs text-gray-500">({doctor.reviewCount})</span>
@@ -293,7 +213,7 @@ const DoctorCard: React.FC<{
             </span>
             <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
               <Globe className="w-3 h-3" />
-              {doctor.languages.length} lang
+              {doctor.languages.length} {doctor.languages.length === 1 ? 'lang' : 'langs'}
             </span>
           </div>
         </div>
@@ -303,7 +223,7 @@ const DoctorCard: React.FC<{
       <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
         <div>
           <p className="text-xs text-gray-500">Consultation Fee</p>
-          <p className="text-lg font-bold text-gray-900">${doctor.consultationFee}</p>
+          <p className="text-lg font-bold text-gray-900">{formatCurrency(doctor.consultationFee)}</p>
         </div>
         <div className="text-right">
           <AvailabilityBadge status={doctor.availability} />
@@ -446,15 +366,54 @@ const SymptomChecker: React.FC<{
 
 // Booking Modal Component
 const BookingModal: React.FC<{
-  doctor: Doctor;
+  doctor: GPDoctor;
   onClose: () => void;
   onBook: (appointment: Partial<Appointment>) => void;
 }> = ({ doctor, onClose, onBook }) => {
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<ConsultationType>(consultationTypes[0]);
   const [notes, setNotes] = useState('');
+
+  // Get consultation pricing for this doctor (convert GPDoctor to Doctor)
+  const doctorForPricing: Doctor = {
+    id: doctor.id,
+    user_id: doctor.id,
+    fullName: doctor.name,
+    email: '',
+    phone: '',
+    specialization: doctor.specialization,
+    bio: doctor.bio,
+    rating: doctor.rating,
+    isAvailable: doctor.availability === 'available',
+    consultationFee: doctor.consultationFee,
+    patientsCount: 0,
+    avatar: doctor.avatar,
+  };
+
+  const { getConsultationTypes } = useConsultationPricing(doctorForPricing);
+
+  // Get doctor availability
+  const { timeSlots } = useDoctorAvailability(doctor.id);
+
+  // Get dynamic consultation types with icons
+  const consultationTypes = useMemo(() => {
+    const types = getConsultationTypes();
+    return types.map((type, index) => ({
+      ...type,
+      icon: index === 0 ? <Video className="w-6 h-6" /> : index === 1 ? <Phone className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />,
+    }));
+  }, [getConsultationTypes]);
+
+  const [selectedType, setSelectedType] = useState<ConsultationType>(consultationTypes[0] || {
+    id: 'video',
+    type: 'video' as const,
+    name: 'Video Call',
+    description: 'Face-to-face consultation via HD video',
+    icon: <Video className="w-6 h-6" />,
+    price: 49,
+    duration: '15-30 min',
+  });
 
   // Generate next 7 days
   const dates = Array.from({ length: 7 }, (_, i) => {
@@ -560,7 +519,7 @@ const BookingModal: React.FC<{
                       <p className="text-sm text-gray-500">{type.description}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-gray-900">${type.price}</p>
+                      <p className="text-lg font-bold text-gray-900">{formatCurrency(type.price)}</p>
                       <p className="text-xs text-gray-500">{type.duration}</p>
                     </div>
                   </button>
@@ -652,7 +611,7 @@ const BookingModal: React.FC<{
                 </div>
                 <div className="border-t border-gray-200 pt-3 flex justify-between">
                   <span className="font-semibold text-gray-900">Total</span>
-                  <span className="font-bold text-xl text-blue-600">${selectedType.price}</span>
+                  <span className="font-bold text-xl text-blue-600">{formatCurrency(selectedType.price)}</span>
                 </div>
               </div>
 
@@ -715,7 +674,7 @@ const BookingModal: React.FC<{
 
 // Video Call Component
 const VideoCall: React.FC<{
-  doctor: Doctor;
+  doctor: GPDoctor;
   onEnd: () => void;
 }> = ({ doctor, onEnd }) => {
   const [isMuted, setIsMuted] = useState(false);
@@ -753,7 +712,7 @@ const VideoCall: React.FC<{
     <div className="fixed inset-0 bg-gray-900 z-50">
       {/* Main Video Area */}
       <div className="absolute inset-0">
-        {/* Doctor Video (Main) */}
+        {/* GPDoctor Video (Main) */}
         <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
           <img
             src={doctor.avatar}
@@ -780,7 +739,7 @@ const VideoCall: React.FC<{
       <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/50 to-transparent">
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 bg-black/30 backdrop-blur-md rounded-full px-4 py-2">
+            <div className="flex items-center gap-3 bg-black/30 backdrop-blur-md rounded-full px-4 py-2 mb-6">
               <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
               <span className="text-white font-medium">{formatDuration(duration)}</span>
             </div>
@@ -904,7 +863,7 @@ const VideoCall: React.FC<{
 
 // Main Page Component
 const GeneralPracticePage: React.FC = () => {
-  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<GPDoctor | null>(null);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showVideoCall, setShowVideoCall] = useState(false);
@@ -913,7 +872,50 @@ const GeneralPracticePage: React.FC = () => {
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
   const [activeTab, setActiveTab] = useState<'doctors' | 'appointments'>('doctors');
 
-  const filteredDoctors = mockDoctors.filter((doctor) => {
+  // Fetch doctors from backend
+  const { doctors: rawDoctors, loading, error } = useDoctors();
+
+  // Get consultation pricing for selected doctor
+  const { getConsultationTypes } = useConsultationPricing();
+
+  // Map backend shape to UI shape expected by this page
+  const formattedDoctors: GPDoctor[] = useMemo(
+    () =>
+      rawDoctors.map((doctor) => ({
+        id: doctor.id.toString(),
+        name: doctor.fullName,
+        specialization: doctor.specialization,
+        avatar:
+          getFullImageUrl(doctor.avatar) ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff`,
+        rating: doctor.rating ?? 0,
+        reviewCount: 0,
+        experience: 5,
+        languages: doctor.languages || [],
+        availability: doctor.isAvailable ? 'available' : 'offline',
+        nextAvailable: doctor.isAvailable ? 'Now' : 'Later',
+        consultationFee: doctor.consultationFee ?? 0,
+        bio: doctor.bio ?? '',
+        education: [],
+        badges: [],
+        totalConsultations: 0,
+      })),
+    [rawDoctors]
+  );
+
+  // Handle loading and error states
+  if (loading) {
+    return <LoadingSpinner message="Loading doctors..." />;
+  }
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-red-600 font-medium">{error}</p>
+      </div>
+    );
+  }
+
+  const filteredDoctors = formattedDoctors.filter((doctor) => {
     const matchesSearch =
       doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doctor.specialization.toLowerCase().includes(searchQuery.toLowerCase());
@@ -938,7 +940,7 @@ const GeneralPracticePage: React.FC = () => {
     setSelectedDoctor(null);
   };
 
-  const startInstantCall = (doctor: Doctor) => {
+  const startInstantCall = (doctor: GPDoctor) => {
     setSelectedDoctor(doctor);
     setShowVideoCall(true);
   };
@@ -977,8 +979,8 @@ const GeneralPracticePage: React.FC = () => {
               <div className="flex flex-wrap gap-4">
                 <button
                   onClick={() => {
-                    const availableDoctor = mockDoctors.find(d => d.availability === 'available');
-                    if (availableDoctor) startInstantCall(availableDoctor);
+                    const availableGPDoctor = formattedDoctors.find(d => d.availability === 'available');
+                    if (availableGPDoctor) startInstantCall(availableGPDoctor);
                   }}
                   className="group flex items-center gap-3 bg-white text-blue-600 px-8 py-4 rounded-2xl font-semibold shadow-lg shadow-blue-900/30 hover:shadow-xl hover:scale-105 transition-all"
                 >
@@ -1040,7 +1042,7 @@ const GeneralPracticePage: React.FC = () => {
               </div>
 
               <button className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all">
-                Find a Doctor Now
+                Find a GPDoctor Now
               </button>
             </div>
           </div>
@@ -1214,7 +1216,7 @@ const GeneralPracticePage: React.FC = () => {
                           </span>
                           <span className="flex items-center gap-1 text-sm text-blue-600">
                             {appointment.type === 'video' ? <Video className="w-4 h-4" /> : 
-                             appointment.type === 'audio' ? <Phone className="w-4 h-4" /> : 
+                             appointment.type === 'phone' ? <Phone className="w-4 h-4" /> : 
                              <MessageCircle className="w-4 h-4" />}
                             {appointment.type.charAt(0).toUpperCase() + appointment.type.slice(1)} Call
                           </span>
@@ -1226,7 +1228,7 @@ const GeneralPracticePage: React.FC = () => {
                           className="p-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors"
                         >
                           {appointment.type === 'video' ? <Video className="w-5 h-5" /> :
-                           appointment.type === 'audio' ? <Phone className="w-5 h-5" /> :
+                           appointment.type === 'phone' ? <Phone className="w-5 h-5" /> :
                            <MessageCircle className="w-5 h-5" />}
                         </button>
                         <button className="p-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors">

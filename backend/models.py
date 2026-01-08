@@ -145,6 +145,9 @@ class Doctor(Base):
     license_number = Column(String(50), unique=True, nullable=True)
     is_available = Column(Boolean, default=True, index=True)
     consultation_fee = Column(Numeric(precision=10, scale=2), nullable=True)
+    video_consultation_fee = Column(Numeric(precision=10, scale=2), nullable=True)
+    phone_consultation_fee = Column(Numeric(precision=10, scale=2), nullable=True)
+    chat_consultation_fee = Column(Numeric(precision=10, scale=2), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

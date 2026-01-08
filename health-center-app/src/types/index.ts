@@ -16,26 +16,23 @@ export interface User {
 
 export interface Doctor {
   id: string;
-  firstName: string;
-  lastName: string;
-  name: string; 
+  user_id: string;
+  fullName: string;
+  email: string;
+  phone: string;
   specialization: string;
-  specialty: string; 
-  experience: number | string; 
-  rating: number;
-  avatar: string;
   bio: string;
-  availability: TimeSlot[];
+  rating: number;
+  isAvailable: boolean;
   consultationFee: number;
-  available: boolean; 
-  hospital?: string;
-  location?: string;
-  phone?: string;
-  email?: string;
-  languages?: string[];
-  reviewCount?: number;
-  education?: string;
-  specializations?: string[];
+  video_consultation_fee?: number;
+  phone_consultation_fee?: number;
+  chat_consultation_fee?: number;
+  patientsCount: number;
+  avatar: string;
+  license_number?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface TimeSlot {

@@ -986,31 +986,45 @@ def list_doctors(
     db: Session = Depends(get_db),
 ):
     """List all doctors, optionally filtered by specialization and availability."""
-    if specialization:
-        doctors = get_doctors_by_specialization(db, specialization, is_available)
-    else:
-        doctors = get_all_doctors(db, is_available)
+    try:
+        if specialization:
+            doctors = get_doctors_by_specialization(db, specialization, is_available)
+        else:
+            doctors = get_all_doctors(db, is_available)
 
-    # Enrich doctor data with user information
-    result = []
-    for doctor in doctors:
-        user = doctor.user
-        result.append({
-            "id": doctor.id,
-            "user_id": doctor.user_id,
-            "fullName": user.full_name,
-            "email": user.email,
-            "phone": user.phone,
-            "specialization": doctor.specialization,
-            "bio": doctor.bio,
-            "isAvailable": doctor.is_available,
-            "rating": float(doctor.rating) if doctor.rating else 0.0,
-            "consultationFee": float(doctor.consultation_fee) if doctor.consultation_fee else 0.0,
-            "patientsCount": 0,  # TODO: Calculate from appointments
-            "avatar": user.profile_picture,
-        })
-    
-    return result
+        logger.info(f"Found {len(doctors)} doctors")
+
+        # Enrich doctor data with user information
+        result = []
+        for doctor in doctors:
+            try:
+                user = doctor.user
+                if not user:
+                    logger.warning(f"Doctor {doctor.id} has no associated user record")
+                    continue
+                    
+                result.append({
+                    "id": doctor.id,
+                    "user_id": doctor.user_id,
+                    "fullName": user.full_name,
+                    "email": user.email,
+                    "phone": user.phone,
+                    "specialization": doctor.specialization,
+                    "bio": doctor.bio,
+                    "isAvailable": doctor.is_available,
+                    "rating": float(doctor.rating) if doctor.rating else 0.0,
+                    "consultationFee": float(doctor.consultation_fee) if doctor.consultation_fee else 0.0,
+                    "patientsCount": 0,  # TODO: Calculate from appointments
+                    "avatar": user.profile_picture,
+                })
+            except Exception as e:
+                logger.error(f"Error processing doctor {doctor.id}: {str(e)}")
+                continue
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error in list_doctors: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @app.get("/doctors/{doctor_id}", response_model=DoctorResponse)

@@ -14,6 +14,7 @@ export interface Doctor {
   rating: number;
   consultationFee: number;
   avatar?: string;  // Changed from profile_picture to match API response
+  languages?: string[];  // Languages from doctor_contact_info
   created_at: string;
   updated_at: string;
 }
@@ -50,17 +51,24 @@ export const useDoctors = (specialization?: string, isAvailable?: boolean) => {
         },
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        
         if (response.status === 401) {
           throw new Error('Authentication required. Please log in.');
         }
         if (response.status === 403) {
           throw new Error('Access denied. You do not have permission to view doctors.');
         }
-        throw new Error(`Failed to fetch doctors: ${response.statusText}`);
+        throw new Error(`Failed to fetch doctors: ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('Doctors data received:', data);
       setDoctors(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
