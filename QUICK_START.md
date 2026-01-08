@@ -62,8 +62,6 @@ VITE_API_URL=http://localhost:8000
 npm run dev
 ```
 
-Frontend will be available at: `http://localhost:5173`
-
 ---
 
 ## 📋 Key Features

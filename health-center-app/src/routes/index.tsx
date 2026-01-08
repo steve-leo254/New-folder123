@@ -38,6 +38,7 @@ export interface RouteConfig {
 
 // Role Constants - Import from centralized constants
 import { ROLE_TYPES } from '../utils/constants';
+import GeneralPracticePage from '@/pages/GeneralPracticePage';
 
 
 export const ROLES = ROLE_TYPES;
@@ -89,6 +90,10 @@ export const publicRoutes: RouteConfig[] = [
     path: '*',
     element: <Navigate to="/404" replace />,
   },
+  {
+     path: '/general-practice',
+     element: <GeneralPracticePage />,
+  }
 ];
 
 // Admin-only Routes

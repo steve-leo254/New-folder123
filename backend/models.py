@@ -424,12 +424,12 @@ class MedicalInfo(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
-    blood_type = Column(String(10), nullable=True)  # A+, A-, B+, B-, AB+, AB-, O+, O-
-    height = Column(String(20), nullable=True)  # e.g., "5'10\"", "178cm"
-    weight = Column(String(20), nullable=True)  # e.g., "175 lbs", "79kg"
-    allergies = Column(JSON, nullable=True)  # ["Peanuts", "Shellfish", "Penicillin"]
-    conditions = Column(JSON, nullable=True)  # ["Diabetes", "Hypertension", "Asthma"]
-    medications = Column(JSON, nullable=True)  # ["Aspirin 81mg", "Metformin 500mg", "Lisinopril 10mg"]
+    blood_type = Column(String(10), nullable=True)
+    height = Column(String(20), nullable=True) 
+    weight = Column(String(20), nullable=True) 
+    allergies = Column(JSON, nullable=True)
+    conditions = Column(JSON, nullable=True) 
+    medications = Column(JSON, nullable=True) 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
