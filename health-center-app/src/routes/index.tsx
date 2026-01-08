@@ -74,13 +74,6 @@ export const publicRoutes: RouteConfig[] = [
     path: '/register',
     element: <RegisterPage />,
   },
-   {
-    path: '/mental-health',
-    element: <MentalHealthPage />,
-  }, {
-    path: '/health-checkup',
-    element: <HealthCheckupsPage />,
-  },
 
   {
     path: '/404',
@@ -89,10 +82,6 @@ export const publicRoutes: RouteConfig[] = [
   {
     path: '*',
     element: <Navigate to="/404" replace />,
-  },
-  {
-     path: '/general-practice',
-     element: <GeneralPracticePage />,
   }
 ];
 
@@ -149,6 +138,18 @@ export const protectedRoutes: RouteConfig[] = [
     path: '/medication/:id',
     element: <MedicationDetailPage />,
     allowedRoles: ALL_AUTHENTICATED_ROLES,
+  },
+  {
+     path: '/general-practice',
+     element: <GeneralPracticePage />,
+  },
+  
+   {
+    path: '/mental-health',
+    element: <MentalHealthPage />,
+  }, {
+    path: '/health-checkup',
+    element: <HealthCheckupsPage />,
   },
 
   // Appointments

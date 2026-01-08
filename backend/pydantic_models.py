@@ -356,6 +356,9 @@ class DoctorResponse(BaseModel):
     isAvailable: bool
     rating: Decimal
     consultationFee: Optional[Decimal] = None
+    video_consultation_fee: Optional[Decimal] = None
+    phone_consultation_fee: Optional[Decimal] = None
+    chat_consultation_fee: Optional[Decimal] = None
     patientsCount: int
     avatar: Optional[str] = None
     

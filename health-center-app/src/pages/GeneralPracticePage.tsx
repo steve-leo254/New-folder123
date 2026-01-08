@@ -26,7 +26,6 @@ import {
   Globe,
   Zap,
   Settings,
-  HelpCircle,
   ArrowRight,
   Sparkles,
   CalendarCheck,

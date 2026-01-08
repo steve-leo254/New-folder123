@@ -64,7 +64,7 @@ const Footer: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">Our Services</h3>
             <ul className="space-y-2">
-              <li><span className="text-gray-400">General Practice</span></li>
+              <li><Link to="/general-practice" className="text-gray-400">General Practice</Link></li>
               <li><span className="text-gray-400">Emergency Care</span></li>
               <li><span className="text-gray-400">Specialized Treatments</span></li>
               <li><Link to="/health-checkup" className="text-gray-400">Health Checkups</Link></li>

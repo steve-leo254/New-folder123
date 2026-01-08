@@ -18,31 +18,31 @@ export interface ConsultationType {
 }
 
 const DEFAULT_PRICING: ConsultationPricing = {
-  video: 49,
-  phone: 39,
-  chat: 29,
+  video: 2000,
+  phone: 1600,
+  chat: 1200,
 };
 
 const ROLE_BASED_PRICING: Record<string, ConsultationPricing> = {
   'General Practitioner': {
-    video: 49,
-    phone: 39,
-    chat: 29,
+    video: 2000,
+    phone: 1600,
+    chat: 1200,
   },
   'Internal Medicine': {
-    video: 59,
-    phone: 49,
-    chat: 39,
+    video: 2500,
+    phone: 2000,
+    chat: 1500,
   },
   'Family Medicine': {
-    video: 45,
-    phone: 35,
-    chat: 25,
+    video: 1800,
+    phone: 1400,
+    chat: 1000,
   },
   'Specialist': {
-    video: 79,
-    phone: 69,
-    chat: 49,
+    video: 3000,
+    phone: 2500,
+    chat: 1800,
   },
 };
 
@@ -64,7 +64,7 @@ export const useConsultationPricing = (doctor?: Doctor) => {
       // Extract pricing from doctor data with fallbacks
       let doctorPricing: ConsultationPricing;
 
-      // Priority 1: Doctor-specific pricing
+      // Priority 1: Doctor-specific pricing from database
       if (doctor.video_consultation_fee || doctor.phone_consultation_fee || doctor.chat_consultation_fee) {
         doctorPricing = {
           video: doctor.video_consultation_fee || DEFAULT_PRICING.video,
@@ -72,11 +72,7 @@ export const useConsultationPricing = (doctor?: Doctor) => {
           chat: doctor.chat_consultation_fee || DEFAULT_PRICING.chat,
         };
       }
-      // Priority 2: Role-based pricing
-      else if (doctor.specialization && ROLE_BASED_PRICING[doctor.specialization]) {
-        doctorPricing = ROLE_BASED_PRICING[doctor.specialization];
-      }
-      // Priority 3: Base consultation fee with multipliers
+      // Priority 2: Base consultation fee with multipliers
       else if (doctor.consultationFee) {
         const baseFee = Number(doctor.consultationFee);
         doctorPricing = {
@@ -84,6 +80,10 @@ export const useConsultationPricing = (doctor?: Doctor) => {
           phone: Math.round(baseFee * 0.8),
           chat: Math.round(baseFee * 0.6),
         };
+      }
+      // Priority 3: Role-based pricing (as fallback)
+      else if (doctor.specialization && ROLE_BASED_PRICING[doctor.specialization]) {
+        doctorPricing = ROLE_BASED_PRICING[doctor.specialization];
       }
       // Priority 4: Default pricing
       else {

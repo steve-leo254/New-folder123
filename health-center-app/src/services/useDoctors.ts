@@ -13,6 +13,9 @@ export interface Doctor {
   isAvailable: boolean;
   rating: number;
   consultationFee: number;
+  video_consultation_fee?: number;
+  phone_consultation_fee?: number;
+  chat_consultation_fee?: number;
   avatar?: string;  // Changed from profile_picture to match API response
   languages?: string[];  // Languages from doctor_contact_info
   created_at: string;

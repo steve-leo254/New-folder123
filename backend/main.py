@@ -1014,6 +1014,9 @@ def list_doctors(
                     "isAvailable": doctor.is_available,
                     "rating": float(doctor.rating) if doctor.rating else 0.0,
                     "consultationFee": float(doctor.consultation_fee) if doctor.consultation_fee else 0.0,
+                    "video_consultation_fee": float(doctor.video_consultation_fee) if doctor.video_consultation_fee else None,
+                    "phone_consultation_fee": float(doctor.phone_consultation_fee) if doctor.phone_consultation_fee else None,
+                    "chat_consultation_fee": float(doctor.chat_consultation_fee) if doctor.chat_consultation_fee else None,
                     "patientsCount": 0,  # TODO: Calculate from appointments
                     "avatar": user.profile_picture,
                 })
