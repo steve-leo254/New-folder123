@@ -15,7 +15,7 @@ export interface BreadcrumbItem {
 
 export type UserRole =
   | 'super_admin'
-  | 'clinical_admin'
+  | 'clinician_admin'
   | 'doctor'
   | 'nurse'
   | 'receptionist'

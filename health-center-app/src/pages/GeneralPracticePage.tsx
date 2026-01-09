@@ -1,5 +1,5 @@
 // pages/GeneralPracticePage.tsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Video,
   Phone,
@@ -70,11 +70,7 @@ interface Symptom {
   icon: string;
   category: string;
 }
-interface TimeSlot {
-  id: string;
-  time: string;
-  available: boolean;
-}
+
 interface Appointment {
   id: string;
   doctor: GPDoctor;
@@ -875,7 +871,7 @@ const GeneralPracticePage: React.FC = () => {
   const { doctors: rawDoctors, loading, error } = useDoctors();
 
   // Get consultation pricing for selected doctor
-  const { getConsultationTypes } = useConsultationPricing();
+  useConsultationPricing();
 
   // Map backend shape to UI shape expected by this page
   const formattedDoctors: GPDoctor[] = useMemo(

@@ -39,16 +39,18 @@ export interface RouteConfig {
 // Role Constants - Import from centralized constants
 import { ROLE_TYPES } from '../utils/constants';
 import GeneralPracticePage from '@/pages/GeneralPracticePage';
+import ForgotPasswordPage from '@/pages/ForgetPasswordPage';
+import EmailVerificationPage from '@/pages/EmailVerificationPage';
 
 
 export const ROLES = ROLE_TYPES;
 
 // Role Groups
-export const ADMIN_ROLES = [ROLES.SUPER_ADMIN, ROLES.CLINICAL_ADMIN];
+export const ADMIN_ROLES = [ROLES.SUPER_ADMIN, ROLES.CLINICIAN_ADMIN];
 
 export const STAFF_ROLES = [
   ROLES.SUPER_ADMIN,
-  ROLES.CLINICAL_ADMIN,
+  ROLES.CLINICIAN_ADMIN,
   ROLES.DOCTOR,
   ROLES.NURSE,
   ROLES.RECEPTIONIST,
@@ -78,6 +80,14 @@ export const publicRoutes: RouteConfig[] = [
   {
     path: '/404',
     element: <NotFoundPage />,
+  },
+   {
+    path: '/forget-password',
+    element: <ForgotPasswordPage />,
+  },
+   {
+    path: '/email-verification',
+    element: <EmailVerificationPage />,
   },
   {
     path: '*',

@@ -54,7 +54,7 @@ export const ROLE_TYPES = {
   PATIENT: 'patient',
   DOCTOR: 'doctor',
   SUPER_ADMIN: 'super_admin',
-  CLINICAL_ADMIN: 'clinician_admin', // Normalized version
+  CLINICIAN_ADMIN: 'clinician_admin', // Match backend exactly
   
   NURSE: 'nurse',
   RECEPTIONIST: 'receptionist',
@@ -72,11 +72,13 @@ export const ROLE_ALIASES: Record<string, string> = {
   'super admin': 'super_admin',
   'lab technician': 'lab_technician',
   'labtechnician': 'lab_technician',
+  'lab-tech': 'lab_technician',
+  'lab tech': 'lab_technician',
 };
 
 export const ROLE_HIERARCHY = {
   [ROLE_TYPES.SUPER_ADMIN]: 100,
-  [ROLE_TYPES.CLINICAL_ADMIN]: 90,
+  [ROLE_TYPES.CLINICIAN_ADMIN]: 90,
   [ROLE_TYPES.DOCTOR]: 80,
   [ROLE_TYPES.NURSE]: 70,
   [ROLE_TYPES.PHARMACIST]: 60,
@@ -93,7 +95,7 @@ export const ROLE_PERMISSIONS = {
     'view_all_data',
     'delete_any_record',
   ],
-  [ROLE_TYPES.CLINICAL_ADMIN]: [
+  [ROLE_TYPES.CLINICIAN_ADMIN]: [
     'manage_staff',
     'manage_appointments',
     'view_patient_data',
