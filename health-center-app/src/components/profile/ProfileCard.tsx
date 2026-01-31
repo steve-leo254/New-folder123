@@ -27,11 +27,19 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       <Card className="p-6">
         <div className="text-center">
           <div className="relative inline-block">
-            <img
-              src={formData.avatar}
-              alt={`${formData.firstName} ${formData.lastName}`}
-              className="w-32 h-32 rounded-full mx-auto mb-4 object-cover border-4 border-blue-100"
-            />
+            {formData.avatar ? (
+              <img
+                src={formData.avatar}
+                alt={`${formData.firstName} ${formData.lastName}`}
+                className="w-32 h-32 rounded-full mx-auto mb-4 object-cover border-4 border-blue-100"
+              />
+            ) : (
+              <div className="w-32 h-32 rounded-full mx-auto mb-4 border-4 border-blue-100 bg-gray-100 flex items-center justify-center">
+                <span className="text-3xl text-gray-400 font-semibold">
+                  {formData.firstName.charAt(0)}{formData.lastName.charAt(0)}
+                </span>
+              </div>
+            )}
             <input
               ref={fileInputRef}
               type="file"

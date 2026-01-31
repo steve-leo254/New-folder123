@@ -17,20 +17,94 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({ onClose }) => {
     cvv: '',
     saveCard: false
   });
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
+    let processedValue = value;
+    
+    // Auto-format expiry date
+    if (name === 'expiryDate') {
+      // Remove any non-digit characters
+      processedValue = value.replace(/\D/g, '');
+      
+      // Add slash after 2 digits
+      if (processedValue.length >= 2) {
+        processedValue = processedValue.slice(0, 2) + '/' + processedValue.slice(2, 4);
+      }
+      
+      // Limit to MM/YY format
+      processedValue = processedValue.slice(0, 5);
+    }
+    
+    // Auto-format card number (add spaces every 4 digits)
+    if (name === 'cardNumber') {
+      processedValue = value.replace(/\s/g, '').replace(/\D/g, '');
+      const groups = processedValue.match(/.{1,4}/g) || [];
+      processedValue = groups.join(' ');
+      processedValue = processedValue.slice(0, 19); // Max 19 chars for 16 digits + 3 spaces
+    }
+    
+    // Limit CVV to 4 digits
+    if (name === 'cvv') {
+      processedValue = value.replace(/\D/g, '').slice(0, 4);
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : processedValue
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Process payment
-    console.log('Processing payment:', formData);
-    onClose();
+    
+    // Validate form
+    if (!formData.cardNumber || !formData.cardName || !formData.expiryDate || !formData.cvv) {
+      setAlertMessage('Please fill in all required fields');
+      setShowAlert(true);
+      return;
+    }
+    
+    // Validate expiry date
+    const [month, year] = formData.expiryDate.split('/');
+    const currentYear = new Date().getFullYear() % 100;
+    const currentMonth = new Date().getMonth() + 1;
+    
+    if (parseInt(month) < 1 || parseInt(month) > 12) {
+      setAlertMessage('Invalid expiry month');
+      setShowAlert(true);
+      return;
+    }
+    
+    if (parseInt(year) < currentYear || (parseInt(year) === currentYear && parseInt(month) < currentMonth)) {
+      setAlertMessage('Card has expired');
+      setShowAlert(true);
+      return;
+    }
+    
+    setIsProcessing(true);
+    
+    try {
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Show success alert
+      setAlertMessage('Payment successful! Order confirmed.');
+      setShowAlert(true);
+      
+      // Close form after success
+      setTimeout(() => {
+        onClose();
+        setIsProcessing(false);
+      }, 2000);
+    } catch (error) {
+      setAlertMessage('Payment failed. Please try again.');
+      setShowAlert(true);
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -115,14 +189,47 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({ onClose }) => {
                 variant="outline"
                 onClick={onClose}
                 className="flex-1"
+                disabled={isProcessing}
               >
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1">
-                <CreditCard className="w-4 h-4 mr-2" />
-                Pay Now
+              <Button 
+                type="submit" 
+                className="flex-1"
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Pay Now
+                  </>
+                )}
               </Button>
             </div>
+            
+            {/* Alert */}
+            {showAlert && (
+              <div className={`mt-4 p-3 rounded-lg ${
+                alertMessage.includes('successful') 
+                  ? 'bg-green-50 text-green-800 border border-green-200' 
+                  : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                <div className="flex items-center">
+                  <span className="text-sm">{alertMessage}</span>
+                  <button
+                    onClick={() => setShowAlert(false)}
+                    className="ml-auto text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
           </form>
         </Card>
       </motion.div>

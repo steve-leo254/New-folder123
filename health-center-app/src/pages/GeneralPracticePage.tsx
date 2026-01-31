@@ -1,5 +1,6 @@
 // pages/GeneralPracticePage.tsx
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Video,
   Phone,
@@ -858,6 +859,7 @@ const VideoCall: React.FC<{
 
 // Main Page Component
 const GeneralPracticePage: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedDoctor, setSelectedDoctor] = useState<GPDoctor | null>(null);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -1036,7 +1038,10 @@ const GeneralPracticePage: React.FC = () => {
                 ))}
               </div>
 
-              <button className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all">
+              <button 
+                onClick={() => navigate('/doctors')}
+                className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
+              >
                 Find a GPDoctor Now
               </button>
             </div>

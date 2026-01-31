@@ -1,75 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { CreditCard, Shield, AlertCircle, TrendingUp } from 'lucide-react';
 import Card from '../../ui/Card';
-import { useInsurance, Insurance } from '../../../services/useInsurance';
+import { PatientProfile } from '../../../services/api/patientApi';
 
 interface InsuranceSectionProps {
   isEditing: boolean;
+  formData: PatientProfile;
+  onFormDataChange: (data: PatientProfile) => void;
 }
 
-export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ isEditing }) => {
-  const { insurance, loading, error, updateInsurance, getQuarterlyUsage, isSHA } = useInsurance();
-  const [formData, setFormData] = useState<Insurance>({
-    provider: '',
-    policyNumber: '',
-    groupNumber: '',
-    holderName: '',
-    type: 'standard',
-    quarterlyLimit: 0,
-    quarterlyUsed: 0,
-    coverageStartDate: '',
-    coverageEndDate: '',
-  });
-
-  // Update local form data when insurance changes
-  useEffect(() => {
-    if (insurance) {
-      setFormData(insurance);
-    }
-  }, [insurance]);
-
+export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ 
+  isEditing, 
+  formData, 
+  onFormDataChange 
+}) => {
   // Handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'quarterlyLimit' || name === 'quarterlyUsed' ? Number(value) || 0 : value,
-    }));
+    onFormDataChange({
+      ...formData,
+      [name]: name === 'insuranceQuarterlyLimit' || name === 'insuranceQuarterlyUsed' ? Number(value) || 0 : value,
+    });
   };
 
-  // Save insurance info
-  const handleSave = async () => {
-    const result = await updateInsurance(formData);
-    if (!result.success) {
-      console.error('Failed to update insurance:', result.error);
-    }
+  // Calculate quarterly usage
+  const getQuarterlyUsage = () => {
+    const limit = formData.insuranceQuarterlyLimit || 0;
+    const used = formData.insuranceQuarterlyUsed || 0;
+    const remaining = limit - used;
+    const percentage = limit > 0 ? (used / limit) * 100 : 0;
+    
+    return { limit, used, remaining, percentage };
   };
 
-  // Auto-save when editing stops
-  useEffect(() => {
-    if (!isEditing && insurance && JSON.stringify(formData) !== JSON.stringify(insurance)) {
-      handleSave();
-    }
-  }, [isEditing, insurance]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="p-12 text-center">
-        <AlertCircle className="h-16 w-16 text-red-300 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Insurance Information</h3>
-        <p className="text-gray-600">{error}</p>
-      </Card>
-    );
-  }
+  // Check if SHA insurance
+  const isSHA = () => {
+    return formData.insuranceType === 'sha';
+  };
   return (
     <motion.div
       key="insurance"
@@ -94,76 +62,101 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ isEditing })
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Insurance Provider
             </label>
-            <input
-              type="text"
-              name="provider"
-              value={formData.provider}
-              onChange={handleInputChange}
-              disabled={!isEditing}
-              placeholder="e.g., Blue Cross Blue Shield"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
+            {isEditing ? (
+              <input
+                type="text"
+                name="insuranceProvider"
+                value={formData.insuranceProvider}
+                onChange={handleInputChange}
+                placeholder="e.g., Blue Cross Blue Shield"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            ) : (
+              <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                {formData.insuranceProvider || 'No insurance provider set'}
+              </div>
+            )}
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Insurance Type
             </label>
-            <select
-              name="type"
-              value={formData.type}
-              onChange={handleInputChange}
-              disabled={!isEditing}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-            >
-              <option value="standard">Standard Insurance</option>
-              <option value="sha">SHA Insurance</option>
-            </select>
+            {isEditing ? (
+              <select
+                name="insuranceType"
+                value={formData.insuranceType}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="standard">Standard Insurance</option>
+                <option value="sha">SHA Insurance</option>
+              </select>
+            ) : (
+              <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                {formData.insuranceType === 'sha' ? 'SHA Insurance' : 'Standard Insurance'}
+              </div>
+            )}
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Policy Number
             </label>
-            <input
-              type="text"
-              name="policyNumber"
-              value={formData.policyNumber}
-              onChange={handleInputChange}
-              disabled={!isEditing}
-              placeholder="Enter policy number"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
+            {isEditing ? (
+              <input
+                type="text"
+                name="insurancePolicyNumber"
+                value={formData.insurancePolicyNumber}
+                onChange={handleInputChange}
+                placeholder="Enter policy number"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            ) : (
+              <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                {formData.insurancePolicyNumber || 'No policy number set'}
+              </div>
+            )}
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Group Number
             </label>
-            <input
-              type="text"
-              name="groupNumber"
-              value={formData.groupNumber}
-              onChange={handleInputChange}
-              disabled={!isEditing}
-              placeholder="Enter group number"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
+            {isEditing ? (
+              <input
+                type="text"
+                name="insuranceGroupNumber"
+                value={formData.insuranceGroupNumber}
+                onChange={handleInputChange}
+                placeholder="Enter group number"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            ) : (
+              <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                {formData.insuranceGroupNumber || 'No group number set'}
+              </div>
+            )}
           </div>
           
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Policy Holder Name
             </label>
-            <input
-              type="text"
-              name="holderName"
-              value={formData.holderName}
-              onChange={handleInputChange}
-              disabled={!isEditing}
-              placeholder="Enter policy holder's name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
+            {isEditing ? (
+              <input
+                type="text"
+                name="insuranceHolderName"
+                value={formData.insuranceHolderName}
+                onChange={handleInputChange}
+                placeholder="Enter policy holder's name"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            ) : (
+              <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                {formData.insuranceHolderName || 'No policy holder name set'}
+              </div>
+            )}
           </div>
           
           {/* SHA-specific fields */}
@@ -173,43 +166,58 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ isEditing })
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Quarterly Limit (KSH)
                 </label>
-                <input
-                  type="number"
-                  name="quarterlyLimit"
-                  value={formData.quarterlyLimit}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                  placeholder="Enter quarterly limit"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-                />
+                {isEditing ? (
+                  <input
+                    type="number"
+                    name="insuranceQuarterlyLimit"
+                    value={formData.insuranceQuarterlyLimit}
+                    onChange={handleInputChange}
+                    placeholder="Enter quarterly limit"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                ) : (
+                  <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                    KSH {formData.insuranceQuarterlyLimit?.toLocaleString() || '0'}
+                  </div>
+                )}
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Coverage Start Date
                 </label>
-                <input
-                  type="date"
-                  name="coverageStartDate"
-                  value={formData.coverageStartDate}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-                />
+                {isEditing ? (
+                  <input
+                    type="date"
+                    name="insuranceCoverageStartDate"
+                    value={formData.insuranceCoverageStartDate}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                ) : (
+                  <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                    {formData.insuranceCoverageStartDate || 'No start date set'}
+                  </div>
+                )}
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Coverage End Date
                 </label>
-                <input
-                  type="date"
-                  name="coverageEndDate"
-                  value={formData.coverageEndDate}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-                />
+                {isEditing ? (
+                  <input
+                    type="date"
+                    name="insuranceCoverageEndDate"
+                    value={formData.insuranceCoverageEndDate}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                ) : (
+                  <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                    {formData.insuranceCoverageEndDate || 'No end date set'}
+                  </div>
+                )}
               </div>
             </>
           )}

@@ -166,11 +166,19 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
             >
               <Card className="overflow-hidden hover:shadow-xl transition-shadow">
                 <div className="relative">
-                  <img
-                    src={getFullImageUrl(member.avatar) || '/images/default-avatar.jpg'}
-                    alt={getFullName(member)}
-                    className="w-full h-80 object-cover"
-                  />
+                  {getFullImageUrl(member.avatar) ? (
+                    <img
+                      src={getFullImageUrl(member.avatar)}
+                      alt={getFullName(member)}
+                      className="w-full h-80 object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-80 bg-gray-200 flex items-center justify-center">
+                      <span className="text-4xl font-semibold text-gray-600">
+                        {getFullName(member).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                      </span>
+                    </div>
+                  )}
                   {member.specialization && (
                     <Badge variant="primary" className="absolute top-4 right-4">
                       {member.specialization}
@@ -313,11 +321,19 @@ const StaffMembers: React.FC<StaffMembersProps> = ({
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <img 
-                        className="h-10 w-10 rounded-full" 
-                        src={member.avatar || '/images/default-avatar.jpg'} 
-                        alt={getFullName(member)} 
-                      />
+                      {member.avatar ? (
+                        <img 
+                          className="h-10 w-10 rounded-full object-cover" 
+                          src={member.avatar} 
+                          alt={getFullName(member)} 
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                          <span className="text-xs font-semibold text-gray-600">
+                            {getFullName(member).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                          </span>
+                        </div>
+                      )}
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{getFullName(member)}</div>
                       </div>

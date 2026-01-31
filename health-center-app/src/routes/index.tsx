@@ -43,6 +43,8 @@ import ForgotPasswordPage from '@/pages/ForgetPasswordPage';
 import EmailVerificationPage from '@/pages/EmailVerificationPage';
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
 import TermsAndConditionsPage from '@/pages/TermsAndConditionsPage';
+import ChatPage from '@/pages/ChatPage';
+import MedicalHistoryPage from '@/pages/MedicalHistoryPage';
 
 
 export const ROLES = ROLE_TYPES;
@@ -251,6 +253,20 @@ export const protectedRoutes: RouteConfig[] = [
   {
     path: '/lab-tests',
     element: <LabTestPage />,
+    allowedRoles: ALL_AUTHENTICATED_ROLES,
+  },
+
+  // Chat (Coming Soon)
+  {
+    path: '/chat',
+    element: <ChatPage />,
+    allowedRoles: ALL_AUTHENTICATED_ROLES,
+  },
+
+  // Medical History
+  {
+    path: '/medical-history',
+    element: <MedicalHistoryPage />,
     allowedRoles: ALL_AUTHENTICATED_ROLES,
   },
  

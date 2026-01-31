@@ -9,6 +9,7 @@ import { getFullImageUrl } from '../utils/imageUtils';
 
 const DoctorsPage: React.FC = () => {
   const navigate = useNavigate();
+
   // Call useDoctors hook consistently without parameters
   const { doctors, loading, error } = useDoctors();
 
@@ -103,6 +104,11 @@ const DoctorsPage: React.FC = () => {
       >
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Our Doctors</h1>
         <p className="text-gray-600">Find and book appointments with our expert medical professionals</p>
+        
+        {/* Quick Actions - Removed GP-specific buttons */}
+        <div className="flex flex-wrap gap-4 mt-6">
+          {/* Buttons removed as requested */}
+        </div>
       </motion.div>
 
       <StaffMembers 

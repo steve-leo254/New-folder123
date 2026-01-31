@@ -20,20 +20,21 @@ const NotFoundPage: React.FC = () => {
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           <Link to="/">
             <Button className="flex items-center">
               <Home className="w-4 h-4 mr-2" />
               Back to Home
             </Button>
           </Link>
-          <button
+          <Button
+            variant="outline"
             onClick={() => window.history.back()}
-            className="flex items-center px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back
-          </button>
+          </Button>
         </div>
       </motion.div>
     </div>

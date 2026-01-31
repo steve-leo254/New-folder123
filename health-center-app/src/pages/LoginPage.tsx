@@ -71,7 +71,16 @@ export const LoginPage: React.FC = () => {
 
       const { access_token } = response.data;
       setTokenInContext(access_token);
-      navigate('/dashboard');
+      
+      // Redirect based on user role
+      const tokenPayload = JSON.parse(atob(access_token.split('.')[1]));
+      const userRole = tokenPayload.role;
+      
+      if (userRole === 'patient') {
+        navigate('/patient');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       const message =
         err?.response?.data?.detail ||

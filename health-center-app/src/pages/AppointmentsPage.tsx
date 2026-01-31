@@ -33,17 +33,20 @@ const AppointmentsPage: React.FC = () => {
       staff
         .filter((staffMember) => staffMember.role === 'doctor' && staffMember.doctor)
         .map((staffMember) => {
-          const nameParts = staffMember.fullName.split(' ');
           const doctor = staffMember.doctor!;
           return {
             id: staffMember.id.toString(),
-            firstName: nameParts[0] || 'Dr',
-            lastName: nameParts.slice(1).join(' ') || '',
+            user_id: staffMember.id.toString(),
+            fullName: staffMember.fullName,
+            email: staffMember.email || '',
+            phone: staffMember.phone || '',
             specialization: doctor.specialization,
             experience: 0,
             rating: doctor.rating,
             avatar: getFullImageUrl(staffMember.avatar) || '/images/doctor-default.jpg',
             bio: doctor.bio || 'Professional healthcare provider',
+            isAvailable: true,
+            patientsCount: 0,
             availability: [],
             consultationFee: doctor.consultationFee,
           };
@@ -61,8 +64,7 @@ const AppointmentsPage: React.FC = () => {
   const filteredDoctors = useMemo(
     () =>
       formattedDoctors.filter(doctor => {
-        const matchesSearch = doctor.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             doctor.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        const matchesSearch = doctor.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesSpecialization = filterSpecialization === 'all' || 
                                      doctor.specialization === filterSpecialization;
@@ -144,12 +146,12 @@ const AppointmentsPage: React.FC = () => {
                     <div className="flex items-start space-x-4">
                       <img
                         src={doctor.avatar}
-                        alt={doctor.firstName}
+                        alt={doctor.fullName}
                         className="w-16 h-16 rounded-full object-cover"
                       />
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900">
-                          Dr. {doctor.firstName} {doctor.lastName}
+                          Dr. {doctor.fullName}
                         </h3>
                         <p className="text-sm text-gray-600">{doctor.specialization}</p>
                         <div className="flex items-center justify-between mt-3">
@@ -195,26 +197,48 @@ const AppointmentsPage: React.FC = () => {
               </div>
             ) : upcomingAppointments.length > 0 ? (
               <div className="space-y-3">
-                {upcomingAppointments.map((appointment) => (
-                  <div key={appointment.id} className="border-l-4 border-primary-500 pl-4 py-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">{appointment.date}</p>
-                        <p className="text-sm text-gray-600 flex items-center mt-1">
-                          <Clock className="w-4 h-4 mr-1" />
-                          {appointment.time}
-                        </p>
+                {upcomingAppointments.map((appointment) => {
+                  // Parse and format the appointment date/time
+                  const appointmentDateTime = appointment.date;
+                  const formattedDate = appointmentDateTime ? new Date(appointmentDateTime).toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  }) : appointment.date || 'Date TBD';
+                  
+                  const formattedTime = appointmentDateTime ? new Date(appointmentDateTime).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  }) : appointment.time || 'Time TBD';
+
+                  return (
+                    <div key={appointment.id} className="border-l-4 border-primary-500 pl-4 py-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900">{formattedDate}</p>
+                          <p className="text-sm text-gray-600 flex items-center mt-1">
+                            <Clock className="w-4 h-4 mr-1" />
+                            {formattedTime}
+                          </p>
+                          {appointment.doctorName && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Dr. {appointment.doctorName}
+                            </p>
+                          )}
+                        </div>
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          appointment.type === 'video' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {appointment.type || 'In-Person'}
+                        </span>
                       </div>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        appointment.type === 'video' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {appointment.type}
-                      </span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-gray-500">No upcoming appointments scheduled</p>

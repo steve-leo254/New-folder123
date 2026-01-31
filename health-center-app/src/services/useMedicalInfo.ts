@@ -56,16 +56,35 @@ export const useMedicalInfo = (): UseMedicalInfoReturn => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.getMedicalInfo();
+      
+      // Fetch medical info and prescriptions in parallel
+      const [medicalData, prescriptionsData] = await Promise.all([
+        apiService.getMedicalInfo(),
+        apiService.getPrescriptions().catch(() => ({ data: [] })) // Don't fail if prescriptions fail
+      ]);
+      
+      // Extract medications from prescriptions
+      const prescriptionMedications: string[] = [];
+      if (prescriptionsData && Array.isArray(prescriptionsData)) {
+        prescriptionsData.forEach((prescription: any) => {
+          if (prescription.medications_json && Array.isArray(prescription.medications_json)) {
+            prescription.medications_json.forEach((med: any) => {
+              if (med.name && !prescriptionMedications.includes(med.name)) {
+                prescriptionMedications.push(med.name);
+              }
+            });
+          }
+        });
+      }
       
       // Map backend response (snake_case) to frontend interface (camelCase)
       const mappedData: MedicalInfo = {
-        bloodType: data.blood_type || '',
-        height: data.height || '',
-        weight: data.weight || '',
-        allergies: data.allergies || [],
-        conditions: data.conditions || [],
-        medications: data.medications || [],
+        bloodType: medicalData.blood_type || '',
+        height: medicalData.height || '',
+        weight: medicalData.weight || '',
+        allergies: medicalData.allergies || [],
+        conditions: medicalData.conditions || [],
+        medications: [...(medicalData.medications || []), ...prescriptionMedications],
       };
       
       setMedicalInfo(mappedData || defaultMedicalInfo);

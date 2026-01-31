@@ -178,7 +178,7 @@ def health_check():
 
 
 @app.post("/upload-image", response_model=ImageResponse, status_code=status.HTTP_201_CREATED)
-async def upload_image(current_user: User = Depends(get_current_active_user), file: UploadFile = File(...)):
+async def upload_image(current_user: User = Depends(get_current_active_user), file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Upload profile image."""
     try:
         # Validate file type
@@ -203,10 +203,15 @@ async def upload_image(current_user: User = Depends(get_current_active_user), fi
             f.write(content)
         
         # Generate full URL for frontend consumption
-        img_url = f"http://localhost:8000/uploads/{unique_filename}"
+        img_url = f"/uploads/{unique_filename}"
+        
+        # Update user's profile_picture in database
+        current_user.profile_picture = img_url.strip()  # Remove any extra quotes or whitespace
+        db.commit()
+        db.refresh(current_user)
         
         logger.info(f"Image uploaded: {unique_filename} by user {current_user.id}")
-        return {"message": "Image uploaded successfully", "img_url": img_url}
+        return {"message": "Image uploaded successfully", "img_url": img_url.strip()}
     except Exception as e:
         logger.error(f"Error uploading image: {str(e)}")
         raise HTTPException(status_code=500, detail="Error uploading image")

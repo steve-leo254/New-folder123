@@ -103,65 +103,74 @@ const PatientProfile: React.FC = () => {
     }
   }, [patient]);
 
-  // Handle input changes
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    if (!formData) return;
-
-    const { name, value, type } = e.target;
-    const newValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
-
-    setFormData({
-      ...formData,
-      [name]: newValue,
-    });
-  };
-
-  // Save profile changes
-  const handleSave = async () => {
-    if (!formData) return;
-
-    const updateData = {
-      full_name: `${formData.firstName} ${formData.lastName}`,
-      phone: formData.phone,
-      date_of_birth: formData.dateOfBirth,
-      gender: formData.gender,
-      address: formData.address,
-      city: formData.city,
-      state: formData.state,
-      zip_code: formData.zipCode,
-      country: formData.country,
-      blood_type: formData.bloodType,
-      height: formData.height,
-      weight: formData.weight,
-      allergies: formData.allergies,
-      conditions: formData.conditions,
-      medications: formData.medications,
-      emergency_contact_name: formData.emergencyContactName,
-      emergency_contact_phone: formData.emergencyContactPhone,
-      emergency_contact_relation: formData.emergencyContactRelation,
-      insurance_provider: formData.insuranceProvider,
-      insurance_policy_number: formData.insurancePolicyNumber,
-      insurance_group_number: formData.insuranceGroupNumber,
-      insurance_holder_name: formData.insuranceHolderName,
-      email_notifications: formData.emailNotifications,
-      sms_notifications: formData.smsNotifications,
-      appointment_reminders: formData.appointmentReminders,
-      lab_results_notifications: formData.labResultsNotifications,
-    };
-
-    const result = await updatePatient(updateData);
-
-    if (result.success) {
-      setIsEditing(false);
-      showSuccessMessage('Profile updated successfully!');
-    } else {
-      showErrorMessage(result.error || 'Failed to update profile');
+  // Handle form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    if (formData) {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
     }
   };
 
-  // Cancel editing
+  // Handle save
+  const handleSave = async () => {
+    if (!formData) return;
+
+    try {
+      const payload = {
+        full_name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        phone: formData.phone,
+        date_of_birth: formData.dateOfBirth,
+        gender: formData.gender,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zipCode,
+        country: formData.country,
+        blood_type: formData.bloodType,
+        height: formData.height,
+        weight: formData.weight,
+        allergies: formData.allergies,
+        conditions: formData.conditions,
+        medications: formData.medications,
+        emergency_contact_name: formData.emergencyContactName,
+        emergency_contact_phone: formData.emergencyContactPhone,
+        emergency_contact_relation: formData.emergencyContactRelation,
+        insurance_provider: formData.insuranceProvider,
+        insurance_policy_number: formData.insurancePolicyNumber,
+        insurance_group_number: formData.insuranceGroupNumber,
+        insurance_holder_name: formData.insuranceHolderName,
+        insurance_type: formData.insuranceType,
+        quarterly_limit: formData.insuranceQuarterlyLimit,
+        quarterly_used: formData.insuranceQuarterlyUsed,
+        coverage_start_date: formData.insuranceCoverageStartDate,
+        coverage_end_date: formData.insuranceCoverageEndDate,
+        email_notifications: formData.emailNotifications,
+        sms_notifications: formData.smsNotifications,
+        appointment_reminders: formData.appointmentReminders,
+        lab_results_notifications: formData.labResultsNotifications,
+      };
+
+      const result = await updatePatient(payload);
+      if (result.success) {
+        setIsEditing(false);
+        // Show success message
+        setSaveMessage({ type: 'success', message: 'Profile updated successfully!' });
+        setTimeout(() => setSaveMessage(null), 3000);
+      } else {
+        setSaveMessage({ type: 'error', message: result.error || 'Failed to update profile' });
+        setTimeout(() => setSaveMessage(null), 5000);
+      }
+    } catch (err) {
+      setSaveMessage({ type: 'error', message: 'An error occurred while updating profile' });
+      setTimeout(() => setSaveMessage(null), 5000);
+    }
+  };
+
+  // Handle cancel
   const handleCancel = () => {
     if (patient) {
       setFormData({ ...patient });
@@ -175,12 +184,14 @@ const PatientProfile: React.FC = () => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      showErrorMessage('Please select an image file.');
+      setSaveMessage({ type: 'error', message: 'Please select an image file.' });
+      setTimeout(() => setSaveMessage(null), 3000);
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      showErrorMessage('Image size must be less than 5MB.');
+      setSaveMessage({ type: 'error', message: 'Image size must be less than 5MB.' });
+      setTimeout(() => setSaveMessage(null), 3000);
       return;
     }
 
@@ -189,21 +200,25 @@ const PatientProfile: React.FC = () => {
     setIsUploading(false);
 
     if (result.success) {
-      showSuccessMessage('Profile picture updated!');
+      setSaveMessage({ type: 'success', message: 'Profile picture updated!' });
+      setTimeout(() => setSaveMessage(null), 3000);
     } else {
-      showErrorMessage(result.error || 'Failed to upload avatar');
+      setSaveMessage({ type: 'error', message: result.error || 'Failed to upload avatar' });
+      setTimeout(() => setSaveMessage(null), 5000);
     }
   };
 
   // Handle password change
   const handlePasswordChange = async () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      showErrorMessage('Passwords do not match.');
+      setSaveMessage({ type: 'error', message: 'Passwords do not match.' });
+      setTimeout(() => setSaveMessage(null), 3000);
       return;
     }
 
     if (passwordForm.newPassword.length < 8) {
-      showErrorMessage('Password must be at least 8 characters.');
+      setSaveMessage({ type: 'error', message: 'Password must be at least 8 characters.' });
+      setTimeout(() => setSaveMessage(null), 3000);
       return;
     }
 
@@ -212,9 +227,11 @@ const PatientProfile: React.FC = () => {
     if (result.success) {
       setShowPasswordModal(false);
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      showSuccessMessage('Password changed successfully!');
+      setSaveMessage({ type: 'success', message: 'Password changed successfully!' });
+      setTimeout(() => setSaveMessage(null), 3000);
     } else {
-      showErrorMessage(result.error || 'Failed to change password');
+      setSaveMessage({ type: 'error', message: result.error || 'Failed to change password' });
+      setTimeout(() => setSaveMessage(null), 5000);
     }
   };
 
@@ -222,9 +239,11 @@ const PatientProfile: React.FC = () => {
   const handleDownloadRecords = async () => {
     try {
       await downloadRecords();
-      showSuccessMessage('Medical records downloaded successfully!');
+      setSaveMessage({ type: 'success', message: 'Medical records downloaded successfully!' });
+      setTimeout(() => setSaveMessage(null), 3000);
     } catch (err) {
-      showErrorMessage('Failed to download records');
+      setSaveMessage({ type: 'error', message: 'Failed to download records' });
+      setTimeout(() => setSaveMessage(null), 5000);
     }
   };
 
@@ -232,21 +251,12 @@ const PatientProfile: React.FC = () => {
   const handleExportData = async () => {
     try {
       await exportData();
-      showSuccessMessage('Patient data exported successfully!');
+      setSaveMessage({ type: 'success', message: 'Patient data exported successfully!' });
+      setTimeout(() => setSaveMessage(null), 3000);
     } catch (err) {
-      showErrorMessage('Failed to export data');
+      setSaveMessage({ type: 'error', message: 'Failed to export data' });
+      setTimeout(() => setSaveMessage(null), 5000);
     }
-  };
-
-  // Helper functions for messages
-  const showSuccessMessage = (message: string) => {
-    setSaveMessage({ type: 'success', message });
-    setTimeout(() => setSaveMessage(null), 3000);
-  };
-
-  const showErrorMessage = (message: string) => {
-    setSaveMessage({ type: 'error', message });
-    setTimeout(() => setSaveMessage(null), 5000);
   };
 
   // Calculate age
@@ -274,7 +284,7 @@ const PatientProfile: React.FC = () => {
   if (error && !patient) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Alert type="error" message={error} onClose={() => navigate('/dashboard')} />
+        <Alert type="error" message={error} onClose={() => navigate('/patient')} />
       </div>
     );
   }
@@ -378,11 +388,19 @@ const PatientProfile: React.FC = () => {
               )}
 
               {activeSection === 'emergency' && (
-                <EmergencyContactSection isEditing={isEditing} />
+                <EmergencyContactSection 
+                  isEditing={isEditing} 
+                  formData={formData}
+                  onFormDataChange={setFormData}
+                />
               )}
 
               {activeSection === 'insurance' && (
-                <InsuranceSection isEditing={isEditing} />
+                <InsuranceSection 
+                  isEditing={isEditing} 
+                  formData={formData}
+                  onFormDataChange={setFormData}
+                />
               )}
 
               {activeSection === 'notifications' && (

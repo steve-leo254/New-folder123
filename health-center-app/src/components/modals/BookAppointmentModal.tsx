@@ -149,11 +149,19 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
           {/* Doctor Info */}
           <div className="mb-6 p-4 bg-blue-50 rounded-lg">
             <div className="flex items-center space-x-3">
-              <img
-                src={doctor.avatar || '/images/default-avatar.jpg'}
-                alt={doctor.name}
-                className="w-12 h-12 rounded-full"
-              />
+              {doctor.avatar ? (
+                <img
+                  src={doctor.avatar}
+                  alt={doctor.name}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                  <span className="text-sm font-semibold text-gray-600">
+                    {doctor.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DR'}
+                  </span>
+                </div>
+              )}
               <div>
                 <p className="font-medium text-gray-900">
                   {doctor.role === 'Doctor' ? 'Dr. ' : ''}{doctor.name}
