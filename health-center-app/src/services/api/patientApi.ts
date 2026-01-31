@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { getFullImageUrl } from '../../utils/imageUtils';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -146,7 +147,8 @@ export const patientApi = {
       // Check if there's a locally stored avatar (user-specific)
       const storedAvatar = getUserSpecificItem('patientAvatar');
       if (storedAvatar) {
-        transformedData.avatar = storedAvatar;
+        const finalAvatar = getFullImageUrl(storedAvatar) || storedAvatar;
+        transformedData.avatar = finalAvatar;
       }
       
       return transformedData;
@@ -217,7 +219,7 @@ export const patientApi = {
         phone: '+254712345678',
         dateOfBirth: '1990-01-01',
         gender: 'male',
-        avatar: storedAvatar || '',
+        avatar: getFullImageUrl(storedAvatar || undefined) || '',
         address: 'Nairobi, Kenya',
         city: 'Nairobi',
         state: 'Nairobi County',
@@ -282,25 +284,36 @@ export const patientApi = {
 
   // Upload avatar
   uploadAvatar: async (file: File): Promise<{ img_url: string }> => {
-    // Since we don't have a backend, create a mock implementation
-    // In a real app, this would upload to a server and return the URL
-    
-    // Simulate upload delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Create a local URL for the uploaded image
-    const localUrl = URL.createObjectURL(file);
-    
-    // Store in user-specific localStorage for persistence (mock implementation)
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64data = reader.result as string;
-      setUserSpecificItem('patientAvatar', base64data);
-    };
-    reader.readAsDataURL(file);
-    
-    // Return the local URL
-    return { img_url: localUrl };
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Upload to backend
+      const response = await apiClient.post('/upload-image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      // Store the returned URL in localStorage as backup
+      setUserSpecificItem('patientAvatar', response.data.img_url);
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      // Fallback to localStorage if backend fails
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64data = reader.result as string;
+        setUserSpecificItem('patientAvatar', base64data);
+      };
+      reader.readAsDataURL(file);
+      
+      // Return a local URL as fallback
+      const localUrl = URL.createObjectURL(file);
+      return { img_url: localUrl };
+    }
   },
 
   // Change password
@@ -327,8 +340,6 @@ export const patientApi = {
     return data;
   },
 };
-
-// Transform backend data to frontend format
 function transformPatientData(data: any): PatientProfile {
   const [firstName = '', lastName = ''] = (data.full_name || '').split(' ');
   
@@ -341,7 +352,7 @@ function transformPatientData(data: any): PatientProfile {
     phone: data.phone || '',
     dateOfBirth: data.date_of_birth || '',
     gender: data.gender || '',
-    avatar: data.profile_picture || '',
+    avatar: getFullImageUrl(data.profile_picture) || '',
     address: data.address || '',
     city: data.city || '',
     state: data.state || '',

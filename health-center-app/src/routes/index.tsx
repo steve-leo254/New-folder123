@@ -15,6 +15,8 @@ import AppointmentsPage from '../pages/AppointmentsPage';
 import PrescriptionPage from '../pages/PrescriptionPage'; // Using test component temporarily
 import DoctorsPage from '../pages/DoctorsPage';
 import VideoChatPage from '../pages/VideoChatPage';
+import TestVideoPage from '../pages/TestVideoPage';
+import VideoChatPageSimple from '../pages/VideoChatPageSimple';
 import CheckoutPage from '../pages/CheckoutPage';
 import CartPage from '../pages/CartPage';
 import PharmacyPage from '../pages/PharmacyPage';
@@ -221,6 +223,18 @@ export const protectedRoutes: RouteConfig[] = [
   {
     path: '/doctors-profile',
     element: <Navigate to="/doctors" replace />,
+  },
+
+  // Test Video Page - No authentication required for testing
+  {
+    path: '/test-video',
+    element: <TestVideoPage />,
+  },
+
+  // Simple Video Chat Test - No authentication required
+  {
+    path: '/video-chat-simple',
+    element: <VideoChatPageSimple />,
   },
 
   // Video Chat - Restricted to medical staff

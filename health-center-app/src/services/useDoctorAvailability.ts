@@ -40,6 +40,15 @@ export const useDoctorAvailability = (doctorId: string) => {
         },
       });
 
+      // If endpoint doesn't exist (404), use fallback data immediately
+      if (response.status === 404) {
+        console.log('Availability endpoint not found, using fallback data');
+        const fallbackSlots = generateDefaultTimeSlots();
+        setTimeSlots(fallbackSlots);
+        setLoading(false);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`Failed to fetch availability: ${response.statusText}`);
       }

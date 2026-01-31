@@ -21,6 +21,7 @@ import {
   VideoOff,
   PhoneOff,
   Maximize2,
+  Minimize2,
   Send,
   Paperclip,
   MoreVertical,
@@ -677,6 +678,7 @@ const VideoCall: React.FC<{
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [duration, setDuration] = useState(0);
   const [showChat, setShowChat] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Array<{ text: string; isOwn: boolean; time: string }>>([
     { text: 'Hello! How can I help you today?', isOwn: false, time: '10:00 AM' },
@@ -705,159 +707,200 @@ const VideoCall: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-900 z-50">
-      {/* Main Video Area */}
-      <div className="absolute inset-0">
-        {/* GPDoctor Video (Main) */}
-        <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-          <img
-            src={doctor.avatar}
-            alt={doctor.name}
-            className="w-48 h-48 rounded-full object-cover border-4 border-white/20"
-          />
-        </div>
-
-        {/* Self Video (PIP) */}
-        <div className="absolute bottom-24 right-6 w-40 h-56 bg-gray-800 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10">
-          {isVideoOff ? (
-            <div className="w-full h-full flex items-center justify-center bg-gray-700">
-              <VideoOff className="w-10 h-10 text-gray-400" />
+    <>
+      {isMinimized ? (
+        /* Minimized View */
+        <div className="fixed bottom-4 right-4 w-80 h-24 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 z-50">
+          <div className="flex items-center gap-3 p-3 h-full">
+            {/* Doctor Avatar */}
+            <img
+              src={doctor.avatar}
+              alt={doctor.name}
+              className="w-12 h-12 rounded-full object-cover border-2 border-white/20"
+            />
+            
+            {/* Call Info */}
+            <div className="flex-1">
+              <div className="text-white text-sm font-medium">{doctor.name}</div>
+              <div className="text-gray-400 text-xs">{formatDuration(duration)}</div>
             </div>
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-              <span className="text-white text-3xl font-bold">You</span>
+            
+            {/* Controls */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsMinimized(false)}
+                className="p-2 bg-gray-800 text-white rounded-full hover:bg-gray-700 transition-colors"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={onEnd}
+                className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+              >
+                <PhoneOff className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Full Screen View */
+        <div className="fixed inset-0 bg-gray-900 z-50">
+          {/* Main Video Area */}
+          <div className="absolute inset-0">
+            {/* GPDoctor Video (Main) */}
+            <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+              <img
+                src={doctor.avatar}
+                alt={doctor.name}
+                className="w-48 h-48 rounded-full object-cover border-4 border-white/20"
+              />
+            </div>
+
+            {/* Self Video (PIP) */}
+            <div className="absolute bottom-24 right-6 w-40 h-56 bg-gray-800 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10">
+              {isVideoOff ? (
+                <div className="w-full h-full flex items-center justify-center bg-gray-700">
+                  <VideoOff className="w-10 h-10 text-gray-400" />
+                </div>
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+                  <span className="text-white text-3xl font-bold">You</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Top Bar */}
+          <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/50 to-transparent">
+            <div className="flex items-center justify-between max-w-6xl mx-auto">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 bg-black/30 backdrop-blur-md rounded-full px-4 py-2 mb-6">
+                  <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-white font-medium">{formatDuration(duration)}</span>
+                </div>
+                <div className="bg-black/30 backdrop-blur-md rounded-full px-4 py-2">
+                  <span className="text-white">{doctor.name}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setIsMinimized(true)}
+                  className="p-2 bg-black/30 backdrop-blur-md rounded-full text-white hover:bg-black/50 transition-colors"
+                >
+                  <Minimize2 className="w-5 h-5" />
+                </button>
+                <button className="p-2 bg-black/30 backdrop-blur-md rounded-full text-white hover:bg-black/50 transition-colors">
+                  <Settings className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/50 to-transparent">
+            <div className="flex items-center justify-center gap-4 max-w-md mx-auto">
+              <button
+                onClick={() => setIsMuted(!isMuted)}
+                className={`p-4 rounded-full transition-all ${
+                  isMuted ? 'bg-red-500 text-white' : 'bg-white/20 backdrop-blur-md text-white hover:bg-white/30'
+                }`}
+              >
+                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+              </button>
+              <button
+                onClick={() => setIsVideoOff(!isVideoOff)}
+                className={`p-4 rounded-full transition-all ${
+                  isVideoOff ? 'bg-red-500 text-white' : 'bg-white/20 backdrop-blur-md text-white hover:bg-white/30'
+                }`}
+              >
+                {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+              </button>
+              <button
+                onClick={onEnd}
+                className="p-4 bg-red-500 hover:bg-red-600 rounded-full text-white transition-colors"
+              >
+                <PhoneOff className="w-6 h-6" />
+              </button>
+              <button
+                onClick={() => setShowChat(!showChat)}
+                className={`p-4 rounded-full transition-all ${
+                  showChat ? 'bg-blue-500 text-white' : 'bg-white/20 backdrop-blur-md text-white hover:bg-white/30'
+                }`}
+              >
+                <MessageCircle className="w-6 h-6" />
+              </button>
+              <button className="p-4 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 transition-colors">
+                <MoreVertical className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Chat Panel */}
+          {showChat && (
+            <div className="absolute right-0 top-0 bottom-0 w-96 bg-white shadow-2xl flex flex-col">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Chat</h3>
+                <button
+                  onClick={() => setShowChat(false)}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                        msg.isOwn
+                          ? 'bg-blue-500 text-white rounded-br-md'
+                          : 'bg-gray-100 text-gray-900 rounded-bl-md'
+                      }`}
+                    >
+                      <p>{msg.text}</p>
+                      <p
+                        className={`text-xs mt-1 ${
+                          msg.isOwn ? 'text-blue-100' : 'text-gray-500'
+                        }`}
+                      >
+                        {msg.time}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 border-t border-gray-100">
+                <div className="flex items-center gap-2">
+                  <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <Paperclip className="w-5 h-5 text-gray-500" />
+                  </button>
+                  <input
+                    type="text"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                    placeholder="Type a message..."
+                    className="flex-1 py-2 px-4 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={sendMessage}
+                    className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
-      </div>
-
-      {/* Top Bar */}
-      <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/50 to-transparent">
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 bg-black/30 backdrop-blur-md rounded-full px-4 py-2 mb-6">
-              <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-white font-medium">{formatDuration(duration)}</span>
-            </div>
-            <div className="bg-black/30 backdrop-blur-md rounded-full px-4 py-2">
-              <span className="text-white">{doctor.name}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="p-2 bg-black/30 backdrop-blur-md rounded-full text-white hover:bg-black/50 transition-colors">
-              <Maximize2 className="w-5 h-5" />
-            </button>
-            <button className="p-2 bg-black/30 backdrop-blur-md rounded-full text-white hover:bg-black/50 transition-colors">
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/50 to-transparent">
-        <div className="flex items-center justify-center gap-4 max-w-md mx-auto">
-          <button
-            onClick={() => setIsMuted(!isMuted)}
-            className={`p-4 rounded-full transition-all ${
-              isMuted ? 'bg-red-500 text-white' : 'bg-white/20 backdrop-blur-md text-white hover:bg-white/30'
-            }`}
-          >
-            {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-          </button>
-          <button
-            onClick={() => setIsVideoOff(!isVideoOff)}
-            className={`p-4 rounded-full transition-all ${
-              isVideoOff ? 'bg-red-500 text-white' : 'bg-white/20 backdrop-blur-md text-white hover:bg-white/30'
-            }`}
-          >
-            {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-          </button>
-          <button
-            onClick={onEnd}
-            className="p-4 bg-red-500 hover:bg-red-600 rounded-full text-white transition-colors"
-          >
-            <PhoneOff className="w-6 h-6" />
-          </button>
-          <button
-            onClick={() => setShowChat(!showChat)}
-            className={`p-4 rounded-full transition-all ${
-              showChat ? 'bg-blue-500 text-white' : 'bg-white/20 backdrop-blur-md text-white hover:bg-white/30'
-            }`}
-          >
-            <MessageCircle className="w-6 h-6" />
-          </button>
-          <button className="p-4 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 transition-colors">
-            <MoreVertical className="w-6 h-6" />
-          </button>
-        </div>
-      </div>
-
-      {/* Chat Panel */}
-      {showChat && (
-        <div className="absolute right-0 top-0 bottom-0 w-96 bg-white shadow-2xl flex flex-col">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900">Chat</h3>
-            <button
-              onClick={() => setShowChat(false)}
-              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2 ${
-                    msg.isOwn
-                      ? 'bg-blue-500 text-white rounded-br-md'
-                      : 'bg-gray-100 text-gray-900 rounded-bl-md'
-                  }`}
-                >
-                  <p>{msg.text}</p>
-                  <p
-                    className={`text-xs mt-1 ${
-                      msg.isOwn ? 'text-blue-100' : 'text-gray-500'
-                    }`}
-                  >
-                    {msg.time}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="p-4 border-t border-gray-100">
-            <div className="flex items-center gap-2">
-              <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                <Paperclip className="w-5 h-5 text-gray-500" />
-              </button>
-              <input
-                type="text"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="Type a message..."
-                className="flex-1 py-2 px-4 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={sendMessage}
-                className="p-2 bg-blue-500 hover:bg-blue-600 rounded-full text-white transition-colors"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
       )}
-    </div>
+    </>
   );
 };
 
-// Main Page Component
 const GeneralPracticePage: React.FC = () => {
   const navigate = useNavigate();
   const [selectedDoctor, setSelectedDoctor] = useState<GPDoctor | null>(null);

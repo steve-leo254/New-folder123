@@ -14,13 +14,21 @@ export const getFullImageUrl = (imageUrl?: string): string | undefined => {
     return undefined;
   }
   
+  // Clean up any malformed URLs with extra quotes
+  const cleanImageUrl = imageUrl.replace(/"/g, '');
+  
+  // If it's a base64 data URL, return as is
+  if (cleanImageUrl.startsWith('data:')) {
+    return cleanImageUrl;
+  }
+  
   // If it's already a full URL (starts with http), return as is
-  if (imageUrl.startsWith('http')) {
-    return imageUrl;
+  if (cleanImageUrl.startsWith('http')) {
+    return cleanImageUrl;
   }
   
   // If it's a relative URL, prepend the API base URL
-  return `${API_BASE_URL}${imageUrl}`;
+  return `${API_BASE_URL}${cleanImageUrl}`;
 };
 
 /**

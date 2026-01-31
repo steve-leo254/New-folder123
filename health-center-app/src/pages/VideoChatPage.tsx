@@ -17,13 +17,16 @@ import {
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { useWebRTC } from '../hooks/useWebRTC';
-import { formatDuration, formatTime, formatDateTime } from '../utils/timeUtils';
+import { formatDuration, formatTime } from '../utils/timeUtils';
 import { useAuth } from '../services/AuthContext';
 
 const VideoChatPage: React.FC = () => {
+  console.log('VideoChatPage component mounting...');
   const navigate = useNavigate();
   const { id: appointmentId } = useParams<{ id: string }>();
+  console.log('Appointment ID:', appointmentId);
   const { role } = useAuth();
+  console.log('User role:', role);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [showChat, setShowChat] = useState(false);
@@ -47,6 +50,28 @@ const VideoChatPage: React.FC = () => {
     isVideoEnabled,
     isAudioEnabled
   } = useWebRTC();
+
+  // Debug WebRTC state
+  console.log('WebRTC State:', {
+    isConnecting,
+    isConnected,
+    error,
+    hasLocalStream: !!localStream,
+    hasRemoteStream: !!remoteStream,
+    isVideoEnabled,
+    isAudioEnabled
+  });
+
+  // Debug WebRTC functions
+  const handleToggleVideo = () => {
+    console.log('Toggle video clicked, current state:', isVideoEnabled);
+    toggleVideo();
+  };
+
+  const handleToggleAudio = () => {
+    console.log('Toggle audio clicked, current state:', isAudioEnabled);
+    toggleAudio();
+  };
 
   // Set video streams to refs
   useEffect(() => {
@@ -81,6 +106,9 @@ const VideoChatPage: React.FC = () => {
   }, [appointmentId, startCall]);
 
   const handleEndCall = () => {
+    console.log('End call button clicked');
+    console.log('Current role:', role);
+    
     // Stop all media tracks
     if (localStream) {
       localStream.getTracks().forEach(track => {
@@ -94,11 +122,18 @@ const VideoChatPage: React.FC = () => {
     }
     
     endCall();
+    
+    // Navigate based on role with fallback
     setTimeout(() => {
       if (role === 'patient') {
+        console.log('Navigating to /patient');
         navigate('/patient');
-      } else {
+      } else if (role === 'doctor' || role === 'admin') {
+        console.log('Navigating to /dashboard');
         navigate('/dashboard');
+      } else {
+        console.log('Role not found, navigating to /');
+        navigate('/');
       }
     }, 1000);
   };
@@ -128,6 +163,7 @@ const VideoChatPage: React.FC = () => {
   };
 
   const toggleSpeaker = () => {
+    console.log('Toggle speaker clicked');
     if (remoteVideoRef.current) {
       remoteVideoRef.current.muted = !isSpeakerOn;
       setIsSpeakerOn(!isSpeakerOn);
@@ -135,10 +171,12 @@ const VideoChatPage: React.FC = () => {
   };
 
   const handleMinimize = () => {
+    console.log('Minimize clicked, current state:', isMinimized);
     setIsMinimized(!isMinimized);
   };
 
   const handleScheduleForLater = () => {
+    console.log('Schedule for later clicked');
     setShowScheduleModal(true);
   };
 
@@ -151,6 +189,7 @@ const VideoChatPage: React.FC = () => {
   };
 
   if (error) {
+    console.log('Rendering error state:', error);
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <Card className="p-8 text-center max-w-md">
@@ -170,6 +209,7 @@ const VideoChatPage: React.FC = () => {
   }
 
   if (!isConnected && !isConnecting) {
+    console.log('Rendering call ended state - isConnected:', isConnected, 'isConnecting:', isConnecting);
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <Card className="p-8 text-center">
@@ -183,15 +223,22 @@ const VideoChatPage: React.FC = () => {
     );
   }
 
+  console.log('Rendering main video interface - isConnected:', isConnected, 'isConnecting:', isConnecting);
+
   return (
     <div className="min-h-screen bg-gray-900">
+      {/* Add debug info at the top */}
+      <div className="fixed top-0 left-0 right-0 bg-red-600 text-white p-2 z-50 text-center">
+        DEBUG: isConnected={isConnected.toString()}, isConnecting={isConnecting.toString()}, role={role || 'null'}
+      </div>
+      
       {isMinimized ? (
         // Minimized View
         <div className="fixed bottom-4 right-4 z-50">
           <div className="bg-gray-800 rounded-lg shadow-xl p-3 flex items-center space-x-3">
             <div className="text-white text-sm">
               <div className="font-semibold">Dr. Sarah Johnson</div>
-              <div className="text-xs opacity-75">{formatTime(callDuration)}</div>
+              <div className="text-xs opacity-75">{formatDuration(callDuration)}</div>
             </div>
             <Button
               variant="outline"
@@ -270,7 +317,7 @@ const VideoChatPage: React.FC = () => {
                   <p className="text-sm opacity-90">Cardiologist</p>
                   <div className="flex items-center mt-2 space-x-2">
                     <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                    <span className="text-sm">{formatTime(callDuration)}</span>
+                    <span className="text-sm">{formatDuration(callDuration)}</span>
                   </div>
                 </div>
               </>
@@ -285,7 +332,7 @@ const VideoChatPage: React.FC = () => {
                   className={`bg-white/10 border-white/30 text-white hover:bg-white/20 ${
                     !isVideoEnabled ? 'bg-red-600/20 border-red-600' : ''
                   }`}
-                  onClick={toggleVideo}
+                  onClick={handleToggleVideo}
                   disabled={!localStream}
                 >
                   {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
@@ -297,7 +344,7 @@ const VideoChatPage: React.FC = () => {
                   className={`bg-white/10 border-white/30 text-white hover:bg-white/20 ${
                     !isAudioEnabled ? 'bg-red-600/20 border-red-600' : ''
                   }`}
-                  onClick={toggleAudio}
+                  onClick={handleToggleAudio}
                   disabled={!localStream}
                 >
                   {isAudioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
@@ -357,6 +404,14 @@ const VideoChatPage: React.FC = () => {
                 >
                   <Settings className="w-5 h-5" />
                 </Button>
+
+                {/* Test Button */}
+                <button
+                  onClick={() => console.log('Test button clicked!')}
+                  className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                >
+                  TEST
+                </button>
               </div>
             </div>
           </div>

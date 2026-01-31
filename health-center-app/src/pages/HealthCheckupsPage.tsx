@@ -75,7 +75,8 @@ const healthQuestions: Question[] = [
     type: 'number',
     min: 100,
     max: 250,
-    unit: 'cm'
+    unit: 'cm',
+    info: 'Height in centimeters (cm)'
   },
   {
     id: 'weight',
@@ -84,7 +85,8 @@ const healthQuestions: Question[] = [
     type: 'number',
     min: 30,
     max: 300,
-    unit: 'kg'
+    unit: 'kg',
+    info: 'Weight in kilograms (kg)'
   },
   // Heart Health
   {
@@ -486,77 +488,120 @@ const HealthCheckupsPage: React.FC = () => {
     return recommendations;
   };
 
-  // Download report functionality
-  const downloadReport = () => {
-    const reportData = {
-      assessmentDate: new Date().toLocaleDateString(),
-      patientInfo: {
-        age: answers.age,
-        gender: answers.gender,
-        height: `${answers.height} cm`,
-        weight: `${answers.weight} kg`,
-        bmi: results?.bmi?.toFixed(1),
-        bmiCategory: results?.bmiCategory,
-      },
-      healthMetrics: results,
-      categoryResults: categoryResults,
-      recommendations: categoryResults.flatMap(cat => cat.recommendations),
+  const getHealthScoreDescription = (score: number): string => {
+    if (score >= 80) return 'EXCELLENT - Your health is in great condition!';
+    if (score >= 60) return 'GOOD - You\'re doing well, with room for improvement.';
+    if (score >= 40) return 'FAIR - Some areas need attention and improvement.';
+    if (score >= 20) return 'POOR - Multiple health areas require immediate attention.';
+    return 'CRITICAL - Please consult a healthcare provider urgently.';
+  };
+
+  const getRiskLevel = (percentage: number): string => {
+    if (percentage <= 20) return '(Low Risk)';
+    if (percentage <= 40) return '(Moderate Risk)';
+    if (percentage <= 60) return '(High Risk)';
+    return '(Very High Risk)';
+  };
+
+  const getQualityLevel = (score: number): string => {
+    if (score >= 8) return '(Excellent)';
+    if (score >= 6) return '(Good)';
+    if (score >= 4) return '(Fair)';
+    return '(Poor)';
+  };
+
+  const getStressLevel = (score: number): string => {
+    if (score <= 3) return '(Low Stress)';
+    if (score <= 6) return '(Moderate Stress)';
+    if (score <= 8) return '(High Stress)';
+    return '(Very High Stress)';
+  };
+
+  const getExerciseLabel = (frequency: string): string => {
+    const labels: Record<string, string> = {
+      'never': 'No regular exercise',
+      '1-2': '1-2 times per week',
+      '3-4': '3-4 times per week',
+      '5+': '5+ times per week (Excellent)'
     };
+    return labels[frequency] || 'Not specified';
+  };
 
-    const reportContent = `
-HEALTH ASSESSMENT REPORT
-========================
+  const getSmokingLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      'never': 'Non-smoker',
+      'quit': 'Former smoker',
+      'occasionally': 'Occasional smoker',
+      'regularly': 'Regular smoker'
+    };
+    return labels[status] || 'Not specified';
+  };
 
-Assessment Date: ${reportData.assessmentDate}
+  const getAlcoholLabel = (frequency: string): string => {
+    const labels: Record<string, string> = {
+      'never': 'No alcohol consumption',
+      'rarely': 'Rarely drinks',
+      'weekly': 'Weekly consumption',
+      'daily': 'Daily consumption'
+    };
+    return labels[frequency] || 'Not specified';
+  };
 
-PATIENT INFORMATION
-------------------
-Age: ${reportData.patientInfo.age} years
-Gender: ${reportData.patientInfo.gender}
-Height: ${reportData.patientInfo.height}
-Weight: ${reportData.patientInfo.weight}
-BMI: ${reportData.patientInfo.bmi} (${reportData.patientInfo.bmiCategory})
+  const getDietLabel = (fruits: string, water: string): string => {
+    const fruitScore = fruits === '5+' ? 10 : fruits === '3-4' ? 7 : fruits === '1-2' ? 4 : 0;
+    const waterScore = water === '7+' ? 10 : water === '5-6' ? 7 : water === '3-4' ? 5 : 2;
+    const totalScore = fruitScore + waterScore;
+    
+    if (totalScore >= 15) return 'Excellent diet quality';
+    if (totalScore >= 10) return 'Good diet quality';
+    if (totalScore >= 5) return 'Fair diet quality';
+    return 'Poor diet quality - needs improvement';
+  };
 
-OVERALL HEALTH SCORE: ${results?.overallHealth}/100
+  const getCheckupLabel = (lastCheckup: string): string => {
+    const labels: Record<string, string> = {
+      '<6months': 'Recent checkup (Good)',
+      '6-12months': 'Checkup within last year',
+      '1-2years': 'Checkup over a year ago',
+      '2+years': 'Checkup over 2 years ago',
+      'never': 'Never had a checkup'
+    };
+    return labels[lastCheckup] || 'Not specified';
+  };
 
-HEALTH METRICS
---------------
-Heart Disease Risk: ${results?.heartRisk}%
-Diabetes Risk: ${results?.diabetesRisk}%
-Sleep Quality: ${results?.sleepQuality}/10
-Stress Level: ${results?.stressLevel}/10
-
-DETAILED RESULTS
-----------------
-${categoryResults.map(cat => `
-${cat.category} Health: ${cat.score}/100 (${cat.status})
-Recommendations:
-${cat.recommendations.map(rec => `• ${rec}`).join('\n')}
-`).join('\n')}
-
-RECOMMENDATIONS SUMMARY
------------------------
-${reportData.recommendations.map(rec => `• ${rec}`).join('\n')}
-
-DISCLAIMER
-----------
-This assessment is for informational purposes only and is not a substitute 
-for professional medical advice, diagnosis, or treatment. Always seek the 
-advice of your physician or other qualified health provider with any 
-questions you may have regarding a medical condition.
-
-Generated by Kiangombe Health Center
-    `.trim();
-
-    const blob = new Blob([reportContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `health-assessment-report-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const getPriorityRecommendations = (categoryResults: AssessmentResult[], answers: Record<string, any>): string[] => {
+    const priorities: string[] = [];
+    
+    // High-risk conditions
+    if (answers.chronic_conditions && answers.chronic_conditions.includes('diabetes')) {
+      priorities.push('URGENT: Schedule regular diabetes monitoring with healthcare provider');
+    }
+    if (answers.blood_pressure === 'uncontrolled') {
+      priorities.push('URGENT: Seek immediate medical attention for blood pressure management');
+    }
+    
+    // Lifestyle priorities based on scores
+    const heartScore = categoryResults.find(c => c.category === 'Heart')?.score || 0;
+    if (heartScore < 40) {
+      priorities.push('Implement cardiovascular exercise routine immediately');
+    }
+    
+    const sleepScore = categoryResults.find(c => c.category === 'Sleep')?.score || 0;
+    if (sleepScore < 40) {
+      priorities.push('Prioritize sleep hygiene - aim for 7-8 hours per night');
+    }
+    
+    const stressScore = categoryResults.find(c => c.category === 'Stress')?.score || 0;
+    if (stressScore < 40) {
+      priorities.push('Develop stress management techniques and consider professional support');
+    }
+    
+    if (priorities.length === 0) {
+      priorities.push('Continue maintaining healthy lifestyle habits');
+      priorities.push('Schedule routine preventive care checkup');
+    }
+    
+    return priorities.slice(0, 5); // Return top 5 priorities
   };
 
   const resetAssessment = () => {
@@ -591,6 +636,118 @@ Generated by Kiangombe Health Center
     if (score >= 40) return 'bg-yellow-500';
     if (score >= 20) return 'bg-orange-500';
     return 'bg-red-500';
+  };
+
+  const downloadReport = () => {
+    const reportData = {
+      assessmentDate: new Date().toLocaleDateString(),
+      assessmentTime: new Date().toLocaleTimeString(),
+      patientInfo: {
+        age: answers.age,
+        gender: answers.gender,
+        height: `${answers.height} cm`,
+        weight: `${answers.weight} kg`,
+        bmi: results?.bmi?.toFixed(1),
+        bmiCategory: results?.bmiCategory,
+      },
+      healthMetrics: results,
+      categoryResults: categoryResults,
+      recommendations: categoryResults.flatMap(cat => cat.recommendations),
+      answers: answers,
+    };
+
+    const reportContent = `HEALTH ASSESSMENT REPORT
+========================
+Kiangombe Health Center
+========================
+
+ASSESSMENT DETAILS
+========================
+Date: ${reportData.assessmentDate}
+Time: ${reportData.assessmentTime}
+Report ID: HA-${new Date().getTime()}
+
+PATIENT INFORMATION
+========================
+Age: ${reportData.patientInfo.age} years
+Gender: ${reportData.patientInfo.gender}
+Height: ${reportData.patientInfo.height}
+Weight: ${reportData.patientInfo.weight}
+BMI: ${reportData.patientInfo.bmi} (${reportData.patientInfo.bmiCategory})
+
+OVERALL HEALTH SCORE
+========================
+${results?.overallHealth}/100
+
+${getHealthScoreDescription(results?.overallHealth || 0)}
+
+HEALTH METRICS ANALYSIS
+========================
+Heart Disease Risk: ${results?.heartRisk}% ${getRiskLevel(results?.heartRisk || 0)}
+Diabetes Risk: ${results?.diabetesRisk}% ${getRiskLevel(results?.diabetesRisk || 0)}
+Sleep Quality: ${results?.sleepQuality}/10 ${getQualityLevel(results?.sleepQuality || 0)}
+Stress Level: ${results?.stressLevel}/10 ${getStressLevel(results?.stressLevel || 0)}
+
+DETAILED CATEGORY RESULTS
+========================
+${categoryResults.map(cat => `${cat.category.toUpperCase()} HEALTH
+------------------------
+Score: ${cat.score}/100 (${cat.status.toUpperCase()})
+
+Recommendations:
+${cat.recommendations.map(rec => `  • ${rec}`).join('\n')}
+`).join('\n')}
+
+LIFESTYLE ASSESSMENT SUMMARY
+========================
+Exercise Frequency: ${getExerciseLabel(answers.exercise_frequency)}
+Smoking Status: ${getSmokingLabel(answers.smoking)}
+Alcohol Consumption: ${getAlcoholLabel(answers.alcohol)}
+Diet Quality: ${getDietLabel(answers.fruits_vegetables, answers.water_intake)}
+Sleep Duration: ${answers.sleep_hours} hours/night
+Last Checkup: ${getCheckupLabel(answers.last_checkup)}
+
+PRIORITY RECOMMENDATIONS
+========================
+${getPriorityRecommendations(categoryResults, answers).map((rec, i) => 
+  `${i + 1}. ${rec}`
+).join('\n')}
+
+NEXT STEPS
+========================
+1. Schedule a follow-up consultation with a healthcare provider
+2. Implement the recommended lifestyle changes gradually
+3. Monitor your progress and retake this assessment in 3 months
+4. Keep this report for your medical records
+
+MEDICAL DISCLAIMER
+========================
+This health assessment is for informational purposes only and is not 
+a substitute for professional medical advice, diagnosis, or treatment. 
+
+The results are based on self-reported information and should be 
+discussed with a qualified healthcare provider for proper interpretation 
+and medical guidance.
+
+Always seek the advice of your physician or other qualified health 
+provider with any questions you may have regarding a medical condition.
+
+If you are experiencing a medical emergency, call your local emergency 
+services immediately.
+
+Report generated on: ${new Date().toLocaleString()}
+ 2024 Kiangombe Health Center - All Rights Reserved
+========================`;
+
+    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `health-assessment-report-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (

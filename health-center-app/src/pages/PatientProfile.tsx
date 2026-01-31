@@ -196,15 +196,20 @@ const PatientProfile: React.FC = () => {
     }
 
     setIsUploading(true);
-    const result = await uploadAvatar(file);
-    setIsUploading(false);
-
-    if (result.success) {
+    try {
+      const result = await uploadAvatar(file);
       setSaveMessage({ type: 'success', message: 'Profile picture updated!' });
+      
+      // The uploadAvatar function already updates the local patient state
+      // No need to call refreshProfile() as it might fetch stale data
+      
       setTimeout(() => setSaveMessage(null), 3000);
-    } else {
-      setSaveMessage({ type: 'error', message: result.error || 'Failed to upload avatar' });
+    } catch (error) {
+      console.error('Upload error:', error);
+      setSaveMessage({ type: 'error', message: 'Failed to upload avatar' });
       setTimeout(() => setSaveMessage(null), 5000);
+    } finally {
+      setIsUploading(false);
     }
   };
 
