@@ -1,13 +1,15 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, Shield, CheckCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { useShoppingCart } from '../services/CartContext';
+import { useInsuranceDiscount } from '../services/useInsuranceDiscount';
 
 const CartPage: React.FC = () => {
   const { cartItems, total, removeFromCart, increaseCartQuantity, decreaseCartQuantity, clearCart } = useShoppingCart();
+  const insuranceDiscount = useInsuranceDiscount(total);
 
   if (cartItems.length === 0) {
     return (
@@ -27,6 +29,10 @@ const CartPage: React.FC = () => {
       </div>
     );
   }
+
+  // Calculate totals with insurance discount
+  const tax = total * 0.16;
+  const finalTotal = total + tax - insuranceDiscount.discountAmount;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -118,27 +124,59 @@ const CartPage: React.FC = () => {
                 <span>Subtotal ({cartItems.length} items)</span>
                 <span>KSH {total.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-gray-600">
-                <span>Shipping</span>
-                <span>Free</span>
-              </div>
+              
+              {/* Insurance Discount */}
+              {insuranceDiscount.hasInsurance && insuranceDiscount.discountAmount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span className="flex items-center">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Insurance Discount ({(insuranceDiscount.discountPercentage * 100).toFixed(0)}%)
+                  </span>
+                  <span>-KSH {insuranceDiscount.discountAmount.toLocaleString()}</span>
+                </div>
+              )}
+              
               <div className="flex justify-between text-gray-600">
                 <span>Tax (16%)</span>
-                <span>KSH {(total * 0.16).toLocaleString()}</span>
+                <span>KSH {Math.round(tax).toLocaleString()}</span>
               </div>
             </div>
+
+            {/* Insurance Status Card */}
+            {insuranceDiscount.hasInsurance && (
+              <Card className="p-4 mb-6 bg-green-50 border-green-200">
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">
+                      {insuranceDiscount.insuranceType === 'sha' ? 'SHA Insurance' : 'Standard Insurance'}
+                    </h3>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {(insuranceDiscount.discountPercentage * 100).toFixed(0)}% discount applied
+                    </p>
+                    {insuranceDiscount.quarterlyLimit > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Quarterly remaining: KSH {insuranceDiscount.remainingQuarterly.toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
 
             <div className="border-t border-gray-200 pt-4 mb-6">
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-gray-900">Total</span>
                 <span className="text-2xl font-bold text-primary-600">
-                  KSH {(total * 1.16).toLocaleString()}
+                  KSH {Math.round(finalTotal).toLocaleString()}
                 </span>
               </div>
             </div>
 
             <Link to="/checkout" className="block mb-3">
-              <Button className="w-full">Proceed to Checkout</Button>
+              <Button className="w-full">
+                Proceed to Checkout
+              </Button>
             </Link>
 
             <button

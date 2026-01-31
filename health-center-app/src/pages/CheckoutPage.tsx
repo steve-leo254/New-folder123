@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CreditCard, Truck, Shield } from 'lucide-react';
+import { CreditCard, Shield, CheckCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import CheckoutForm from '../components/features/checkoutForm';
 import { useShoppingCart } from '../services/CartContext';
+import { useInsuranceDiscount } from '../services/useInsuranceDiscount';
 import { formatCurrency } from '../services/formatCurrency';
 
 const CheckoutPage: React.FC = () => {
@@ -16,8 +17,11 @@ const CheckoutPage: React.FC = () => {
   const subtotal = cart?.subtotal || 0;
   const deliveryFee = cart?.deliveryFee || 0;
 
+  // Calculate insurance discount
+  const insuranceDiscount = useInsuranceDiscount(subtotal);
+
   const tax = subtotal * 0.16; // 16% VAT
-  const total = subtotal + deliveryFee + tax;
+  const total = subtotal + deliveryFee + tax - insuranceDiscount.discountAmount;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -105,10 +109,18 @@ const CheckoutPage: React.FC = () => {
                 <span>Subtotal ({cartItems.length} items)</span>
                 <span>{formatCurrency(subtotal)}</span>
               </div>
-              <div className="flex justify-between text-gray-600">
-                <span>Delivery</span>
-                <span>{deliveryFee === 0 ? 'Free' : formatCurrency(deliveryFee)}</span>
-              </div>
+              
+              {/* Insurance Discount */}
+              {insuranceDiscount.hasInsurance && insuranceDiscount.discountAmount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span className="flex items-center">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Insurance Discount ({(insuranceDiscount.discountPercentage * 100).toFixed(0)}%)
+                  </span>
+                  <span>-{formatCurrency(insuranceDiscount.discountAmount)}</span>
+                </div>
+              )}
+              
               <div className="flex justify-between text-gray-600">
                 <span>Tax (16%)</span>
                 <span>{formatCurrency(Math.round(tax))}</span>
@@ -120,6 +132,29 @@ const CheckoutPage: React.FC = () => {
                 </div>
               </div>
             </div>
+            
+            {/* Insurance Status Card */}
+            {insuranceDiscount.hasInsurance && (
+              <Card className="p-4 mt-4 bg-green-50 border-green-200">
+                <div className="flex items-start space-x-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">
+                      {insuranceDiscount.insuranceType === 'sha' ? 'SHA Insurance' : 'Standard Insurance'}
+                    </h3>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {(insuranceDiscount.discountPercentage * 100).toFixed(0)}% discount applied
+                    </p>
+                    {insuranceDiscount.quarterlyLimit > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Quarterly remaining: {formatCurrency(insuranceDiscount.remainingQuarterly)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
+            
             <Button
               className="w-full mt-6"
               onClick={() => setShowPaymentForm(true)}
@@ -127,16 +162,6 @@ const CheckoutPage: React.FC = () => {
               <CreditCard className="w-4 h-4 mr-2" />
               Proceed to Payment
             </Button>
-          </Card>
-
-          <Card className="p-6 bg-blue-50">
-            <div className="flex items-start space-x-3">
-              <Truck className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-gray-900">Free Delivery</h3>
-                <p className="text-sm text-gray-600 mt-1">On orders above $50</p>
-              </div>
-            </div>
           </Card>
 
           <Card className="p-6 bg-green-50">
