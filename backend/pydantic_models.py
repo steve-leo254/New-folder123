@@ -203,6 +203,19 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=72)
 
 
+class VerifyCodeRequest(BaseModel):
+    """Verify reset code request."""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class ResetPasswordWithCodeRequest(BaseModel):
+    """Password reset with verification code."""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=8, max_length=72)
+
+
 # ============================================================================
 # User & Profile
 # ============================================================================

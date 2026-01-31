@@ -28,6 +28,7 @@ import {
   Zap,
   Award,
 } from 'lucide-react';
+import { authService } from '../services/auth';
 
 type VerificationStatus = 'pending' | 'verifying' | 'success' | 'expired' | 'error';
 
@@ -71,24 +72,15 @@ const EmailVerificationPage: React.FC = () => {
   const verifyEmailWithToken = async (token: string) => {
     setStatus('verifying');
     setIsLoading(true);
+    setError(null);
 
     try {
-      // Simulate API verification
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // For demo, simulate success
-      if (token === 'expired') {
-        setStatus('expired');
-      } else if (token === 'invalid') {
-        setStatus('error');
-        setError('Invalid verification link');
-      } else {
-        setStatus('success');
-        setShowConfetti(true);
-      }
-    } catch (err) {
+      await authService.verifyEmail(token);
+      setStatus('success');
+      setShowConfetti(true);
+    } catch (err: any) {
       setStatus('error');
-      setError('Verification failed. Please try again.');
+      setError(err.response?.data?.detail || 'Verification failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -170,12 +162,12 @@ const EmailVerificationPage: React.FC = () => {
     setError(null);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await authService.resendVerification(email);
       setResendTimer(60);
       setVerificationCode(['', '', '', '', '', '']);
       codeInputRefs.current[0]?.focus();
-    } catch (err) {
-      setError('Failed to resend code');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to resend code');
     } finally {
       setIsLoading(false);
     }
@@ -188,11 +180,11 @@ const EmailVerificationPage: React.FC = () => {
     setError(null);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await authService.resendVerification(email);
       setResendTimer(60);
       setStatus('pending');
-    } catch (err) {
-      setError('Failed to resend verification link');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to resend verification link');
     } finally {
       setIsLoading(false);
     }

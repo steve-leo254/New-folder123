@@ -111,6 +111,14 @@ def create_password_reset_token(user_id: int, email: str) -> str:
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_email_verification_token(user_id: int, email: str) -> str:
+    """Create an email verification token valid for 24 hours."""
+    data = {"sub": str(user_id), "email": email, "type": "email_verification"}
+    expire = datetime.utcnow() + timedelta(hours=24)
+    data.update({"exp": expire})
+    return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
+
+
 # ============================================================================
 # Dependencies
 # ============================================================================
@@ -142,6 +150,12 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is deactivated"
+        )
+
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before logging in"
         )
 
     return user
@@ -238,6 +252,61 @@ async def send_welcome_email(email: str, full_name: str):
         logger.error(f"Failed to send welcome email: {e}")
 
 
+async def send_verification_email(email: str, full_name: str, verification_url: str):
+    """Send email verification email."""
+    try:
+        message = MessageSchema(
+            subject="Verify Your Kiangombe Health Account",
+            recipients=[email],
+            body=f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">Kiangombe Health</h1>
+                </div>
+                <div style="padding: 30px; background: #f9f9f9;">
+                    <h2 style="color: #333;">Welcome to Kiangombe Health, {full_name}!</h2>
+                    <p style="color: #666; line-height: 1.6;">
+                        Thank you for registering with Kiangombe Health. To complete your registration and activate your account, 
+                        please click the verification button below:
+                    </p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{verification_url}" 
+                           style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                  color: white; 
+                                  padding: 15px 30px; 
+                                  text-decoration: none; 
+                                  border-radius: 5px; 
+                                  display: inline-block; 
+                                  font-weight: bold;">
+                            Verify My Account
+                        </a>
+                    </div>
+                    <p style="color: #666; font-size: 14px;">
+                        If the button doesn't work, you can copy and paste this link into your browser:<br>
+                        <a href="{verification_url}" style="color: #667eea;">{verification_url}</a>
+                    </p>
+                    <p style="color: #666; font-size: 14px;">
+                        This verification link will expire in 24 hours. If you didn't create an account with Kiangombe Health, 
+                        please ignore this email.
+                    </p>
+                </div>
+                <div style="background: #333; color: white; padding: 20px; text-align: center; font-size: 12px;">
+                    <p> 2024 Kiangombe Health. All rights reserved.</p>
+                </div>
+            </div>
+            </body>
+            </html>
+            """,
+            subtype="html",
+        )
+        fm = FastMail(mail_conf)
+        await fm.send_message(message)
+        logger.info(f"Verification email sent to: {email}")
+    except Exception as e:
+        logger.error(f"Failed to send verification email: {e}")
+
+
 # ============================================================================
 # Router
 # ============================================================================
@@ -291,10 +360,12 @@ async def register(
         db.refresh(new_user)
         logger.info(f"User registered: {new_user.email}")
 
-        # Send welcome email in background
-        background_tasks.add_task(send_welcome_email, new_user.email, new_user.full_name)
+        # Send verification email in background instead of welcome email
+        verification_token = create_email_verification_token(new_user.id, new_user.email)
+        verification_url = f"{FRONTEND_URL}/verify-email?token={verification_token}"
+        background_tasks.add_task(send_verification_email, new_user.email, new_user.full_name, verification_url)
 
-        return {"message": "Registration successful", "detail": "You can now log in."}
+        return {"message": "Registration successful", "detail": "Please check your email to verify your account."}
     except IntegrityError:
         db.rollback()
         raise HTTPException(
@@ -430,6 +501,12 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
             detail="Account is deactivated"
         )
 
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before logging in"
+        )
+
     token_data = {"sub": str(user.id), "email": user.email, "role": user.role.value}
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
@@ -508,10 +585,18 @@ async def forgot_password(
     user = db.query(User).filter(User.email == request.email).first()
 
     if user:
-        reset_token = create_password_reset_token(user.id, user.email)
-        reset_url = f"{FRONTEND_URL}/reset-password?token={reset_token}"
-        background_tasks.add_task(send_password_reset_email, user.email, user.full_name, reset_url)
-        logger.info(f"Password reset email queued for: {user.email}")
+        try:
+            reset_token = create_password_reset_token(user.id, user.email)
+            reset_url = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+            background_tasks.add_task(send_password_reset_email, user.email, user.full_name, reset_url)
+            logger.info(f"Password reset email queued for: {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send password reset email: {e}")
+            # Still return success to prevent email enumeration
+            return {
+                "message": "If an account exists, a password reset link has been sent.",
+                "detail": "Check your email inbox and spam folder."
+            }
 
     return {
         "message": "If an account exists, a password reset link has been sent.",
@@ -538,6 +623,51 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
 
     logger.info(f"Password reset for: {user.email}")
     return {"message": "Password has been reset successfully"}
+
+
+@router.post("/verify-email", response_model=MessageResponse)
+async def verify_email(token: str, db: Session = Depends(get_db)):
+    """Verify email using token from registration email."""
+    payload = decode_token(token)
+    if payload is None or payload.get("type") != "email_verification":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token"
+        )
+
+    user = db.query(User).filter(User.id == int(payload.get("sub"))).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.is_verified:
+        return {"message": "Email already verified", "detail": "Your account is already active."}
+
+    user.is_verified = True
+    db.commit()
+
+    logger.info(f"Email verified for: {user.email}")
+    return {"message": "Email verified successfully", "detail": "Your account is now active. You can log in."}
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+async def resend_verification(
+    request: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Resend email verification link."""
+    user = db.query(User).filter(User.email == request.email).first()
+
+    if user and not user.is_verified:
+        verification_token = create_email_verification_token(user.id, user.email)
+        verification_url = f"{FRONTEND_URL}/verify-email?token={verification_token}"
+        background_tasks.add_task(send_verification_email, user.email, user.full_name, verification_url)
+        logger.info(f"Verification email resent to: {user.email}")
+
+    return {
+        "message": "If an unverified account exists, a verification link has been sent.",
+        "detail": "Check your email inbox and spam folder."
+    }
 
 
 @router.get("/me", response_model=UserResponse)

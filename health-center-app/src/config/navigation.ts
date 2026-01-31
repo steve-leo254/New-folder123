@@ -57,12 +57,14 @@ export const patientNavigation: NavItem[] = [
     icon: Activity,
     allowedRoles: PATIENT_ROLES,
   },
+  
   {
     label: 'My Appointments',
     path: '/appointments',
     icon: Calendar,
     allowedRoles: PATIENT_ROLES,
   },
+  
   {
     label: 'Prescriptions',
     path: '/prescriptions',

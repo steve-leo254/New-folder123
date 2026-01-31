@@ -426,11 +426,11 @@ const Signup: React.FC = () => {
               />
               <span className="text-sm text-gray-700">
                 I accept the{' '}
-                <a href="#" className="text-blue-600 hover:text-blue-500 underline">
+                <a href="/terms-and-conditions" className="text-blue-600 hover:text-blue-500 underline">
                   Terms and Conditions
                 </a>{' '}
                 and{' '}
-                <a href="#" className="text-blue-600 hover:text-blue-500 underline">
+                <a href="/privacy-policy" className="text-blue-600 hover:text-blue-500 underline">
                   Privacy Policy
                 </a>{' '}
                 *

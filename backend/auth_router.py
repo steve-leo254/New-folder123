@@ -15,21 +15,16 @@ from pydantic_models import (
     LoginUserRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
-    TokenVerificationResponse
+    TokenVerificationResponse,
+    VerifyCodeRequest,
+    ResetPasswordWithCodeRequest
 )
 from passlib.context import CryptContext
-
-def get_password_hash(password: str) -> str:
-    """Generate a hashed password."""
-    return bcrypt_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against a hash."""
-    return bcrypt_context.verify(plain_password, hashed_password)
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 import os
-from dotenv import load_dotenv
 import logging
+import random
+import string
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -43,17 +38,32 @@ ALGORITHM = "HS256"
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-conf = ConnectionConfig(
-    MAIL_USERNAME="steveleo254@gmail.com",
-    MAIL_PASSWORD="dhqf lxgw zlaw bwdj",
-    MAIL_FROM="steveleo254@gmail.com",
-    MAIL_PORT=587,
-    MAIL_SERVER="smtp.gmail.com",
-    MAIL_STARTTLS=True,
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True,
-)
+# Store verification codes in memory (for demo purposes)
+verification_codes = {}
+
+def get_password_hash(password: str) -> str:
+    """Generate a hashed password."""
+    return bcrypt_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against a hash."""
+    return bcrypt_context.verify(plain_password, hashed_password)
+
+def generate_verification_code(length=6):
+    """Generate a random verification code."""
+    return ''.join(random.choices(string.digits, k=length))
+
+def display_verification_code(email: str, code: str, purpose: str = "verification"):
+    """Display verification code in terminal."""
+    print("\n" + "="*60)
+    print(f" {purpose.upper()} CODE GENERATED")
+    print("="*60)
+    print(f" Email: {email}")
+    print(f" Code: {code}")
+    print(f" This code will expire in 1 hour")
+    print("="*60)
+    print("  Note: In production, this would be sent via email")
+    print("="*60 + "\n")
 
 @router.post("/register/customer", status_code=status.HTTP_201_CREATED)
 async def register_customer(create_user_request: CreateUserRequest, db: Session = Depends(get_db)):
@@ -409,21 +419,108 @@ async def forgot_password(forgot_password_request: ForgotPasswordRequest, db: Se
         logger.warning(f"Password reset requested for non-existent email: {email}")
         raise HTTPException(status_code=404, detail="User does not exist")
     
-    token_expires = timedelta(hours=1)
-    reset_token = create_access_token(user.full_name, user.id, user.role.value, token_expires)
+    # Generate verification code
+    verification_code = generate_verification_code()
     
-    message = MessageSchema(
-        subject="Password Reset Request",
-        recipients=[email],
-        body=f"Please use the following link to reset your password: "
-             f"http://localhost:3000/reset-password?token={reset_token}",
-        subtype="html",
+    # Store the code with timestamp (in production, use Redis or database)
+    verification_codes[email] = {
+        'code': verification_code,
+        'timestamp': datetime.utcnow(),
+        'user_id': user.id,
+        'purpose': 'password_reset'
+    }
+    
+    # Display code in terminal
+    display_verification_code(email, verification_code, "Password Reset")
+    
+    logger.info(f"Password reset code generated for: {email}")
+    return {
+        "message": "Password reset code generated. Check the terminal for the verification code.",
+        "email": email,
+        "note": "In production, this would be sent via email"
+    }
+    
+
+@router.post("/verify-reset-code", status_code=status.HTTP_200_OK)
+async def verify_reset_code(verify_request: VerifyCodeRequest, db: Session = Depends(get_db)):
+    """Verify the reset code sent to email."""
+    email = verify_request.email
+    code = verify_request.code
+    
+    # Check if verification code exists and is valid
+    if email not in verification_codes:
+        logger.warning(f"Verification code requested for email with no code: {email}")
+        raise HTTPException(status_code=400, detail="No verification code found for this email")
+    
+    stored_data = verification_codes[email]
+    
+    # Check if code matches
+    if stored_data['code'] != code:
+        logger.warning(f"Invalid verification code provided for: {email}")
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    
+    # Check if code has expired (1 hour)
+    if datetime.utcnow() - stored_data['timestamp'] > timedelta(hours=1):
+        logger.warning(f"Expired verification code provided for: {email}")
+        # Remove expired code
+        del verification_codes[email]
+        raise HTTPException(status_code=400, detail="Verification code has expired")
+    
+    logger.info(f"Verification code validated for: {email}")
+    return {
+        "message": "Verification code validated successfully",
+        "email": email,
+        "user_id": stored_data['user_id']
+    }
+
+@router.post("/reset-password-with-code", status_code=status.HTTP_200_OK)
+async def reset_password_with_code(reset_request: ResetPasswordWithCodeRequest, db: Session = Depends(get_db)):
+    """Reset password using verification code."""
+    email = reset_request.email
+    code = reset_request.code
+    new_password = reset_request.new_password
+    
+    # First verify the code
+    if email not in verification_codes:
+        logger.warning(f"Password reset requested for email with no code: {email}")
+        raise HTTPException(status_code=400, detail="No verification code found for this email")
+    
+    stored_data = verification_codes[email]
+    
+    if stored_data['code'] != code:
+        logger.warning(f"Invalid verification code for password reset: {email}")
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    
+    # Check if code has expired
+    if datetime.utcnow() - stored_data['timestamp'] > timedelta(hours=1):
+        logger.warning(f"Expired verification code for password reset: {email}")
+        del verification_codes[email]
+        raise HTTPException(status_code=400, detail="Verification code has expired")
+    
+    # Get user and update password
+    user = db.query(User).filter(User.id == stored_data['user_id']).first()
+    if not user:
+        logger.warning(f"User not found for password reset: {email}")
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.password_hash = bcrypt_context.hash(new_password)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    # Remove the used verification code
+    del verification_codes[email]
+    
+    # Log password reset
+    create_activity_log(
+        user_id=user.id,
+        action="Password Reset",
+        device="Web Application",
+        db=db
     )
-    fm = FastMail(conf)
-    await fm.send_message(message)
-    logger.info(f"Password reset email sent to: {email}")
-    return {"message": "Password reset email sent"}
     
+    logger.info(f"Password reset successfully for user: {user.full_name}")
+    return {"message": "Password has been reset successfully"}
 
 @router.post("/reset-password/{token}", status_code=status.HTTP_200_OK)
 async def reset_password(token: str, reset_password_request: ResetPasswordRequest, db: Session = Depends(get_db)):

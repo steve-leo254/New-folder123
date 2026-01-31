@@ -1,6 +1,6 @@
 // pages/ForgotPasswordPage.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Mail,
   ArrowLeft,
@@ -18,11 +18,11 @@ import {
   Sparkles,
   HelpCircle,
   MessageCircle,
-  ChevronRight,
   Home,
   Check,
   X,
 } from 'lucide-react';
+import { authService } from '../services/auth';
 
 type Step = 'email' | 'verification' | 'reset' | 'success';
 
@@ -35,6 +35,7 @@ interface PasswordStrength {
 
 const ForgotPasswordPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
@@ -46,8 +47,18 @@ const ForgotPasswordPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(0);
   const [emailSent, setEmailSent] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Check for token in URL (direct password reset link)
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (token) {
+      setResetToken(token);
+      setCurrentStep('reset');
+    }
+  }, [searchParams]);
 
   // Resend timer countdown
   useEffect(() => {
@@ -116,20 +127,18 @@ const ForgotPasswordPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         throw new Error('Please enter a valid email address');
       }
 
+      await authService.forgotPassword(email);
       setEmailSent(true);
       setResendTimer(60);
       setCurrentStep('verification');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send reset email');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to send reset email');
     } finally {
       setIsLoading(false);
     }
@@ -179,17 +188,11 @@ const ForgotPasswordPage: React.FC = () => {
         throw new Error('Please enter the complete verification code');
       }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // For demo, accept any 6-digit code or specific test code
-      if (code !== '123456' && !/^\d{6}$/.test(code)) {
-        throw new Error('Invalid verification code. Please try again.');
-      }
-
+      // Call the backend API to verify the code
+      await authService.verifyResetCode(email, code);
       setCurrentStep('reset');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Invalid verification code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -210,12 +213,12 @@ const ForgotPasswordPage: React.FC = () => {
         throw new Error('Please choose a stronger password');
       }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
+      // Use the verification code to reset password
+      const code = verificationCode.join('');
+      await authService.resetPasswordWithCode(email, code, newPassword);
       setCurrentStep('success');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to reset password');
     } finally {
       setIsLoading(false);
     }
@@ -227,12 +230,12 @@ const ForgotPasswordPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await authService.forgotPassword(email);
       setResendTimer(60);
       setVerificationCode(['', '', '', '', '', '']);
       setError(null);
-    } catch (err) {
-      setError('Failed to resend code');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to resend code');
     } finally {
       setIsLoading(false);
     }

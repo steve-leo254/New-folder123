@@ -41,6 +41,8 @@ import { ROLE_TYPES } from '../utils/constants';
 import GeneralPracticePage from '@/pages/GeneralPracticePage';
 import ForgotPasswordPage from '@/pages/ForgetPasswordPage';
 import EmailVerificationPage from '@/pages/EmailVerificationPage';
+import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage';
+import TermsAndConditionsPage from '@/pages/TermsAndConditionsPage';
 
 
 export const ROLES = ROLE_TYPES;
@@ -81,6 +83,15 @@ export const publicRoutes: RouteConfig[] = [
     path: '/404',
     element: <NotFoundPage />,
   },
+  {
+    path: '/privacy-policy',
+    element: <PrivacyPolicyPage />,
+  },
+  {
+    path: '/terms-and-conditions',
+    element: <TermsAndConditionsPage />,
+  },
+
    {
     path: '/forget-password',
     element: <ForgotPasswordPage />,
