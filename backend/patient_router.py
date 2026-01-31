@@ -14,9 +14,16 @@ import logging
 from datetime import datetime
 
 from database import get_db
-from models import User, Insurance
+from models import User, Insurance, EmergencyContact, MedicalHistory, MedicalInfo
 from auth_router import get_current_active_user
-from pydantic_models import InsuranceRequest
+from pydantic_models import InsuranceRequest, EmergencyContactRequest
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from io import BytesIO
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/patient", tags=["patient"])
@@ -63,21 +70,6 @@ class MedicalInfoResponse(BaseModel):
     allergies: List[str] = []
     conditions: List[str] = []
     medications: List[str] = []
-    created_at: str
-    updated_at: str
-
-# Emergency Contact Models
-class EmergencyContactRequest(BaseModel):
-    emergency_contact_name: Optional[str] = None
-    emergency_contact_phone: Optional[str] = None
-    emergency_contact_relation: Optional[str] = None
-
-class EmergencyContactResponse(BaseModel):
-    id: int
-    patient_id: int
-    name: str
-    phone: str
-    relation: str
     created_at: str
     updated_at: str
 
@@ -411,16 +403,20 @@ async def get_emergency_contact(
     """Get patient's emergency contact"""
     patient_id = current_user.id
     
-    # Get emergency contact for this patient
-    emergency_contact = emergency_contact_storage.get(patient_id, {
-        "id": patient_id,
-        "patient_id": patient_id,
-        "name": "",
-        "phone": "",
-        "relation": "",
-        "created_at": "2024-01-01T00:00:00",
-        "updated_at": "2024-01-01T00:00:00"
-    })
+    # Get emergency contact from database
+    emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == patient_id).first()
+    
+    if not emergency_contact:
+        # Return empty emergency contact if none exists
+        return {
+            "id": 0,
+            "patient_id": patient_id,
+            "name": "",
+            "phone": "",
+            "relation": "",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
     
     return emergency_contact
 
@@ -433,20 +429,32 @@ async def update_emergency_contact(
     """Update patient's emergency contact"""
     patient_id = current_user.id
     
-    from datetime import datetime
-    emergency_contact = {
-        "id": patient_id,
-        "patient_id": patient_id,
-        "name": request.emergency_contact_name or "",
-        "phone": request.emergency_contact_phone or "",
-        "relation": request.emergency_contact_relation or "",
-        "created_at": "2024-01-01T00:00:00",
-        "updated_at": datetime.now().isoformat()
-    }
+    # Get existing emergency contact or create new
+    emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == patient_id).first()
     
-    emergency_contact_storage[patient_id] = emergency_contact
+    if not emergency_contact:
+        # Create new emergency contact record
+        emergency_contact = EmergencyContact(
+            patient_id=patient_id,
+            name=request.name,
+            phone=request.phone,
+            relation=request.relation
+        )
+        db.add(emergency_contact)
+    else:
+        # Update existing emergency contact
+        emergency_contact.name = request.name
+        emergency_contact.phone = request.phone
+        emergency_contact.relation = request.relation
+        emergency_contact.updated_at = datetime.utcnow()
     
-    return emergency_contact
+    try:
+        db.commit()
+        db.refresh(emergency_contact)
+        return emergency_contact
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 # Insurance endpoints
 @router.get("/insurance")
@@ -667,3 +675,145 @@ async def get_activity_logs(
     ])
     
     return logs
+
+
+@router.get("/medical-records/download")
+async def download_medical_records(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Download patient's medical records as PDF"""
+    patient_id = current_user.id
+    
+    # Get patient's medical history
+    medical_history = db.query(MedicalHistory).filter(MedicalHistory.patient_id == patient_id).all()
+    
+    # Get patient's basic info
+    user = db.query(User).filter(User.id == patient_id).first()
+    
+    # Get patient's medical info
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == patient_id).first()
+    
+    # Get emergency contact
+    emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == patient_id).first()
+    
+    # Get insurance info
+    insurance = db.query(Insurance).filter(Insurance.patient_id == patient_id).first()
+    
+    # Create PDF
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    
+    # Add styles
+    styles = getSampleStyleSheet()
+    
+    # Title
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(100, height - 50, "Medical Records Report")
+    
+    # Patient Information
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, height - 100, "Patient Information:")
+    p.setFont("Helvetica", 10)
+    
+    y_position = height - 120
+    if user:
+        p.drawString(50, y_position, f"Name: {user.full_name or 'N/A'}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Email: {user.email or 'N/A'}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Phone: {user.phone or 'N/A'}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Date of Birth: {user.date_of_birth.strftime('%Y-%m-%d') if user.date_of_birth else 'N/A'}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Blood Type: {medical_info.blood_type if medical_info and medical_info.blood_type else 'N/A'}")
+        if medical_info:
+            y_position -= 20
+            p.drawString(50, y_position, f"Height: {medical_info.height or 'N/A'}")
+            y_position -= 20
+            p.drawString(50, y_position, f"Weight: {medical_info.weight or 'N/A'}")
+    
+    # Emergency Contact
+    y_position -= 40
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, y_position, "Emergency Contact:")
+    p.setFont("Helvetica", 10)
+    
+    if emergency_contact:
+        y_position -= 20
+        p.drawString(50, y_position, f"Name: {emergency_contact.name}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Phone: {emergency_contact.phone}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Relationship: {emergency_contact.relation}")
+    
+    # Insurance Information
+    y_position -= 40
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, y_position, "Insurance Information:")
+    p.setFont("Helvetica", 10)
+    
+    if insurance:
+        y_position -= 20
+        p.drawString(50, y_position, f"Provider: {insurance.provider}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Policy Number: {insurance.policy_number}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Group Number: {insurance.group_number or 'N/A'}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Holder Name: {insurance.holder_name}")
+        y_position -= 20
+        p.drawString(50, y_position, f"Type: {insurance.insurance_type or 'standard'}")
+    
+    # Medical History
+    y_position -= 40
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, y_position, "Medical History:")
+    
+    if medical_history:
+        for i, record in enumerate(medical_history):
+            y_position -= 30
+            p.setFont("Helvetica-Bold", 10)
+            p.drawString(50, y_position, f"Record {i+1}:")
+            y_position -= 20
+            p.setFont("Helvetica", 9)
+            
+            if record.diagnosis:
+                p.drawString(70, y_position, f"Diagnosis: {record.diagnosis}")
+                y_position -= 15
+            if record.symptoms:
+                p.drawString(70, y_position, f"Symptoms: {record.symptoms}")
+                y_position -= 15
+            if record.treatment_plan:
+                p.drawString(70, y_position, f"Treatment: {record.treatment_plan}")
+                y_position -= 15
+            if record.notes:
+                p.drawString(70, y_position, f"Notes: {record.notes}")
+                y_position -= 15
+            if record.created_at:
+                p.drawString(70, y_position, f"Date: {record.created_at.strftime('%Y-%m-%d')}")
+                y_position -= 20
+    else:
+        y_position -= 20
+        p.setFont("Helvetica", 10)
+        p.drawString(50, y_position, "No medical records found")
+    
+    # Footer
+    p.setFont("Helvetica", 8)
+    p.drawString(50, 50, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    p.drawString(50, 40, f"Generated by: Kiangombe Patient Center")
+    
+    p.save()
+    
+    buffer.seek(0)
+    
+    from starlette.responses import StreamingResponse
+    
+    return StreamingResponse(
+        BytesIO(buffer.read()),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=medical_records_{current_user.id}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        }
+    )

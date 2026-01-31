@@ -243,7 +243,25 @@ const PatientProfile: React.FC = () => {
   // Download records handler
   const handleDownloadRecords = async () => {
     try {
-      await downloadRecords();
+      const blob = await downloadRecords();
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename with current date
+      const currentDate = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `medical_records_${currentDate}.pdf`);
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
       setSaveMessage({ type: 'success', message: 'Medical records downloaded successfully!' });
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (err) {

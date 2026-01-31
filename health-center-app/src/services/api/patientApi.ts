@@ -118,14 +118,30 @@ export const patientApi = {
       const { data: profileData } = await apiClient.get('/api/patient/profile');
       const transformedData = transformPatientData(profileData);
       
+      // Fetch emergency contact data separately
+      try {
+        const { data: emergencyData } = await apiClient.get('/api/patient/emergency-contact');
+        
+        // Map backend emergency contact data to frontend format
+        if (emergencyData && emergencyData.name) {
+          transformedData.emergencyContactName = emergencyData.name;
+          transformedData.emergencyContactPhone = emergencyData.phone;
+          transformedData.emergencyContactRelation = emergencyData.relation;
+        }
+      } catch (emergencyError) {
+        console.warn('Could not fetch emergency contact data:', emergencyError);
+        // Set default emergency contact values if API fails
+        transformedData.emergencyContactName = '';
+        transformedData.emergencyContactPhone = '';
+        transformedData.emergencyContactRelation = '';
+      }
+      
       // Fetch insurance data separately
       try {
         const { data: insuranceData } = await apiClient.get('/api/patient/insurance');
-        console.log('Insurance data fetched from backend:', insuranceData);
         
         // Map backend insurance data to frontend format
         if (insuranceData && insuranceData.provider) {
-          console.log('Mapping insurance data to frontend format');
           transformedData.insuranceProvider = insuranceData.provider;
           transformedData.insurancePolicyNumber = insuranceData.policy_number;
           transformedData.insuranceGroupNumber = insuranceData.group_number || '';
@@ -135,14 +151,6 @@ export const patientApi = {
           transformedData.insuranceQuarterlyUsed = insuranceData.quarterly_used || 0;
           transformedData.insuranceCoverageStartDate = insuranceData.coverage_start_date || '';
           transformedData.insuranceCoverageEndDate = insuranceData.coverage_end_date || '';
-          console.log('Mapped insurance data:', {
-            provider: transformedData.insuranceProvider,
-            policyNumber: transformedData.insurancePolicyNumber,
-            type: transformedData.insuranceType,
-            quarterlyLimit: transformedData.insuranceQuarterlyLimit
-          });
-        } else {
-          console.log('No insurance data found or provider field missing');
         }
       } catch (insuranceError) {
         console.warn('Could not fetch insurance data:', insuranceError);
@@ -158,13 +166,6 @@ export const patientApi = {
         transformedData.insuranceCoverageEndDate = '';
       }
       
-      console.log('Final patient data being returned:', {
-        insuranceProvider: transformedData.insuranceProvider,
-        insurancePolicyNumber: transformedData.insurancePolicyNumber,
-        insuranceType: transformedData.insuranceType,
-        insuranceQuarterlyLimit: transformedData.insuranceQuarterlyLimit
-      });
-      
       return transformedData;
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -175,13 +176,19 @@ export const patientApi = {
   // Update patient profile
   updateProfile: async (updateData: PatientUpdateData): Promise<PatientProfile> => {
     try {
-      // Separate basic profile data from insurance data
+      // Separate basic profile data, emergency contact data, and insurance data
       const profileData: any = {};
+      const emergencyData: any = {};
       const insuranceData: any = {};
       
       // Map frontend fields to backend profile fields
       if (updateData.full_name) profileData.full_name = updateData.full_name;
       if (updateData.phone) profileData.phone = updateData.phone;
+      
+      // Map frontend emergency contact fields to backend emergency contact fields
+      if (updateData.emergency_contact_name) emergencyData.name = updateData.emergency_contact_name;
+      if (updateData.emergency_contact_phone) emergencyData.phone = updateData.emergency_contact_phone;
+      if (updateData.emergency_contact_relation) emergencyData.relation = updateData.emergency_contact_relation;
       
       // Map frontend insurance fields to backend insurance fields
       if (updateData.insurance_provider) insuranceData.provider = updateData.insurance_provider;
@@ -197,6 +204,11 @@ export const patientApi = {
       // Update basic profile if there's data
       if (Object.keys(profileData).length > 0) {
         await apiClient.put('/api/patient/profile', profileData);
+      }
+      
+      // Update emergency contact if there's data
+      if (Object.keys(emergencyData).length > 0) {
+        await apiClient.put('/api/patient/emergency-contact', emergencyData);
       }
       
       // Update insurance if there's data
