@@ -10,33 +10,6 @@ const apiClient = axios.create({
   },
 });
 
-// Helper functions for user-specific localStorage
-const getUserSpecificKey = (baseKey: string, userId?: string) => {
-  // Try to get user ID from token or use a default
-  const token = localStorage.getItem('token');
-  let currentUserId = userId;
-  
-  if (!currentUserId && token) {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      currentUserId = payload.id?.toString() || 'anonymous';
-    } catch (e) {
-      currentUserId = 'anonymous';
-    }
-  }
-  
-  return `${baseKey}_${currentUserId}`;
-};
-
-// User-specific localStorage getters/setters
-const setUserSpecificItem = (baseKey: string, data: any, userId?: string) => {
-  localStorage.setItem(getUserSpecificKey(baseKey, userId), JSON.stringify(data));
-};
-
-const getUserSpecificItem = (baseKey: string, userId?: string) => {
-  return localStorage.getItem(getUserSpecificKey(baseKey, userId));
-};
-
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
@@ -141,144 +114,102 @@ export const patientApi = {
   // Get patient profile
   getProfile: async (): Promise<PatientProfile> => {
     try {
-      const { data } = await apiClient.get('/api/patient/profile');
-      const transformedData = transformPatientData(data);
+      // Fetch basic profile data
+      const { data: profileData } = await apiClient.get('/api/patient/profile');
+      const transformedData = transformPatientData(profileData);
       
-      // Check if there's a locally stored avatar (user-specific)
-      const storedAvatar = getUserSpecificItem('patientAvatar');
-      if (storedAvatar) {
-        const finalAvatar = getFullImageUrl(storedAvatar) || storedAvatar;
-        transformedData.avatar = finalAvatar;
+      // Fetch insurance data separately
+      try {
+        const { data: insuranceData } = await apiClient.get('/api/patient/insurance');
+        console.log('Insurance data fetched from backend:', insuranceData);
+        
+        // Map backend insurance data to frontend format
+        if (insuranceData && insuranceData.provider) {
+          console.log('Mapping insurance data to frontend format');
+          transformedData.insuranceProvider = insuranceData.provider;
+          transformedData.insurancePolicyNumber = insuranceData.policy_number;
+          transformedData.insuranceGroupNumber = insuranceData.group_number || '';
+          transformedData.insuranceHolderName = insuranceData.holder_name;
+          transformedData.insuranceType = insuranceData.insurance_type || 'standard';
+          transformedData.insuranceQuarterlyLimit = insuranceData.quarterly_limit || 0;
+          transformedData.insuranceQuarterlyUsed = insuranceData.quarterly_used || 0;
+          transformedData.insuranceCoverageStartDate = insuranceData.coverage_start_date || '';
+          transformedData.insuranceCoverageEndDate = insuranceData.coverage_end_date || '';
+          console.log('Mapped insurance data:', {
+            provider: transformedData.insuranceProvider,
+            policyNumber: transformedData.insurancePolicyNumber,
+            type: transformedData.insuranceType,
+            quarterlyLimit: transformedData.insuranceQuarterlyLimit
+          });
+        } else {
+          console.log('No insurance data found or provider field missing');
+        }
+      } catch (insuranceError) {
+        console.warn('Could not fetch insurance data:', insuranceError);
+        // Set default insurance values if API fails
+        transformedData.insuranceProvider = '';
+        transformedData.insurancePolicyNumber = '';
+        transformedData.insuranceGroupNumber = '';
+        transformedData.insuranceHolderName = '';
+        transformedData.insuranceType = 'standard';
+        transformedData.insuranceQuarterlyLimit = 0;
+        transformedData.insuranceQuarterlyUsed = 0;
+        transformedData.insuranceCoverageStartDate = '';
+        transformedData.insuranceCoverageEndDate = '';
       }
+      
+      console.log('Final patient data being returned:', {
+        insuranceProvider: transformedData.insuranceProvider,
+        insurancePolicyNumber: transformedData.insurancePolicyNumber,
+        insuranceType: transformedData.insuranceType,
+        insuranceQuarterlyLimit: transformedData.insuranceQuarterlyLimit
+      });
       
       return transformedData;
     } catch (error) {
-      // If backend is not available, return mock data with user-specific stored data
-      const storedAvatar = getUserSpecificItem('patientAvatar');
-      const storedEmergencyContact = getUserSpecificItem('emergencyContact');
-      const storedInsurance = getUserSpecificItem('insuranceData');
-      
-      // Parse stored emergency contact if exists
-      let emergencyContactData = {
-        emergencyContactName: 'Jane Smith',
-        emergencyContactPhone: '+254723456789',
-        emergencyContactRelation: 'Spouse'
-      };
-      
-      if (storedEmergencyContact) {
-        try {
-          const parsed = JSON.parse(storedEmergencyContact);
-          emergencyContactData = {
-            emergencyContactName: parsed.emergency_contact_name || 'Jane Smith',
-            emergencyContactPhone: parsed.emergency_contact_phone || '+254723456789',
-            emergencyContactRelation: parsed.emergency_contact_relation || 'Spouse'
-          };
-        } catch (e) {
-          console.error('Error parsing stored emergency contact:', e);
-        }
-      }
-      
-      // Parse stored insurance data if exists - PRIORITIZE STORED DATA
-      let insuranceData = {
-        insuranceProvider: 'Blue Cross Blue Shield',
-        insurancePolicyNumber: 'POL123456',
-        insuranceGroupNumber: 'GRP789',
-        insuranceHolderName: 'John Doe',
-        insuranceType: 'sha', // Ensure SHA type is set
-        insuranceQuarterlyLimit: 10000, // Match user's example
-        insuranceQuarterlyUsed: 0, // Start with 0 used
-        insuranceCoverageStartDate: '2024-01-01',
-        insuranceCoverageEndDate: '2024-12-31'
-      };
-      
-      if (storedInsurance) {
-        try {
-          const parsed = JSON.parse(storedInsurance);
-          insuranceData = {
-            insuranceProvider: parsed.insurance_provider || insuranceData.insuranceProvider,
-            insurancePolicyNumber: parsed.insurance_policy_number || insuranceData.insurancePolicyNumber,
-            insuranceGroupNumber: parsed.insurance_group_number || insuranceData.insuranceGroupNumber,
-            insuranceHolderName: parsed.insurance_holder_name || insuranceData.insuranceHolderName,
-            insuranceType: parsed.insurance_type || insuranceData.insuranceType,
-            insuranceQuarterlyLimit: parsed.quarterly_limit || insuranceData.insuranceQuarterlyLimit,
-            insuranceQuarterlyUsed: parsed.quarterly_used || insuranceData.insuranceQuarterlyUsed,
-            insuranceCoverageStartDate: parsed.coverage_start_date || insuranceData.insuranceCoverageStartDate,
-            insuranceCoverageEndDate: parsed.coverage_end_date || insuranceData.insuranceCoverageEndDate
-          };
-        } catch (e) {
-          console.error('Error parsing stored insurance data:', e);
-        }
-      }
-      
-      return {
-        id: '1',
-        user_id: '1',
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john.doe@example.com',
-        phone: '+254712345678',
-        dateOfBirth: '1990-01-01',
-        gender: 'male',
-        avatar: getFullImageUrl(storedAvatar || undefined) || '',
-        address: 'Nairobi, Kenya',
-        city: 'Nairobi',
-        state: 'Nairobi County',
-        zipCode: '00100',
-        country: 'Kenya',
-        bloodType: 'O+',
-        height: '180 cm',
-        weight: '75 kg',
-        allergies: [],
-        conditions: [],
-        medications: [],
-        ...emergencyContactData,
-        ...insuranceData,
-        memberId: 'MEM001',
-        registrationDate: new Date().toISOString(),
-        status: 'active',
-        emailNotifications: true,
-        smsNotifications: true,
-        appointmentReminders: true,
-        labResultsNotifications: true
-      };
+      console.error('Error fetching profile:', error);
+      throw error;
     }
   },
 
   // Update patient profile
   updateProfile: async (updateData: PatientUpdateData): Promise<PatientProfile> => {
     try {
-      const { data } = await apiClient.put('/api/patient/profile', updateData);
+      // Separate basic profile data from insurance data
+      const profileData: any = {};
+      const insuranceData: any = {};
+      
+      // Map frontend fields to backend profile fields
+      if (updateData.full_name) profileData.full_name = updateData.full_name;
+      if (updateData.phone) profileData.phone = updateData.phone;
+      
+      // Map frontend insurance fields to backend insurance fields
+      if (updateData.insurance_provider) insuranceData.provider = updateData.insurance_provider;
+      if (updateData.insurance_policy_number) insuranceData.policy_number = updateData.insurance_policy_number;
+      if (updateData.insurance_group_number) insuranceData.group_number = updateData.insurance_group_number;
+      if (updateData.insurance_holder_name) insuranceData.holder_name = updateData.insurance_holder_name;
+      if (updateData.insurance_type) insuranceData.insurance_type = updateData.insurance_type;
+      if (updateData.quarterly_limit !== undefined) insuranceData.quarterly_limit = updateData.quarterly_limit;
+      if (updateData.quarterly_used !== undefined) insuranceData.quarterly_used = updateData.quarterly_used;
+      if (updateData.coverage_start_date) insuranceData.coverage_start_date = updateData.coverage_start_date;
+      if (updateData.coverage_end_date) insuranceData.coverage_end_date = updateData.coverage_end_date;
+      
+      // Update basic profile if there's data
+      if (Object.keys(profileData).length > 0) {
+        await apiClient.put('/api/patient/profile', profileData);
+      }
+      
+      // Update insurance if there's data
+      if (Object.keys(insuranceData).length > 0) {
+        await apiClient.put('/api/patient/insurance', insuranceData);
+      }
+      
+      // Return updated profile
+      const { data } = await apiClient.get('/api/patient/profile');
       return transformPatientData(data);
     } catch (error) {
-      // If backend is not available, save emergency contact and insurance to user-specific localStorage and return current profile with updates
-      if (updateData.emergency_contact_name || updateData.emergency_contact_phone || updateData.emergency_contact_relation) {
-        const emergencyContactPayload = {
-          emergency_contact_name: updateData.emergency_contact_name,
-          emergency_contact_phone: updateData.emergency_contact_phone,
-          emergency_contact_relation: updateData.emergency_contact_relation,
-        };
-        setUserSpecificItem('emergencyContact', emergencyContactPayload);
-      }
-      
-      if (updateData.insurance_provider || updateData.insurance_policy_number || updateData.insurance_group_number || 
-          updateData.insurance_holder_name || updateData.insurance_type || updateData.quarterly_limit || 
-          updateData.quarterly_used || updateData.coverage_start_date || updateData.coverage_end_date) {
-        const insurancePayload = {
-          insurance_provider: updateData.insurance_provider,
-          insurance_policy_number: updateData.insurance_policy_number,
-          insurance_group_number: updateData.insurance_group_number,
-          insurance_holder_name: updateData.insurance_holder_name,
-          insurance_type: updateData.insurance_type,
-          quarterly_limit: updateData.quarterly_limit,
-          quarterly_used: updateData.quarterly_used,
-          coverage_start_date: updateData.coverage_start_date,
-          coverage_end_date: updateData.coverage_end_date,
-        };
-        setUserSpecificItem('insuranceData', insurancePayload);
-      }
-      
-      const currentProfile = await patientApi.getProfile();
-      return { ...currentProfile, ...updateData };
+      console.error('Error updating profile:', error);
+      throw error;
     }
   },
 
@@ -296,23 +227,10 @@ export const patientApi = {
         },
       });
       
-      // Store the returned URL in localStorage as backup
-      setUserSpecificItem('patientAvatar', response.data.img_url);
-      
       return response.data;
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      // Fallback to localStorage if backend fails
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64data = reader.result as string;
-        setUserSpecificItem('patientAvatar', base64data);
-      };
-      reader.readAsDataURL(file);
-      
-      // Return a local URL as fallback
-      const localUrl = URL.createObjectURL(file);
-      return { img_url: localUrl };
+      throw error;
     }
   },
 

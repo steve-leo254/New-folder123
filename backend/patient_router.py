@@ -11,10 +11,12 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 import logging
+from datetime import datetime
 
 from database import get_db
-from models import User
+from models import User, Insurance
 from auth_router import get_current_active_user
+from pydantic_models import InsuranceRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/patient", tags=["patient"])
@@ -79,34 +81,7 @@ class EmergencyContactResponse(BaseModel):
     created_at: str
     updated_at: str
 
-# Insurance Models
-class InsuranceRequest(BaseModel):
-    insurance_provider: Optional[str] = None
-    insurance_policy_number: Optional[str] = None
-    insurance_group_number: Optional[str] = None
-    insurance_holder_name: Optional[str] = None
-    insurance_type: Optional[str] = None
-    quarterly_limit: Optional[int] = None
-    quarterly_used: Optional[int] = None
-    coverage_start_date: Optional[str] = None
-    coverage_end_date: Optional[str] = None
-
-class InsuranceResponse(BaseModel):
-    id: int
-    patient_id: int
-    provider: str
-    policy_number: str
-    group_number: Optional[str] = None
-    holder_name: str
-    type: str
-    quarterly_limit: Optional[int] = None
-    quarterly_used: Optional[int] = None
-    coverage_start_date: Optional[str] = None
-    coverage_end_date: Optional[str] = None
-    created_at: str
-    updated_at: str
-
-# Notification Models
+# Notification Settings endpoints
 class NotificationSettingsRequest(BaseModel):
     email_notifications: Optional[bool] = True
     sms_notifications: Optional[bool] = True
@@ -482,22 +457,26 @@ async def get_insurance(
     """Get patient's insurance information"""
     patient_id = current_user.id
     
-    # Get insurance for this patient
-    insurance = insurance_storage.get(patient_id, {
-        "id": patient_id,
-        "patient_id": patient_id,
-        "provider": "",
-        "policy_number": "",
-        "group_number": None,
-        "holder_name": "",
-        "type": "",
-        "quarterly_limit": None,
-        "quarterly_used": None,
-        "coverage_start_date": None,
-        "coverage_end_date": None,
-        "created_at": "2024-01-01T00:00:00",
-        "updated_at": "2024-01-01T00:00:00"
-    })
+    # Get insurance from database
+    insurance = db.query(Insurance).filter(Insurance.patient_id == patient_id).first()
+    
+    if not insurance:
+        # Return empty insurance if none exists
+        return {
+            "id": 0,
+            "patient_id": patient_id,
+            "provider": "",
+            "policy_number": "",
+            "group_number": None,
+            "holder_name": "",
+            "insurance_type": "standard",
+            "quarterly_limit": None,
+            "quarterly_used": None,
+            "coverage_start_date": None,
+            "coverage_end_date": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
     
     return insurance
 
@@ -510,26 +489,66 @@ async def update_insurance(
     """Update patient's insurance information"""
     patient_id = current_user.id
     
-    from datetime import datetime
-    insurance = {
-        "id": patient_id,
-        "patient_id": patient_id,
-        "provider": request.insurance_provider or "",
-        "policy_number": request.insurance_policy_number or "",
-        "group_number": request.insurance_group_number,
-        "holder_name": request.insurance_holder_name or "",
-        "type": request.insurance_type or "",
-        "quarterly_limit": request.quarterly_limit,
-        "quarterly_used": request.quarterly_used,
-        "coverage_start_date": request.coverage_start_date,
-        "coverage_end_date": request.coverage_end_date,
-        "created_at": "2024-01-01T00:00:00",
-        "updated_at": datetime.now().isoformat()
-    }
+    # Validate insurance type
+    valid_types = ['standard', 'sha', 'SHA', 'Standard', 'STANDARD']
+    if request.insurance_type and request.insurance_type not in valid_types:
+        raise HTTPException(status_code=400, detail="Invalid insurance type. Must be 'standard' or 'sha'")
     
-    insurance_storage[patient_id] = insurance
+    # Normalize insurance type
+    normalized_type = 'sha' if request.insurance_type and request.insurance_type.lower() == 'sha' else 'standard'
     
-    return insurance
+    # Get existing insurance or create new
+    insurance = db.query(Insurance).filter(Insurance.patient_id == patient_id).first()
+    
+    if not insurance:
+        # Only create if we have the minimum required fields
+        if not request.provider or not request.policy_number or not request.holder_name:
+            raise HTTPException(status_code=400, detail="Provider, policy number, and holder name are required for new insurance")
+            
+        # Create new insurance record
+        insurance = Insurance(
+            patient_id=patient_id,
+            provider=request.provider,
+            policy_number=request.policy_number,
+            group_number=request.group_number,
+            holder_name=request.holder_name,
+            insurance_type=normalized_type,
+            quarterly_limit=request.quarterly_limit,
+            quarterly_used=request.quarterly_used,
+            coverage_start_date=request.coverage_start_date,
+            coverage_end_date=request.coverage_end_date
+        )
+        db.add(insurance)
+    else:
+        # Update only provided fields
+        if request.provider is not None:
+            insurance.provider = request.provider
+        if request.policy_number is not None:
+            insurance.policy_number = request.policy_number
+        if request.group_number is not None:
+            insurance.group_number = request.group_number
+        if request.holder_name is not None:
+            insurance.holder_name = request.holder_name
+        if request.insurance_type is not None:
+            insurance.insurance_type = normalized_type
+        if request.quarterly_limit is not None:
+            insurance.quarterly_limit = request.quarterly_limit
+        if request.quarterly_used is not None:
+            insurance.quarterly_used = request.quarterly_used
+        if request.coverage_start_date is not None:
+            insurance.coverage_start_date = request.coverage_start_date
+        if request.coverage_end_date is not None:
+            insurance.coverage_end_date = request.coverage_end_date
+        insurance.updated_at = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(insurance)
+        return insurance
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 # Notification Settings endpoints
 @router.get("/notifications")

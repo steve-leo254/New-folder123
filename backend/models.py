@@ -466,6 +466,11 @@ class Insurance(Base):
     policy_number = Column(String(100), nullable=False)
     group_number = Column(String(100), nullable=True)
     holder_name = Column(String(120), nullable=False)  # Policy holder's name
+    insurance_type = Column(String(50), nullable=True, default="standard")
+    quarterly_limit = Column(Numeric(10, 2), nullable=True)
+    quarterly_used = Column(Numeric(10, 2), nullable=True, default=0)
+    coverage_start_date = Column(DateTime, nullable=True)
+    coverage_end_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

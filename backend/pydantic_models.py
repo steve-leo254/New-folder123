@@ -752,10 +752,15 @@ class EmergencyContactResponse(BaseModel):
 
 class InsuranceRequest(BaseModel):
     """Insurance request model."""
-    provider: str
-    policy_number: str
+    provider: Optional[str] = None
+    policy_number: Optional[str] = None
     group_number: Optional[str] = None
-    holder_name: str
+    holder_name: Optional[str] = None
+    insurance_type: Optional[str] = "standard"
+    quarterly_limit: Optional[float] = None
+    quarterly_used: Optional[float] = None
+    coverage_start_date: Optional[str] = None
+    coverage_end_date: Optional[str] = None
 
 
 class InsuranceResponse(BaseModel):
@@ -766,6 +771,11 @@ class InsuranceResponse(BaseModel):
     policy_number: str
     group_number: Optional[str] = None
     holder_name: str
+    insurance_type: Optional[str] = "standard"
+    quarterly_limit: Optional[float] = None
+    quarterly_used: Optional[float] = None
+    coverage_start_date: Optional[str] = None
+    coverage_end_date: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
