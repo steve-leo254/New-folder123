@@ -120,7 +120,7 @@ except Exception as e:
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"], 
+    allow_origins=["http://localhost:3000"], 
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -297,7 +297,7 @@ def get_current_user_profile(
         address=current_user.address,
         emergencyContact=emergency_contact.phone if emergency_contact else None,
         bloodType=medical_info.blood_type if medical_info else None,
-        allergies=medical_info.allergies if medical_info else None
+        allergies=', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None
     )
 
 
@@ -967,9 +967,19 @@ def list_patients(
         )
     
     try:
-        # Return only users with PATIENT role
-        patients = db.query(User).filter(User.role == Role.PATIENT).order_by(User.created_at.desc()).all()
+        # Return only users with PATIENT role, joined with their medical info
+        patients = db.query(User).outerjoin(MedicalInfo).filter(User.role == Role.PATIENT).order_by(User.created_at.desc()).all()
         logger.info(f"Retrieved {len(patients)} patients for user {current_user.id}")
+        
+        # Debug: Log first patient data to see structure
+        if patients:
+            first_patient = patients[0]
+            logger.info(f"First patient data: {first_patient.__dict__}")
+            if hasattr(first_patient, 'medical_info') and first_patient.medical_info:
+                logger.info(f"Medical info for first patient: {first_patient.medical_info.__dict__}")
+            else:
+                logger.info("No medical info found for first patient")
+        
         return patients
         
     except SQLAlchemyError as e:
@@ -1504,7 +1514,17 @@ def dashboard_summary(
     _: User = Depends(get_current_user)
 ) -> dict:
     """Get dashboard summary statistics."""
-    return dashboard_snapshot(db)
+    try:
+        logger.info(f"Dashboard summary requested by user {_.id}")
+        summary = dashboard_snapshot(db)
+        logger.info(f"Dashboard summary generated: {summary}")
+        return summary
+    except Exception as e:
+        logger.error(f"Error generating dashboard summary: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate dashboard summary"
+        )
 
 
 # ============================================================================
@@ -2058,16 +2078,43 @@ async def get_patient_profile(
             detail="Only patients can access patient profile"
         )
     
+    # Get medical info for blood type and allergies
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+    
+    # Create medical info record if it doesn't exist
+    if not medical_info:
+        medical_info = MedicalInfo(
+            patient_id=current_user.id,
+            blood_type=None,
+            height=None,
+            weight=None,
+            allergies=[],
+            conditions=[],
+            medications=[]
+        )
+        db.add(medical_info)
+        db.commit()
+        db.refresh(medical_info)
+        logger.info(f"Created new medical info record for patient {current_user.id}")
+    
+    logger.info(f"Fetched medical info for patient {current_user.id}: {medical_info}")
+    
     return UserProfileResponse(
         id=current_user.id,
         email=current_user.email,
         full_name=current_user.full_name,
         phone=current_user.phone,
+        date_of_birth=current_user.date_of_birth,
+        gender=current_user.gender,
         role=current_user.role.value,
         is_verified=current_user.is_verified,
         created_at=current_user.created_at,
-        profile_picture=current_user.profile_picture
+        profile_picture=current_user.profile_picture,
+        address=current_user.address,
+        bloodType=medical_info.blood_type if medical_info else None,
+        allergies=', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None
     )
+    logger.info(f"Profile response for patient {current_user.id}: bloodType={medical_info.blood_type if medical_info else None}, allergies={', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None}")
 
 @app.put("/api/patient/profile", response_model=UserProfileResponse)
 async def update_patient_profile(
@@ -2083,7 +2130,7 @@ async def update_patient_profile(
         )
     
     # Update allowed fields
-    allowed_fields = ['full_name', 'phone', 'profile_picture']
+    allowed_fields = ['full_name', 'phone', 'profile_picture', 'gender', 'date_of_birth', 'address']
     for field, value in profile_update.items():
         if field in allowed_fields and hasattr(current_user, field):
             setattr(current_user, field, value)
@@ -2093,15 +2140,23 @@ async def update_patient_profile(
         db.refresh(current_user)
         logger.info(f"Patient profile updated: {current_user.email}")
         
+        # Get updated medical info for response
+        medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+        
         return UserProfileResponse(
             id=current_user.id,
             email=current_user.email,
             full_name=current_user.full_name,
             phone=current_user.phone,
+            date_of_birth=current_user.date_of_birth,
+            gender=current_user.gender,
             role=current_user.role.value,
             is_verified=current_user.is_verified,
             created_at=current_user.created_at,
-            profile_picture=current_user.profile_picture
+            profile_picture=current_user.profile_picture,
+            address=current_user.address,
+            bloodType=medical_info.blood_type if medical_info else None,
+            allergies=', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None
         )
     except SQLAlchemyError as e:
         db.rollback()
@@ -2151,6 +2206,8 @@ async def update_medical_info(
             detail="Only patients can update medical information"
         )
     
+    logger.info(f"Received medical update request: {medical_update}")
+    
     medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
     
     if not medical_info:
@@ -2158,13 +2215,22 @@ async def update_medical_info(
         db.add(medical_info)
     
     # Update fields
-    for field, value in medical_update.dict(exclude_unset=True).items():
+    update_data = medical_update.dict(exclude_unset=True)
+    logger.info(f"Medical update data (exclude_unset): {update_data}")
+    
+    # Special logging for blood type
+    if 'blood_type' in update_data:
+        logger.info(f"BLOOD TYPE UPDATE: {update_data['blood_type']}")
+    
+    for field, value in update_data.items():
+        logger.info(f"Updating field {field} with value: {value}")
         setattr(medical_info, field, value)
     
     try:
         db.commit()
         db.refresh(medical_info)
         logger.info(f"Medical info updated for patient: {current_user.email}")
+        logger.info(f"Final medical info after update: blood_type={medical_info.blood_type}, allergies={medical_info.allergies}")
         
         # Log medical info update
         from activity_logger import create_activity_log
@@ -2806,7 +2872,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8001,
         reload=True,
         log_level="info"
     )

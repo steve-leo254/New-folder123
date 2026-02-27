@@ -57,9 +57,9 @@ export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
           />
           <InputField
             label="Date of Birth"
-            name="dateOfBirth"
+            name="date_of_birth"
             type="date"
-            value={formData.dateOfBirth}
+            value={formData.date_of_birth}
             onChange={onChange}
             disabled={!isEditing}
           />

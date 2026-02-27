@@ -17,10 +17,12 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMedications } from '../services/useMedication';
+import { usePatient } from '../services/usePatient';
 import { formatCurrency } from '../services/formatCurrency';
 import { useShoppingCart } from '../services/CartContext';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Card from '../components/ui/Card';
+import WishlistButton from '../components/ui/WishlistButton';
 
 interface Medication {
   id: string;
@@ -50,6 +52,7 @@ interface PharmacyPageProps {
 
 export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
   const navigate = useNavigate();
+  const { patient } = usePatient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSort, setSelectedSort] = useState('name');
@@ -604,10 +607,16 @@ export const PharmacyPage = ({ patientId: _patientId }: PharmacyPageProps) => {
             </div>
           </div>
           <div className="flex items-center px-4 py-3 bg-white rounded-xl shadow">
-            <Truck className="h-5 w-5 text-amber-600 mr-3" />
+            <Shield className="h-5 w-5 text-blue-600 mr-3" />
             <div>
-              <div className="text-lg font-bold text-gray-900">Free</div>
-              <div className="text-sm text-gray-600">Delivery Over Ksh 2500</div>
+              <div className="text-lg font-bold text-gray-900">
+                {patient?.insuranceProvider ? (
+                  patient.insuranceType === 'sha' ? 'SHA' : 'Standard'
+                ) : 'No'}
+              </div>
+              <div className="text-sm text-gray-600">
+                {patient?.insuranceProvider ? 'Insurance Coverage' : 'Get Insurance for Discounts'}
+              </div>
             </div>
           </div>
         </div>

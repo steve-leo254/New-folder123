@@ -3,19 +3,20 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useShoppingCart } from '../../services/CartContext';
 import { useAuth } from '../../services/AuthContext';
-import { 
-  Calendar, 
-  User, 
-  ShoppingCart, 
-  Menu, 
-  X, 
+import {
+  Calendar,
+  User,
+  ShoppingCart,
+  Menu,
+  X,
   Stethoscope,
   Video,
   Pill,
   FileText,
   Home,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Heart
 } from 'lucide-react';
 import logoImage from '@/assets/kiangombe.jpg';
 
@@ -27,7 +28,7 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const { cartQuantity } = useShoppingCart();
   const { logout, role } = useAuth();
-  
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -60,12 +61,12 @@ const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center space-x-2">
-            <img 
-              src={logoImage} 
-              alt="Kiangombe Health" 
+            <img
+              src={logoImage}
+              alt="Kiangombe Health"
               className="w-12 h-14 rounded-lg object-cover"
             />
-           
+
           </Link>
 
           <nav className="hidden md:flex space-x-8">
@@ -76,11 +77,10 @@ const Header: React.FC = () => {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive
                       ? 'text-primary-600 bg-primary-50'
                       : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{item.name}</span>
@@ -99,7 +99,7 @@ const Header: React.FC = () => {
                 <span>Dashboard</span>
                 <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              
+
               {isDropdownOpen && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -118,7 +118,7 @@ const Header: React.FC = () => {
                       Patient Dashboard
                     </Link>
                   )}
-                  
+
                   {(role === 'SUPER_ADMIN' || role === 'CLINICIAN_ADMIN' || role === 'DOCTOR' || role === 'NURSE' || role === 'RECEPTIONIST' || role === 'LAB_TECHNICIAN' || role === 'PHARMACIST') && (
                     <>
                       <Link
@@ -129,7 +129,7 @@ const Header: React.FC = () => {
                         <User className="w-4 h-4 mr-2" />
                         Staff Dashboard
                       </Link>
-                      
+
                       <Link
                         to="/doctors-profile"
                         className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -140,9 +140,9 @@ const Header: React.FC = () => {
                       </Link>
                     </>
                   )}
-                  
+
                   {/* Super Admin specific */}
-                  {(role === 'SUPER_ADMIN' || role === 'CLINICIAN_ADMIN') && (
+                  {role === 'clinician_admin' && (
                     <Link
                       to="/superadmindashboard"
                       className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -152,7 +152,16 @@ const Header: React.FC = () => {
                       Super Admin
                     </Link>
                   )}
-                  
+
+                  <Link
+                    to="/wishlist"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setIsDropdownOpen(false)}
+                  >
+                    <Heart className="w-4 h-4 mr-2" />
+                    Wishlist
+                  </Link>
+
                   <Link
                     to="/profile"
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

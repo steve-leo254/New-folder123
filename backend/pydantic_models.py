@@ -227,6 +227,12 @@ class UserProfileResponse(BaseModel):
     email: str
     phone: Optional[str] = None
     date_of_birth: Optional[datetime] = None
+    
+    @property
+    def date_of_birth_formatted(self) -> Optional[str]:
+        """Format date of birth as YYYY-MM-DD string."""
+        return self.date_of_birth.strftime('%Y-%m-%d') if self.date_of_birth else None
+    
     gender: Optional[str] = None
     role: str
     is_verified: bool
@@ -236,6 +242,12 @@ class UserProfileResponse(BaseModel):
     emergencyContact: Optional[str] = None
     bloodType: Optional[str] = None
     allergies: Optional[str] = None
+    # Additional medical fields
+    height: Optional[str] = None
+    weight: Optional[str] = None
+    conditions: Optional[List[str]] = []
+    medications: Optional[List[str]] = []
+    status: Optional[str] = 'active'
     
     model_config = ConfigDict(from_attributes=True)
 

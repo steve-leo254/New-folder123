@@ -1,0 +1,6 @@
+# Kiangombe Health Center - Placeholder Image
+# This is a placeholder for the kiangombe.jpg favicon
+# In a real application, this would be the actual logo/brand image
+
+# For now, this serves as a marker that the file exists
+# The browser will use this as the favicon when referenced in index.html

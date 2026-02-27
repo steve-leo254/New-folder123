@@ -121,15 +121,10 @@ const PatientProfile: React.FC = () => {
     try {
       const payload = {
         full_name: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email,
         phone: formData.phone,
-        date_of_birth: formData.dateOfBirth,
+        date_of_birth: formData.date_of_birth,
         gender: formData.gender,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        zip_code: formData.zipCode,
-        country: formData.country,
+        // Always include medical data
         blood_type: formData.bloodType,
         height: formData.height,
         weight: formData.weight,
@@ -154,6 +149,7 @@ const PatientProfile: React.FC = () => {
         lab_results_notifications: formData.labResultsNotifications,
       };
 
+      console.log('PatientProfile: Sending payload to updatePatient:', payload);
       const result = await updatePatient(payload);
       if (result.success) {
         setIsEditing(false);
@@ -243,30 +239,9 @@ const PatientProfile: React.FC = () => {
   // Download records handler
   const handleDownloadRecords = async () => {
     try {
-      const blob = await downloadRecords();
-      
-      // Create a download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Generate filename with current date
-      const currentDate = new Date().toISOString().split('T')[0];
-      link.setAttribute('download', `medical_records_${currentDate}.pdf`);
-      
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
-      
-      // Clean up
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      setSaveMessage({ type: 'success', message: 'Medical records downloaded successfully!' });
-      setTimeout(() => setSaveMessage(null), 3000);
-    } catch (err) {
-      setSaveMessage({ type: 'error', message: 'Failed to download records' });
-      setTimeout(() => setSaveMessage(null), 5000);
+      await downloadRecords();
+    } catch (error) {
+      console.error('Failed to download records:', error);
     }
   };
 
@@ -407,7 +382,11 @@ const PatientProfile: React.FC = () => {
               )}
 
               {activeSection === 'medical' && (
-                <MedicalInfoSection isEditing={isEditing} />
+                <MedicalInfoSection 
+                  isEditing={isEditing}
+                  formData={formData}
+                  onFormDataChange={setFormData}
+                />
               )}
 
               {activeSection === 'emergency' && (

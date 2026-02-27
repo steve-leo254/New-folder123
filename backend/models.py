@@ -113,6 +113,7 @@ class User(Base):
 
     # Relationships
     staff_role = relationship("StaffRole", backref="users")
+    medical_info = relationship("MedicalInfo", uselist=False)
     appointments = relationship(
         "Appointment",
         back_populates="patient",
@@ -131,6 +132,7 @@ class User(Base):
     payments = relationship("Payment", back_populates="user")
     medical_history = relationship("MedicalHistory", back_populates="patient")
     addresses = relationship("Address", back_populates="user")
+    wishlist_items = relationship("Wishlist", back_populates="user", cascade="all, delete-orphan")
 
 
 class Doctor(Base):
@@ -374,6 +376,9 @@ class Medication(Base):
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
+    # Relationships
+    wishlist_items = relationship("Wishlist", back_populates="medication", cascade="all, delete-orphan")
+
 
 class MedicalHistory(Base):
     """Medical history model for tracking patient health records."""
@@ -437,7 +442,7 @@ class MedicalInfo(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    patient = relationship("User", backref="medical_info")
+    patient = relationship("User")
 
 
 class EmergencyContact(Base):
@@ -661,4 +666,24 @@ class ChatRoom(Base):
     patient = relationship("User", foreign_keys=[patient_id], backref="patient_chat_rooms")
     doctor = relationship("User", foreign_keys=[doctor_id], backref="doctor_chat_rooms")
     appointment = relationship("Appointment", backref="chat_room")
+
+
+class Wishlist(Base):
+    """Wishlist model for patient medication favorites."""
+    __tablename__ = "wishlists"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    medication_id = Column(Integer, ForeignKey("medications.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="wishlist_items")
+    medication = relationship("Medication", back_populates="wishlist_items")
+
+    # Ensure unique user-medication combination
+    __table_args__ = (
+        {"mysql_charset": "utf8mb4", "mysql_collate": "utf8mb4_unicode_ci"},
+    )
 

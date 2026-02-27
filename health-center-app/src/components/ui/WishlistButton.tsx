@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Heart } from 'lucide-react';
 import { useWishlist } from '../../services/useWishlist';
+import { useAuth } from '../../services/AuthContext';
 
 interface WishlistButtonProps {
   medication: {
@@ -26,6 +27,7 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
   showText = false
 }) => {
   const { addToWishlist, removeFromWishlist, isInWishlist, isLoading } = useWishlist();
+  const { token } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   
   const isWishlisted = isInWishlist(medication.id);
@@ -36,13 +38,29 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
     
     if (isProcessing || isLoading) return;
 
+    console.log('Wishlist button clicked:', { medicationId: medication.id, isWishlisted, token: !!token });
+    
     setIsProcessing(true);
     try {
       if (isWishlisted) {
         // Find the wishlist item by medication ID and remove it
         // Note: This would need the actual wishlist item ID, for now we'll use medication ID
+        console.log('Removing from wishlist:', medication.id);
         await removeFromWishlist(medication.id);
       } else {
+        console.log('Adding to wishlist:', {
+          medication_id: medication.id,
+          medication: {
+            name: medication.name,
+            dosage: medication.dosage,
+            price: medication.price,
+            category: medication.category,
+            image: medication.image,
+            stock: medication.stock,
+            inStock: medication.inStock,
+            prescriptionRequired: medication.prescriptionRequired,
+          }
+        });
         await addToWishlist({ 
           medication_id: medication.id,
           medication: {
@@ -50,7 +68,7 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
             dosage: medication.dosage,
             price: medication.price,
             category: medication.category,
-            image: medication.image, // Use the correct 'image' property from MedicationRecord
+            image: medication.image,
             stock: medication.stock,
             inStock: medication.inStock,
             prescriptionRequired: medication.prescriptionRequired,
@@ -58,6 +76,7 @@ const WishlistButton: React.FC<WishlistButtonProps> = ({
         });
       }
     } catch (error) {
+      console.error('Wishlist operation failed:', error);
       // Don't log 404 and 400 errors since they're expected (404 = backend not running, 400 = duplicate item)
       const axiosError = error as any;
       if (axiosError?.response?.status !== 404 && axiosError?.response?.status !== 400) {

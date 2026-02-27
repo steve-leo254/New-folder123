@@ -75,7 +75,7 @@ export interface PatientProfile {
   lastName: string;
   email: string;
   phone: string;
-  dateOfBirth: string;
+  date_of_birth: string;
   gender: string;
   avatar: string;
   address: string;
@@ -116,7 +116,9 @@ export const patientApi = {
     try {
       // Fetch basic profile data
       const { data: profileData } = await apiClient.get('/api/patient/profile');
+      console.log('Raw profile data from backend:', profileData);
       const transformedData = transformPatientData(profileData);
+      console.log('Transformed profile data:', transformedData);
       
       // Fetch emergency contact data separately
       try {
@@ -166,6 +168,32 @@ export const patientApi = {
         transformedData.insuranceCoverageEndDate = '';
       }
       
+      // Fetch medical info separately
+      try {
+        const { data: medicalData } = await apiClient.get('/api/patient/medical-info');
+        console.log('Raw medical data from backend:', medicalData);
+        
+        // Map backend medical data to frontend format
+        if (medicalData) {
+          transformedData.bloodType = medicalData.blood_type || '';
+          transformedData.height = medicalData.height || '';
+          transformedData.weight = medicalData.weight || '';
+          transformedData.allergies = medicalData.allergies || [];
+          transformedData.conditions = medicalData.conditions || [];
+          transformedData.medications = medicalData.medications || [];
+        }
+        console.log('Profile data after medical merge:', transformedData);
+      } catch (medicalError) {
+        console.warn('Could not fetch medical data:', medicalError);
+        // Set default medical values if API fails
+        transformedData.bloodType = '';
+        transformedData.height = '';
+        transformedData.weight = '';
+        transformedData.allergies = [];
+        transformedData.conditions = [];
+        transformedData.medications = [];
+      }
+      
       return transformedData;
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -176,14 +204,18 @@ export const patientApi = {
   // Update patient profile
   updateProfile: async (updateData: PatientUpdateData): Promise<PatientProfile> => {
     try {
-      // Separate basic profile data, emergency contact data, and insurance data
+      // Separate basic profile data, emergency contact data, insurance data, and medical data
       const profileData: any = {};
       const emergencyData: any = {};
       const insuranceData: any = {};
+      const medicalData: any = {};
       
       // Map frontend fields to backend profile fields
       if (updateData.full_name) profileData.full_name = updateData.full_name;
       if (updateData.phone) profileData.phone = updateData.phone;
+      if (updateData.gender) profileData.gender = updateData.gender;
+      if (updateData.date_of_birth) profileData.date_of_birth = updateData.date_of_birth;
+      if (updateData.address) profileData.address = updateData.address;
       
       // Map frontend emergency contact fields to backend emergency contact fields
       if (updateData.emergency_contact_name) emergencyData.name = updateData.emergency_contact_name;
@@ -191,29 +223,89 @@ export const patientApi = {
       if (updateData.emergency_contact_relation) emergencyData.relation = updateData.emergency_contact_relation;
       
       // Map frontend insurance fields to backend insurance fields
-      if (updateData.insurance_provider) insuranceData.provider = updateData.insurance_provider;
-      if (updateData.insurance_policy_number) insuranceData.policy_number = updateData.insurance_policy_number;
-      if (updateData.insurance_group_number) insuranceData.group_number = updateData.insurance_group_number;
-      if (updateData.insurance_holder_name) insuranceData.holder_name = updateData.insurance_holder_name;
-      if (updateData.insurance_type) insuranceData.insurance_type = updateData.insurance_type;
-      if (updateData.quarterly_limit !== undefined) insuranceData.quarterly_limit = updateData.quarterly_limit;
-      if (updateData.quarterly_used !== undefined) insuranceData.quarterly_used = updateData.quarterly_used;
-      if (updateData.coverage_start_date) insuranceData.coverage_start_date = updateData.coverage_start_date;
-      if (updateData.coverage_end_date) insuranceData.coverage_end_date = updateData.coverage_end_date;
+      if (updateData.insurance_provider && updateData.insurance_provider.trim() !== '') {
+        insuranceData.provider = updateData.insurance_provider;
+      }
+      if (updateData.insurance_policy_number && updateData.insurance_policy_number.trim() !== '') {
+        insuranceData.policy_number = updateData.insurance_policy_number;
+      }
+      if (updateData.insurance_group_number && updateData.insurance_group_number.trim() !== '') {
+        insuranceData.group_number = updateData.insurance_group_number;
+      }
+      if (updateData.insurance_holder_name && updateData.insurance_holder_name.trim() !== '') {
+        insuranceData.holder_name = updateData.insurance_holder_name;
+      }
+      if (updateData.insurance_type && updateData.insurance_type.trim() !== '') {
+        insuranceData.insurance_type = updateData.insurance_type;
+      }
+      if (updateData.quarterly_limit !== undefined && updateData.quarterly_limit !== null && updateData.quarterly_limit > 0) {
+        insuranceData.quarterly_limit = updateData.quarterly_limit;
+      }
+      if (updateData.quarterly_used !== undefined && updateData.quarterly_used !== null && updateData.quarterly_used >= 0) {
+        insuranceData.quarterly_used = updateData.quarterly_used;
+      }
+      if (updateData.coverage_start_date && updateData.coverage_start_date.trim() !== '') {
+        insuranceData.coverage_start_date = updateData.coverage_start_date;
+      }
+      if (updateData.coverage_end_date && updateData.coverage_end_date.trim() !== '') {
+        insuranceData.coverage_end_date = updateData.coverage_end_date;
+      }
+      
+      // Map frontend medical fields to backend medical fields
+      if (updateData.blood_type && updateData.blood_type.trim() !== '') {
+        medicalData.blood_type = updateData.blood_type;
+      }
+      if (updateData.height && updateData.height.trim() !== '') {
+        medicalData.height = updateData.height;
+      }
+      if (updateData.weight && updateData.weight.trim() !== '') {
+        medicalData.weight = updateData.weight;
+      }
+      if (updateData.allergies && Array.isArray(updateData.allergies) && updateData.allergies.length > 0) {
+        medicalData.allergies = updateData.allergies;
+      }
+      if (updateData.conditions && Array.isArray(updateData.conditions) && updateData.conditions.length > 0) {
+        medicalData.conditions = updateData.conditions;
+      }
+      if (updateData.medications && Array.isArray(updateData.medications) && updateData.medications.length > 0) {
+        medicalData.medications = updateData.medications;
+      }
       
       // Update basic profile if there's data
       if (Object.keys(profileData).length > 0) {
+        console.log('Sending profile data:', profileData);
         await apiClient.put('/api/patient/profile', profileData);
       }
       
       // Update emergency contact if there's data
       if (Object.keys(emergencyData).length > 0) {
+        console.log('Sending emergency contact data:', emergencyData);
         await apiClient.put('/api/patient/emergency-contact', emergencyData);
       }
       
       // Update insurance if there's data
-      if (Object.keys(insuranceData).length > 0) {
+      const hasValidInsuranceData = 
+        insuranceData.provider !== undefined && insuranceData.provider.trim() !== '' &&
+        insuranceData.policy_number !== undefined && insuranceData.policy_number.trim() !== '' &&
+        insuranceData.holder_name !== undefined && insuranceData.holder_name.trim() !== '';
+      
+      if (hasValidInsuranceData) {
+        console.log('Sending insurance data:', insuranceData);
         await apiClient.put('/api/patient/insurance', insuranceData);
+      }
+      
+      // Update medical info if there's data
+      const hasValidMedicalData = 
+        medicalData.blood_type !== undefined ||
+        medicalData.height !== undefined ||
+        medicalData.weight !== undefined ||
+        (medicalData.allergies !== undefined && Array.isArray(medicalData.allergies)) ||
+        (medicalData.conditions !== undefined && Array.isArray(medicalData.conditions)) ||
+        (medicalData.medications !== undefined && Array.isArray(medicalData.medications));
+      
+      if (hasValidMedicalData) {
+        console.log('Sending medical data:', medicalData);
+        await apiClient.put('/api/patient/medical-info', medicalData);
       }
       
       // Return updated profile
@@ -221,6 +313,12 @@ export const patientApi = {
       return transformPatientData(data);
     } catch (error) {
       console.error('Error updating profile:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any;
+        console.error('Error response data:', axiosError.response?.data);
+        console.error('Error response status:', axiosError.response?.status);
+        console.error('Error response headers:', axiosError.response?.headers);
+      }
       throw error;
     }
   },
@@ -280,7 +378,7 @@ function transformPatientData(data: any): PatientProfile {
     lastName,
     email: data.email || '',
     phone: data.phone || '',
-    dateOfBirth: data.date_of_birth || '',
+    date_of_birth: data.date_of_birth ? (new Date(data.date_of_birth).toISOString().split('T')[0]) : '',
     gender: data.gender || '',
     avatar: getFullImageUrl(data.profile_picture) || '',
     address: data.address || '',
@@ -288,10 +386,10 @@ function transformPatientData(data: any): PatientProfile {
     state: data.state || '',
     zipCode: data.zip_code || '',
     country: data.country || '',
-    bloodType: data.blood_type || '',
+    bloodType: data.bloodType || data.blood_type || '',
     height: data.height || '',
     weight: data.weight || '',
-    allergies: data.allergies || [],
+    allergies: data.allergies ? (Array.isArray(data.allergies) ? data.allergies : data.allergies.split(', ').filter((a: string) => a.trim())) : [],
     conditions: data.conditions || [],
     medications: data.medications || [],
     emergencyContactName: data.emergency_contact_name || '',

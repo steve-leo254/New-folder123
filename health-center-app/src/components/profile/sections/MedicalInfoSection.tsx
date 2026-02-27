@@ -6,6 +6,8 @@ import { useMedicalInfo, MedicalInfo } from '../../../services/useMedicalInfo';
 
 interface MedicalInfoSectionProps {
   isEditing: boolean;
+  formData: any;
+  onFormDataChange: (data: any) => void;
 }
 
 export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditing }) => {
@@ -39,6 +41,7 @@ export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditin
   // Handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    console.log(`MedicalInfoSection: Field ${name} changed to ${value}`);
     setFormData(prev => ({
       ...prev,
       [name]: value,
@@ -47,10 +50,13 @@ export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditin
 
   // Save medical info
   const handleSave = async () => {
+    console.log('MedicalInfoSection: Saving medical data:', formData);
     const result = await updateMedicalInfo(formData);
     if (!result.success) {
       // Handle error - you could show a toast or alert here
       console.error('Failed to update medical info:', result.error);
+    } else {
+      console.log('MedicalInfoSection: Save successful');
     }
   };
 
@@ -87,12 +93,12 @@ export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditin
     }
   };
 
-  // Auto-save when editing stops
-  useEffect(() => {
-    if (!isEditing && medicalInfo && JSON.stringify(formData) !== JSON.stringify(medicalInfo)) {
-      handleSave();
-    }
-  }, [isEditing]);
+  // Auto-save disabled - using main profile save instead
+  // useEffect(() => {
+  //   if (!isEditing && medicalInfo && JSON.stringify(formData) !== JSON.stringify(medicalInfo)) {
+  //     handleSave();
+  //   }
+  // }, [isEditing]);
 
   if (loading) {
     return (

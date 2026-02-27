@@ -1,6 +1,6 @@
 // pages/ForgotPasswordPage.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Mail,
   ArrowLeft,
@@ -15,11 +15,9 @@ import {
   RefreshCw,
   Smartphone,
   Timer,
-  Sparkles,
   HelpCircle,
   MessageCircle,
   Home,
-  Check,
   X,
 } from 'lucide-react';
 import { authService } from '../services/auth';
@@ -34,7 +32,6 @@ interface PasswordStrength {
 }
 
 const ForgotPasswordPage: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -46,19 +43,8 @@ const ForgotPasswordPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(0);
-  const [emailSent, setEmailSent] = useState(false);
-  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Check for token in URL (direct password reset link)
-  useEffect(() => {
-    const token = searchParams.get('token');
-    if (token) {
-      setResetToken(token);
-      setCurrentStep('reset');
-    }
-  }, [searchParams]);
 
   // Resend timer countdown
   useEffect(() => {
@@ -134,7 +120,7 @@ const ForgotPasswordPage: React.FC = () => {
       }
 
       await authService.forgotPassword(email);
-      setEmailSent(true);
+      
       setResendTimer(60);
       setCurrentStep('verification');
     } catch (err: any) {

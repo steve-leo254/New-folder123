@@ -14,7 +14,7 @@ import logging
 from datetime import datetime
 
 from database import get_db
-from models import User, Insurance, EmergencyContact, MedicalHistory, MedicalInfo
+from models import User, Insurance, EmergencyContact, MedicalHistory, MedicalInfo, Wishlist, Medication
 from auth_router import get_current_active_user
 from pydantic_models import InsuranceRequest, EmergencyContactRequest
 from reportlab.pdfgen import canvas
@@ -168,36 +168,42 @@ async def get_wishlist(
     db: Session = Depends(get_db)
 ):
     """Get patient's wishlist items"""
-    patient_id = current_user.id
-    
-    # Get wishlist items for this patient
-    patient_wishlist = wishlist_storage.get(patient_id, [])
-    
-    # Transform to response format
-    wishlist_items = []
-    for item in patient_wishlist:
-        medication_info = MOCK_MEDICATIONS.get(item["medication_id"])
-        if medication_info:
-            wishlist_item = {
-                "id": item["id"],
-                "patient_id": patient_id,
-                "medication_id": item["medication_id"],
-                "medication_name": medication_info["name"],
-                "dosage": medication_info["dosage"],
-                "price": medication_info["price"],
-                "category": medication_info["category"],
-                "image_url": medication_info["image_url"],
-                "in_stock": medication_info["in_stock"],
-                "requires_prescription": medication_info["requires_prescription"],
-                "rating": medication_info["rating"],
-                "reviews": medication_info["reviews"],
-                "added_date": item["added_date"],
-                "availability": medication_info["availability"],
-                "stock_count": medication_info["stock_count"]
-            }
-            wishlist_items.append(wishlist_item)
-    
-    return wishlist_items
+    try:
+        # Query wishlist items for this patient from database
+        wishlist_items = db.query(Wishlist).filter(
+            Wishlist.user_id == current_user.id
+        ).all()
+        
+        # Transform to response format
+        wishlist_response = []
+        for item in wishlist_items:
+            if item.medication:
+                wishlist_response.append({
+                    "id": item.id,
+                    "patient_id": current_user.id,
+                    "medication_id": item.medication_id,
+                    "medication_name": item.medication.name,
+                    "dosage": item.medication.dosage or "As directed",
+                    "price": float(item.medication.price),
+                    "category": item.medication.category,
+                    "image_url": item.medication.image_url or "",
+                    "in_stock": item.medication.in_stock,
+                    "requires_prescription": item.medication.prescription_required,
+                    "rating": 4.5,  # Default rating - can be added to medication model
+                    "reviews": 100,  # Default reviews - can be added to medication model
+                    "added_date": item.created_at.isoformat(),
+                    "availability": "in-stock" if item.medication.in_stock else "out-of-stock",
+                    "stock_count": item.medication.stock
+                })
+        
+        return wishlist_response
+        
+    except Exception as e:
+        logger.error(f"Error fetching wishlist: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch wishlist"
+        )
 
 @router.post("/wishlist")
 async def add_to_wishlist(
@@ -206,56 +212,73 @@ async def add_to_wishlist(
     db: Session = Depends(get_db)
 ):
     """Add item to patient's wishlist"""
-    logger.info(f"POST /api/patient/wishlist called by user {current_user.id}")
-    logger.info(f"Request payload: {request}")
-    
-    patient_id = current_user.id
-    medication_id = request.medication_id
-    
-    # Use medication data from frontend if provided, otherwise use mock data
-    medication_info = None
-    
-    if request.medication:
-        # Use frontend medication data
-        med = request.medication
-        medication_info = {
-            "name": med.get("name", f"Medication {medication_id}"),
-            "dosage": med.get("dosage", "Standard Dosage"),
-            "price": float(med.get("price", 15.99)),
-            "category": med.get("category", "general"),
-            "image_url": med.get("image", "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop"),
-            "in_stock": med.get("inStock", True),
-            "requires_prescription": med.get("prescriptionRequired", False),
-            "rating": float(med.get("rating", 4.5)),
-            "reviews": int(med.get("reviews", 100)),
-            "availability": "in-stock" if med.get("inStock", True) else "out-of-stock",
-            "stock_count": int(med.get("stock", 50))
+    try:
+        logger.info(f"POST /api/patient/wishlist called by user {current_user.id}")
+        logger.info(f"Request payload: {request}")
+        
+        medication_id = int(request.medication_id)
+        
+        # Check if medication exists
+        medication = db.query(Medication).filter(
+            Medication.id == medication_id
+        ).first()
+        
+        if not medication:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Medication not found"
+            )
+        
+        # Check if item already exists in wishlist
+        existing_item = db.query(Wishlist).filter(
+            Wishlist.user_id == current_user.id,
+            Wishlist.medication_id == medication_id
+        ).first()
+        
+        if existing_item:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Item already in wishlist"
+            )
+        
+        # Create new wishlist item
+        wishlist_item = Wishlist(
+            user_id=current_user.id,
+            medication_id=medication_id
+        )
+        
+        db.add(wishlist_item)
+        db.commit()
+        db.refresh(wishlist_item)
+        
+        # Return response
+        return {
+            "id": wishlist_item.id,
+            "patient_id": current_user.id,
+            "medication_id": medication_id,
+            "medication_name": medication.name,
+            "dosage": medication.dosage or "As directed",
+            "price": float(medication.price),
+            "category": medication.category,
+            "image_url": medication.image_url or "",
+            "in_stock": medication.in_stock,
+            "requires_prescription": medication.prescription_required,
+            "rating": 4.5,  # Default rating
+            "reviews": 100,  # Default reviews
+            "added_date": wishlist_item.created_at.isoformat(),
+            "availability": "in-stock" if medication.in_stock else "out-of-stock",
+            "stock_count": medication.stock
         }
-    else:
-        # Use mock medication data
-        medication_info = MOCK_MEDICATIONS.get(medication_id)
-        if not medication_info:
-            # Create default medication info if not found in mock data
-            medication_info = {
-                "name": f"Medication {medication_id}",
-                "dosage": "Standard Dosage",
-                "price": 15.99,
-                "category": "general",
-                "image_url": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop",
-                "in_stock": True,
-                "requires_prescription": False,
-                "rating": 4.5,
-                "reviews": 100,
-                "availability": "in-stock",
-                "stock_count": 50
-            }
-    
-    # Initialize patient wishlist if not exists
-    if patient_id not in wishlist_storage:
-        wishlist_storage[patient_id] = []
-    
-    # Check if item already in wishlist
-    for item in wishlist_storage[patient_id]:
+        
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        logger.error(f"Error adding to wishlist: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add item to wishlist"
+        )
         if item["medication_id"] == medication_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -297,23 +320,34 @@ async def remove_from_wishlist(
     db: Session = Depends(get_db)
 ):
     """Remove item from patient's wishlist"""
-    patient_id = current_user.id
-    
-    if patient_id not in wishlist_storage:
+    try:
+        # Find the wishlist item
+        wishlist_item = db.query(Wishlist).filter(
+            Wishlist.id == wishlist_item_id,
+            Wishlist.user_id == current_user.id
+        ).first()
+        
+        if not wishlist_item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Wishlist item not found"
+            )
+        
+        # Delete the item
+        db.delete(wishlist_item)
+        db.commit()
+        
+        return {"message": "Item removed from wishlist successfully"}
+        
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        logger.error(f"Error removing from wishlist: {str(e)}")
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Wishlist not found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to remove item from wishlist"
         )
-    
-    # Find and remove the item
-    item_found = False
-    for i, item in enumerate(wishlist_storage[patient_id]):
-        if item["id"] == wishlist_item_id:
-            del wishlist_storage[patient_id][i]
-            item_found = True
-            break
-    
-    if not item_found:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Wishlist item not found"
@@ -327,11 +361,23 @@ async def clear_wishlist(
     db: Session = Depends(get_db)
 ):
     """Clear patient's entire wishlist"""
-    patient_id = current_user.id
-    
-    wishlist_storage[patient_id] = []
-    
-    return {"message": "Wishlist cleared"}
+    try:
+        # Delete all wishlist items for this user
+        db.query(Wishlist).filter(
+            Wishlist.user_id == current_user.id
+        ).delete()
+        
+        db.commit()
+        
+        return {"message": "Wishlist cleared successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error clearing wishlist: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to clear wishlist"
+        )
 
 # In-memory storage for patient data (for demo purposes)
 # In production, this would be stored in the database

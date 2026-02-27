@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Point this to your FastAPI backend root. Override with VITE_API_URL if needed.
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -160,11 +160,17 @@ export const apiService = {
     return data;
   },
   addMedicalItem: async (type: 'allergy' | 'condition' | 'medication', value: string) => {
-    const { data } = await api.post(`/api/patient/medical-info/${type}`, { value });
+    // Convert singular to plural form for backend
+    const itemType = type === 'allergy' ? 'allergies' : 
+                   type === 'condition' ? 'conditions' : 'medications';
+    const { data } = await api.post(`/api/patient/medical-info/${itemType}`, { value });
     return data;
   },
   removeMedicalItem: async (type: 'allergy' | 'condition' | 'medication', index: number) => {
-    const { data } = await api.delete(`/api/patient/medical-info/${type}/${index}`);
+    // Convert singular to plural form for backend
+    const itemType = type === 'allergy' ? 'allergies' : 
+                   type === 'condition' ? 'conditions' : 'medications';
+    const { data } = await api.delete(`/api/patient/medical-info/${itemType}/${index}`);
     return data;
   },
   // Emergency Contact endpoints

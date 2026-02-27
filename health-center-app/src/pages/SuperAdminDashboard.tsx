@@ -40,6 +40,7 @@ import AddMedicationModal from "../components/modals/AddMedicationModal";
 import RoleManagementPage from "./RoleManagementPage";
 import Alert from "../components/ui/Alert";
 import { apiService } from "../services/api";
+import PatientRecordsManagement from "../components/admin/PatientRecordsManagement";
 import {
   XAxis,
   YAxis,
@@ -444,6 +445,7 @@ const SuperDashboardPage: React.FC = () => {
           <div className="flex space-x-8">
             {[
               "overview",
+              "patients",
               "users",
               "appointments",
               "medications",
@@ -690,6 +692,11 @@ const SuperDashboardPage: React.FC = () => {
               </Card>
             </div>
           </div>
+        )}
+
+        {/* Patients Tab */}
+        {activeTab === "patients" && (
+          <PatientRecordsManagement />
         )}
 
         {/* Users Tab */}
@@ -1492,7 +1499,7 @@ const SuperDashboardPage: React.FC = () => {
         onClose={() => setIsMedicationModalOpen(false)}
         onSubmit={async (medicationData) => {
           try {
-            await apiService.createMedication(medicationData);
+            await apiService.createMedicine(medicationData);
             setToast({
               type: "success",
               message: "Medication added successfully",
