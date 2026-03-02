@@ -39,6 +39,7 @@ const PatientRecordsManagement: React.FC = () => {
     updatePatientStatus,
     exportPatientsData,
     getPatientsStats,
+    getPatientDetails,
   } = useAdminPatients();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -107,9 +108,18 @@ const PatientRecordsManagement: React.FC = () => {
     }
   };
 
-  const handleViewPatient = (patient: PatientRecord) => {
-    setSelectedPatient(patient);
-    setIsDetailModalOpen(true);
+  const handleViewPatient = async (patient: PatientRecord) => {
+    try {
+      // Fetch detailed patient information including medical data
+      const detailedPatient = await getPatientDetails(patient.id.toString());
+      setSelectedPatient(detailedPatient);
+      setIsDetailModalOpen(true);
+    } catch (error) {
+      console.error('Error fetching patient details:', error);
+      // Fallback to basic patient info if detailed fetch fails
+      setSelectedPatient(patient);
+      setIsDetailModalOpen(true);
+    }
   };
 
   const handleStatusToggle = async (patient: PatientRecord) => {

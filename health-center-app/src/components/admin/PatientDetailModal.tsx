@@ -482,7 +482,7 @@ const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
             <div className="border-t border-gray-200 px-6 py-4">
               <div className="flex justify-between items-center">
                 <div className="text-sm text-gray-500">
-                  Last updated: {new Date(patient.updated_at).toLocaleDateString()}
+                  Last updated: {patient.updated_at ? new Date(patient.updated_at).toLocaleDateString() : 'N/A'}
                 </div>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm">

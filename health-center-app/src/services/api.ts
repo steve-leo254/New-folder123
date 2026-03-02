@@ -1,7 +1,5 @@
 import axios from 'axios';
-
-// Point this to your FastAPI backend root. Override with VITE_API_URL if needed.
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+import { API_BASE_URL } from './config';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -13,7 +11,7 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -121,6 +119,14 @@ export const apiService = {
   },
   getMedications: async (params?: Record<string, unknown>) => {
     const { data } = await api.get('/medications', { params });
+    return data;
+  },
+  createMedication: async (payload: unknown) => {
+    const { data } = await api.post('/medications', payload);
+    return data;
+  },
+  updateMedication: async (medicationId: string | number, payload: unknown) => {
+    const { data } = await api.put(`/medications/${medicationId}`, payload);
     return data;
   },
   createMedicine: async (payload: unknown) => {

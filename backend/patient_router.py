@@ -186,7 +186,7 @@ async def get_wishlist(
                     "dosage": item.medication.dosage or "As directed",
                     "price": float(item.medication.price),
                     "category": item.medication.category,
-                    "image_url": item.medication.image_url or "",
+                    "image_url": f"http://localhost:8001{item.medication.image_url}" if item.medication.image_url and not item.medication.image_url.startswith('http') else item.medication.image_url or "",
                     "in_stock": item.medication.in_stock,
                     "requires_prescription": item.medication.prescription_required,
                     "rating": 4.5,  # Default rating - can be added to medication model
@@ -260,7 +260,7 @@ async def add_to_wishlist(
             "dosage": medication.dosage or "As directed",
             "price": float(medication.price),
             "category": medication.category,
-            "image_url": medication.image_url or "",
+            "image_url": f"http://localhost:8001{medication.image_url}" if medication.image_url and not medication.image_url.startswith('http') else medication.image_url or "",
             "in_stock": medication.in_stock,
             "requires_prescription": medication.prescription_required,
             "rating": 4.5,  # Default rating
@@ -303,7 +303,7 @@ async def add_to_wishlist(
         "dosage": medication_info["dosage"],
         "price": medication_info["price"],
         "category": medication_info["category"],
-        "image_url": medication_info["image_url"],
+        "image_url": f"http://localhost:8001{medication_info['image_url']}" if medication_info["image_url"] and not medication_info["image_url"].startswith('http') else medication_info["image_url"],
         "in_stock": medication_info["in_stock"],
         "requires_prescription": medication_info["requires_prescription"],
         "rating": medication_info["rating"],

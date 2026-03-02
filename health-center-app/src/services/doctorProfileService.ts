@@ -171,10 +171,35 @@ export const doctorProfileService = {
 
   // Complete Profile
   async getCompleteProfile(doctorId?: string | number): Promise<DoctorProfile> {
-    const url = doctorId ? `/api/doctor/profile/complete/${doctorId}` : '/api/doctor/profile/complete';
-    const { data } = await api.get(url);
+    try {
+      const url = doctorId ? `/api/doctor/profile/complete/${doctorId}` : '/api/doctor/profile/complete';
+      const { data } = await api.get(url);
+      return data;
+    } catch (error: any) {
+      // If profile doesn't exist, try to create it first
+      if (error.response?.status === 404 && !doctorId) {
+        console.log('Doctor profile not found, attempting to create...');
+        try {
+          await this.createProfile();
+          // Try again after creating
+          const { data } = await api.get('/api/doctor/profile/complete');
+          return data;
+        } catch (createError: any) {
+          console.error('Failed to create doctor profile:', createError);
+          handleProfileError(createError, 'Failed to create doctor profile');
+        }
+      } else {
+        handleProfileError(error, 'Failed to fetch doctor profile');
+      }
+      throw error;
+    }
+  },
+
+  // Create Profile
+  async createProfile(): Promise<{ message: string; doctor_id: number; specialization: string }> {
+    const { data } = await api.post('/api/doctor/profile/create');
     return data;
-  }
+  },
 };
 
 // Helper function to handle API errors

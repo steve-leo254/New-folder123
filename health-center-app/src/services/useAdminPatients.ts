@@ -250,15 +250,65 @@ export const useAdminPatients = () => {
     return new Blob([], { type: 'application/octet-stream' });
   };
 
+  const getPatientDetails = async (patientId: string) => {
+    try {
+      const response = await apiClient.get(`/patients/${patientId}`);
+      
+      // Transform the response to match expected format
+      const patient = response.data;
+      const medicalInfo = patient.medical_info || {};
+      
+      return {
+        ...patient,
+        user_id: patient.id, // Map id to user_id for frontend compatibility
+        conditions: medicalInfo.conditions || [],
+        medications: medicalInfo.medications || [],
+        allergies: medicalInfo.allergies || [],
+        blood_type: medicalInfo.blood_type || patient.bloodType || patient.blood_type || 'N/A',
+        height: medicalInfo.height || patient.height || 'N/A',
+        weight: medicalInfo.weight || patient.weight || 'N/A',
+        status: patient.status || 'active',
+        date_of_birth: patient.date_of_birth_formatted || patient.date_of_birth,
+        zip_code: patient.zip_code || '',
+        country: patient.country || '',
+        member_id: patient.member_id || '',
+        appointments_count: patient.appointments_count || 0,
+        last_visit: patient.last_visit || null,
+        total_billed: patient.total_billed || 0,
+        insurance_status: patient.insurance_status || 'Unknown',
+        // Add missing fields that frontend expects
+        emergency_contact_name: '',
+        emergency_contact_phone: '',
+        emergency_contact_relation: '',
+        insurance_provider: '',
+        insurance_policy_number: '',
+        insurance_group_number: '',
+        insurance_holder_name: '',
+        insurance_type: '',
+        quarterly_limit: 0,
+        quarterly_used: 0,
+        coverage_start_date: '',
+        coverage_end_date: '',
+        email_notifications: false,
+        sms_notifications: false,
+        appointment_reminders: false,
+        lab_results_notifications: false,
+      };
+    } catch (error) {
+      console.error('Error fetching patient details:', error);
+      throw error;
+    }
+  };
+
   const getPatientsStats = async () => {
     // This endpoint doesn't exist in backend yet - return mock stats
     console.log('Fetching patient stats (not implemented in backend)');
     
     return {
-      total_patients: patients.length,
-      active_patients: patients.filter(p => p.status === 'active').length,
-      inactive_patients: patients.filter(p => p.status === 'inactive').length,
-      new_patients_this_month: 0, // Would need date filtering
+      totalPatients: patients.length,
+      activePatients: patients.filter(p => p.status === 'active').length,
+      inactivePatients: patients.filter(p => p.status === 'inactive').length,
+      newThisMonth: 0, // Would need date filtering
     };
   };
 
@@ -273,6 +323,7 @@ export const useAdminPatients = () => {
     pagination,
     fetchPatients,
     getPatientById,
+    getPatientDetails,
     updatePatientStatus,
     exportPatientsData,
     getPatientsStats,

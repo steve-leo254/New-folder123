@@ -34,8 +34,39 @@ def get_doctor_profile(current_user: User, db: Session) -> Doctor:
     if not doctor:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Doctor profile not found"
+            detail="Doctor profile not found. Please create your profile first."
         )
+    return doctor
+
+# Helper function to create doctor profile for current user
+def create_doctor_profile_for_user(current_user: User, db: Session) -> Doctor:
+    """Create doctor profile for current user if it doesn't exist."""
+    # Check if user is actually a doctor
+    if current_user.role.value != 'DOCTOR':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only doctors can create doctor profiles."
+        )
+    
+    # Check if profile already exists
+    existing_doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+    if existing_doctor:
+        return existing_doctor
+    
+    # Create new doctor profile
+    doctor = Doctor(
+        user_id=current_user.id,
+        specialization="General Practice",  # Default specialization
+        bio="Doctor profile",  # Default bio
+        rating=0.0,
+        is_available=True,
+        consultation_fee=50.0  # Default consultation fee
+    )
+    
+    db.add(doctor)
+    db.commit()
+    db.refresh(doctor)
+    
     return doctor
 
 # ============================================================================
@@ -388,6 +419,41 @@ async def update_settings(
     return settings
 
 # ============================================================================
+# PROFILE MANAGEMENT
+# ============================================================================
+
+@router.post("/create", response_model=dict)
+async def create_doctor_profile(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Create doctor profile for current user."""
+    try:
+        # Check if user is actually a doctor
+        if current_user.role.value != 'DOCTOR':
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only doctors can create doctor profiles."
+            )
+        
+        # Create doctor profile
+        doctor = create_doctor_profile_for_user(current_user, db)
+        
+        return {
+            "message": "Doctor profile created successfully",
+            "doctor_id": doctor.id,
+            "specialization": doctor.specialization
+        }
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create doctor profile: {str(e)}"
+        )
+
+# ============================================================================
 # COMPLETE PROFILE
 # ============================================================================
 
@@ -397,14 +463,18 @@ async def get_complete_profile(
     db: Session = Depends(get_db)
 ):
     """Get complete doctor profile with all sections."""
-    # Get doctor profile - don't auto-create
+    # Get doctor profile - create if doesn't exist
     doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
     
     if not doctor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Doctor profile not found. Please create your profile first."
-        )
+        # Auto-create doctor profile for doctors who don't have one
+        if current_user.role.value == 'DOCTOR':
+            doctor = create_doctor_profile_for_user(current_user, db)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Doctor profile not found. Please create your profile first."
+            )
     
     return build_complete_profile_response(doctor, db)
 

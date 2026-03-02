@@ -103,7 +103,7 @@ const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8000/upload-image', {
+      const response = await fetch('http://localhost:8001/upload-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

@@ -561,7 +561,7 @@ import { useDoctorProfileById } from '../hooks/useDoctorProfileById';
                             <div>
                               <h3 className="font-semibold text-gray-900">Medical Degree</h3>
                               <p className="text-sm text-gray-600">
-                                {doctor.education || 'Harvard Medical School'}
+                                {education.length > 0 ? education[0].institution : 'Harvard Medical School'}
                               </p>
                             </div>
                           </div>
@@ -592,7 +592,7 @@ import { useDoctorProfileById } from '../hooks/useDoctorProfileById';
                   <div className="bg-white rounded-xl shadow p-6">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">Specializations</h2>
                     <div className="flex flex-wrap gap-2">
-                      {(doctor.specializations ?? [doctor.specialty, 'General Medicine', 'Preventive Care']).map(
+                      {[doctor.specialization, doctor.specialty, 'General Medicine', 'Preventive Care'].filter(Boolean).map(
                         (spec, idx) => (
                           <span
                             key={idx}
@@ -686,7 +686,7 @@ import { useDoctorProfileById } from '../hooks/useDoctorProfileById';
                             <div>
                               <p className="text-sm text-gray-500">Hospital</p>
                               <p className="font-medium text-gray-900">
-                                {doctor.hospital || 'City Medical Center'}
+                                {(doctor as any).hospital || 'City Medical Center'}
                               </p>
                             </div>
                           </div>
@@ -697,7 +697,7 @@ import { useDoctorProfileById } from '../hooks/useDoctorProfileById';
                             <div>
                               <p className="text-sm text-gray-500">Location</p>
                               <p className="font-medium text-gray-900">
-                                {doctor.location || '123 Medical Drive'}
+                                {(doctor as any).location || '123 Medical Drive'}
                               </p>
                             </div>
                           </div>
@@ -728,7 +728,7 @@ import { useDoctorProfileById } from '../hooks/useDoctorProfileById';
                             <div>
                               <p className="text-sm text-gray-500">Languages</p>
                               <p className="font-medium text-gray-900">
-                                {(doctor.languages || ['English', 'Spanish']).join(', ')}
+                                {((doctor as any).languages || ['English', 'Spanish']).join(', ')}
                               </p>
                             </div>
                           </div>

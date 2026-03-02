@@ -21,15 +21,18 @@ const DoctorsPage: React.FC = () => {
       id: doctor.id.toString(),
       user_id: doctor.id.toString(),
       fullName: doctor.fullName,
+      name: doctor.fullName, // Alias for compatibility
       email: doctor.email,
       phone: doctor.phone,
       specialization: doctor.specialization,
+      specialty: doctor.specialization, // Alias for compatibility
       bio: doctor.bio || 'Professional healthcare provider',
       rating: doctor.rating || 0,
       isAvailable: doctor.isAvailable,
+      available: doctor.isAvailable, // Alias for compatibility
       consultationFee: doctor.consultationFee || 0,
       patientsCount: Math.floor(Math.random() * 500) + 50, // Realistic patient count (50-550)
-      avatar: getFullImageUrl(doctor.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff`,
+      avatar: doctor.avatar && doctor.avatar !== 'null' ? getFullImageUrl(doctor.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff` : `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff`,
       created_at: doctor.created_at
     }));
   }, [doctors]);
@@ -42,6 +45,7 @@ const DoctorsPage: React.FC = () => {
         name: doctor.fullName,
         role: 'Doctor',
         specialization: doctor.specialization,
+      specialty: doctor.specialization, // Alias for compatibility
         status: 'active' as const,
         rating: doctor.rating,
         avatar: doctor.avatar,

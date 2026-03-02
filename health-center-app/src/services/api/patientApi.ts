@@ -1,7 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { getFullImageUrl } from '../../utils/imageUtils';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '../config';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

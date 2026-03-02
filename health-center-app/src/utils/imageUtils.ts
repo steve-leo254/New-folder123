@@ -2,7 +2,7 @@
  * Utility functions for handling image URLs
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '../services/config';
 
 /**
  * Converts a relative image URL from the backend to a full URL

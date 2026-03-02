@@ -25,14 +25,15 @@ interface UsePatientReturn {
 }
 
 export const usePatient = (): UsePatientReturn => {
-  const { token, logout } = useAuth();
+  const { token, logout, role } = useAuth();
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch patient profile
   const fetchProfile = useCallback(async () => {
-    if (!token) {
+    // Only fetch patient data if user is actually a patient
+    if (!token || role !== 'patient') {
       setLoading(false);
       return;
     }
@@ -51,7 +52,7 @@ export const usePatient = (): UsePatientReturn => {
     } finally {
       setLoading(false);
     }
-  }, [token, logout]);
+  }, [token, logout, role]);
 
   // Initial fetch
   useEffect(() => {

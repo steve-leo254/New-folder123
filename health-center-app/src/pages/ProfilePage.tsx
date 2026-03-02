@@ -7,6 +7,7 @@ import Alert from '../components/ui/Alert';
 import { useUser } from '../services/useUser';
 import { useAuth } from '../services/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../services/config';
 
 const ProfilePage: React.FC = () => {
   const { token } = useAuth();
@@ -101,7 +102,7 @@ const ProfilePage: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8000/upload-image', {
+      const response = await fetch('/upload-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

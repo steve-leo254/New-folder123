@@ -56,7 +56,9 @@ const DoctorProfilePage: React.FC = () => {
   const { user, isLoading, updateUser } = useUser();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
-  // Use the doctor profile hook for API integration
+  // Only use doctor profile hook if user is a doctor
+  const shouldLoadDoctorProfile = user?.role === 'doctor';
+  const doctorProfileHook = useDoctorProfile();
   const {
     profile,
     education,
@@ -67,7 +69,17 @@ const DoctorProfilePage: React.FC = () => {
     deleteEducation,
     updateContactInfo,
     updateAvailability
-  } = useDoctorProfile();
+  } = shouldLoadDoctorProfile ? doctorProfileHook : {
+    profile: null,
+    education: [],
+    contactInfo: null,
+    availability: [],
+    addEducation: async () => {},
+    updateEducation: async () => {},
+    deleteEducation: async () => {},
+    updateContactInfo: async () => {},
+    updateAvailability: async () => {}
+  };
   
   // State Management
   const [activeTab, setActiveTab] = useState<'profile' | 'appointments' | 'availability' | 'settings'>('profile');

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from './config';
 
 export interface TimeSlot {
   id: string;
@@ -17,8 +18,6 @@ export interface DoctorAvailability {
   bufferTime: number;
   maxAppointmentsPerDay: number;
 }
-
-const API_BASE_URL = 'http://localhost:8000';
 
 export const useDoctorAvailability = (doctorId: string) => {
   const [availability, setAvailability] = useState<DoctorAvailability[]>([]);

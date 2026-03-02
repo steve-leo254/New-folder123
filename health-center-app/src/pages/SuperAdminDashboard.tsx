@@ -317,7 +317,7 @@ const SuperDashboardPage: React.FC = () => {
         status: staffMember.doctor?.isAvailable ? "active" : "inactive",
         rating: staffMember.doctor?.rating || 0,
         patients: staffMember.patientsCount,
-        avatar: staffMember.avatar ? `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${staffMember.avatar}` : "/images/doctor1.jpg",
+        avatar: staffMember.avatar ? `${import.meta.env.VITE_API_URL || 'http://localhost:8001'}${staffMember.avatar}` : "/images/doctor1.jpg",
         bio: staffMember.doctor?.bio || '',
         consultationFee: staffMember.doctor?.consultationFee || 0,
       })),
@@ -1431,8 +1431,8 @@ const SuperDashboardPage: React.FC = () => {
         isOpen={isStaffModalOpen}
         onClose={() => setIsStaffModalOpen(false)}
         onSubmit={async ({ account, profile }) => {
-          const token = localStorage.getItem('token');
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/staff`, {
+          const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001'}/staff`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,

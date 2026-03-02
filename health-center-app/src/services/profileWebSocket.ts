@@ -51,7 +51,7 @@ class ProfileWebSocketService {
       return;
     }
 
-    this.socket = io(import.meta.env.VITE_WS_URL || 'ws://localhost:8000', {
+    this.socket = io(import.meta.env.VITE_WS_URL || 'ws://localhost:8001', {
       auth: {
         token: token
       },

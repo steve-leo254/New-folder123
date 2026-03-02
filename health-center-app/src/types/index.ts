@@ -18,19 +18,25 @@ export interface Doctor {
   id: string;
   user_id: string;
   fullName: string;
+  name: string; // Alias for fullName for compatibility
   email: string;
   phone: string;
   specialization: string;
+  specialty: string; // Alias for specialization for compatibility
   bio: string;
   rating: number;
   isAvailable: boolean;
+  available: boolean; // Alias for isAvailable for compatibility
   consultationFee: number;
   video_consultation_fee?: number;
   phone_consultation_fee?: number;
   chat_consultation_fee?: number;
   patientsCount: number;
+  reviewCount?: number;
+  experience?: number;
   avatar: string;
   license_number?: string;
+  education?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -75,7 +81,7 @@ export interface Medication {
   category: string;
   inStock: boolean;
   prescriptionRequired: boolean;
-  image_url?: string;
+  image?: string;
 }
 
 export interface VideoCall {

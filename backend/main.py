@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload, Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import or_, and_
 from dotenv import load_dotenv
@@ -967,26 +967,255 @@ def list_patients(
         )
     
     try:
-        # Return only users with PATIENT role, joined with their medical info
-        patients = db.query(User).outerjoin(MedicalInfo).filter(User.role == Role.PATIENT).order_by(User.created_at.desc()).all()
+        # Return only users with PATIENT role, with their medical info eagerly loaded
+        patients = db.query(User).options(joinedload(User.medical_info), joinedload(User.emergency_contact)).filter(User.role == Role.PATIENT).order_by(User.created_at.desc()).all()
         logger.info(f"Retrieved {len(patients)} patients for user {current_user.id}")
         
-        # Debug: Log first patient data to see structure
-        if patients:
-            first_patient = patients[0]
-            logger.info(f"First patient data: {first_patient.__dict__}")
-            if hasattr(first_patient, 'medical_info') and first_patient.medical_info:
-                logger.info(f"Medical info for first patient: {first_patient.medical_info.__dict__}")
-            else:
-                logger.info("No medical info found for first patient")
+        # Transform to UserProfileResponse format
+        patient_responses = []
+        for patient in patients:
+            # Extract medical info if available
+            conditions = []
+            medications = []
+            blood_type = None
+            if hasattr(patient, 'medical_info') and patient.medical_info:
+                medical_info = patient.medical_info
+                conditions = medical_info.conditions or []
+                medications = medical_info.medications or []
+                blood_type = medical_info.blood_type
+            
+            # Get emergency contact phone if available
+            emergency_contact_phone = None
+            if hasattr(patient, 'emergency_contact') and patient.emergency_contact:
+                # emergency_contact might be a list, get the first item
+                emergency_contact = patient.emergency_contact[0] if isinstance(patient.emergency_contact, list) else patient.emergency_contact
+                if emergency_contact and hasattr(emergency_contact, 'phone'):
+                    emergency_contact_phone = emergency_contact.phone
+            
+            patient_responses.append(UserProfileResponse(
+                id=patient.id,
+                full_name=patient.full_name,
+                email=patient.email,
+                phone=patient.phone,
+                date_of_birth=patient.date_of_birth,
+                gender=patient.gender,
+                role=patient.role,
+                is_verified=patient.is_verified,
+                created_at=patient.created_at,
+                profile_picture=patient.profile_picture,
+                address=patient.address,
+                emergencyContact=emergency_contact_phone,  # Use emergency contact phone
+                bloodType=blood_type,  # Use blood type from medical info
+                conditions=conditions,  # Add medical conditions
+                medications=medications,  # Add medications
+            ))
         
-        return patients
+        # Debug: Log first patient data to see structure
+        if patient_responses:
+            first_patient = patient_responses[0]
+            logger.info(f"First patient response: {first_patient.dict()}")
+            logger.info(f"First patient conditions: {first_patient.conditions}")
+            logger.info(f"First patient medications: {first_patient.medications}")
+            logger.info(f"First patient emergency contact: {first_patient.emergencyContact}")
+        else:
+            logger.info("No patients found")
+        
+        return patient_responses
         
     except SQLAlchemyError as e:
         logger.error(f"Error fetching patients: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch patients."
+        )
+
+
+@app.get("/patients/{patient_id}", response_model=UserProfileResponse)
+def get_patient_details(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get detailed patient information including medical data."""
+    # Check permissions - only staff and admins can view patient details
+    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST, Role.PHARMACIST, Role.LAB_TECHNICIAN, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view patient details"
+        )
+    
+    try:
+        # Get patient with medical info eagerly loaded
+        patient = db.query(User).options(joinedload(User.medical_info), joinedload(User.emergency_contact)).filter(
+            User.id == patient_id,
+            User.role == Role.PATIENT
+        ).first()
+        
+        if not patient:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Patient not found"
+            )
+        
+        logger.info(f"Retrieved patient details for patient {patient_id} by user {current_user.id}")
+        
+        # Transform to UserProfileResponse format
+        conditions = []
+        medications = []
+        blood_type = None
+        if hasattr(patient, 'medical_info') and patient.medical_info:
+            medical_info = patient.medical_info
+            conditions = medical_info.conditions or []
+            medications = medical_info.medications or []
+            blood_type = medical_info.blood_type
+        
+        # Get emergency contact phone if available
+        emergency_contact_phone = None
+        if hasattr(patient, 'emergency_contact') and patient.emergency_contact:
+            # emergency_contact might be a list, get the first item
+            emergency_contact = patient.emergency_contact[0] if isinstance(patient.emergency_contact, list) else patient.emergency_contact
+            if emergency_contact and hasattr(emergency_contact, 'phone'):
+                emergency_contact_phone = emergency_contact.phone
+        
+        # Debug: Log medical info structure
+        if hasattr(patient, 'medical_info') and patient.medical_info:
+            logger.info(f"Medical info for patient {patient_id}: {patient.medical_info.__dict__}")
+        else:
+            logger.info(f"No medical info found for patient {patient_id}")
+        
+        return UserProfileResponse(
+            id=patient.id,
+            full_name=patient.full_name,
+            email=patient.email,
+            phone=patient.phone,
+            date_of_birth=patient.date_of_birth,
+            gender=patient.gender,
+            role=patient.role,
+            is_verified=patient.is_verified,
+            created_at=patient.created_at,
+            profile_picture=patient.profile_picture,
+            address=patient.address,
+            emergencyContact=emergency_contact_phone,  # Use emergency contact phone
+            bloodType=blood_type,  # Use blood type from medical info
+            conditions=conditions,  # Add medical conditions
+            medications=medications,  # Add medications
+        )
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Error fetching patient details: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch patient details."
+        )
+
+
+@app.post("/patients/{patient_id}/medical-info")
+def create_medical_info(
+    patient_id: int,
+    medical_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create or update medical information for a patient."""
+    # Check permissions - only staff and admins can update medical info
+    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST, Role.PHARMACIST, Role.LAB_TECHNICIAN, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update medical information"
+        )
+    
+    try:
+        # Check if medical info already exists
+        existing_medical = db.query(MedicalInfo).filter(MedicalInfo.patient_id == patient_id).first()
+        
+        if existing_medical:
+            # Update existing medical info
+            for key, value in medical_data.items():
+                if hasattr(existing_medical, key):
+                    setattr(existing_medical, key, value)
+            existing_medical.updated_at = datetime.utcnow()
+            db.commit()
+            logger.info(f"Updated medical info for patient {patient_id}")
+        else:
+            # Create new medical info
+            new_medical = MedicalInfo(
+                patient_id=patient_id,
+                **medical_data
+            )
+            db.add(new_medical)
+            db.commit()
+            logger.info(f"Created medical info for patient {patient_id}")
+        
+        return {"message": "Medical information updated successfully"}
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Error updating medical info: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update medical information."
+        )
+
+
+@app.post("/add-sample-medical-data")
+def add_sample_medical_data(db: Session = Depends(get_db)):
+    """Add sample medical data for existing patients (for testing)."""
+    try:
+        # Get all patients
+        patients = db.query(User).filter(User.role == Role.PATIENT).all()
+        
+        sample_data = [
+            {
+                "blood_type": "A+",
+                "height": "175 cm", 
+                "weight": "70 kg",
+                "allergies": ["Penicillin", "Peanuts"],
+                "conditions": ["Hypertension", "Type 2 Diabetes"],
+                "medications": ["Metformin", "Lisinopril"]
+            },
+            {
+                "blood_type": "O+",
+                "height": "162 cm",
+                "weight": "58 kg", 
+                "allergies": ["Dust mites"],
+                "conditions": ["Asthma"],
+                "medications": ["Albuterol inhaler"]
+            },
+            {
+                "blood_type": "B+",
+                "height": "180 cm",
+                "weight": "85 kg",
+                "allergies": [],
+                "conditions": [],
+                "medications": []
+            }
+        ]
+        
+        added_count = 0
+        for i, patient in enumerate(patients):
+            if i < len(sample_data):
+                # Check if medical info already exists
+                existing = db.query(MedicalInfo).filter(MedicalInfo.patient_id == patient.id).first()
+                
+                if not existing:
+                    medical_info = MedicalInfo(
+                        patient_id=patient.id,
+                        **sample_data[i]
+                    )
+                    db.add(medical_info)
+                    added_count += 1
+        
+        db.commit()
+        logger.info(f"Added sample medical data for {added_count} patients")
+        
+        return {"message": f"Added sample medical data for {added_count} patients"}
+        
+    except Exception as e:
+        logger.error(f"Error adding sample medical data: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add sample medical data."
         )
 
 
@@ -1002,44 +1231,48 @@ def list_doctors(
 ):
     """List all doctors, optionally filtered by specialization and availability."""
     try:
+        logger.info(f"Fetching doctors with specialization: {specialization}, is_available: {is_available}")
+        
         if specialization:
             doctors = get_doctors_by_specialization(db, specialization, is_available)
         else:
             doctors = get_all_doctors(db, is_available)
 
-        logger.info(f"Found {len(doctors)} doctors")
+        logger.info(f"Found {len(doctors)} doctors in database")
 
         # Enrich doctor data with user information
         result = []
         for doctor in doctors:
             try:
                 user = doctor.user
-                if not user:
-                    logger.warning(f"Doctor {doctor.id} has no associated user record")
-                    continue
-                    
-                result.append({
-                    "id": doctor.id,
-                    "user_id": doctor.user_id,
-                    "fullName": user.full_name,
-                    "email": user.email,
-                    "phone": user.phone,
-                    "specialization": doctor.specialization,
-                    "bio": doctor.bio,
-                    "isAvailable": doctor.is_available,
-                    "rating": float(doctor.rating) if doctor.rating else 0.0,
-                    "consultationFee": float(doctor.consultation_fee) if doctor.consultation_fee else 0.0,
-                    "video_consultation_fee": float(doctor.video_consultation_fee) if doctor.video_consultation_fee else None,
-                    "phone_consultation_fee": float(doctor.phone_consultation_fee) if doctor.phone_consultation_fee else None,
-                    "chat_consultation_fee": float(doctor.chat_consultation_fee) if doctor.chat_consultation_fee else None,
-                    "patientsCount": 0,  # TODO: Calculate from appointments
-                    "avatar": user.profile_picture,
-                })
+                logger.info(f"Processing doctor {doctor.id} with user {user.id if user else 'None'}")
+                
+                doctor_response = DoctorResponse(
+                    id=doctor.id,
+                    user_id=doctor.user_id,
+                    fullName=user.full_name if user else "Unknown",
+                    email=user.email if user else "unknown@example.com",
+                    phone=user.phone if user else None,
+                    specialization=doctor.specialization,
+                    bio=doctor.bio,
+                    isAvailable=doctor.is_available,
+                    rating=doctor.rating,
+                    consultationFee=doctor.consultation_fee,
+                    video_consultation_fee=doctor.video_consultation_fee,
+                    phone_consultation_fee=doctor.phone_consultation_fee,
+                    chat_consultation_fee=doctor.chat_consultation_fee,
+                    patientsCount=0,  # Would need to calculate from appointments
+                    avatar=user.profile_picture if user else None
+                )
+                result.append(doctor_response)
+                
             except Exception as e:
                 logger.error(f"Error processing doctor {doctor.id}: {str(e)}")
                 continue
-        
+
+        logger.info(f"Returning {len(result)} doctor responses")
         return result
+        
     except Exception as e:
         logger.error(f"Error in list_doctors: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
@@ -1074,6 +1307,138 @@ def get_doctor(
         "patientsCount": 0,  # TODO: Calculate from appointments
         "avatar": user.profile_picture,
     }
+
+
+@app.post("/add-sample-doctors")
+def add_sample_doctors(db: Session = Depends(get_db)):
+    """Add sample doctors for testing."""
+    try:
+        # Check if there are any users with doctor role
+        doctor_users = db.query(User).filter(User.role == Role.DOCTOR).all()
+        
+        if not doctor_users:
+            # Create sample doctor users first
+            sample_doctors = [
+                {
+                    "full_name": "Dr. Sarah Johnson",
+                    "email": "sarah.johnson@kiangombe.com",
+                    "password_hash": bcrypt_context.hash("password123"),
+                    "phone": "+254712345678",
+                    "role": Role.DOCTOR,
+                    "is_verified": True
+                },
+                {
+                    "full_name": "Dr. Michael Chen",
+                    "email": "michael.chen@kiangombe.com", 
+                    "password_hash": bcrypt_context.hash("password123"),
+                    "phone": "+254723456789",
+                    "role": Role.DOCTOR,
+                    "is_verified": True
+                },
+                {
+                    "full_name": "Dr. Emily Williams",
+                    "email": "emily.williams@kiangombe.com",
+                    "password_hash": bcrypt_context.hash("password123"),
+                    "phone": "+254734567890",
+                    "role": Role.DOCTOR,
+                    "is_verified": True
+                }
+            ]
+            
+            created_users = []
+            for doctor_data in sample_doctors:
+                user = User(**doctor_data)
+                db.add(user)
+                db.flush()  # Get the ID
+                created_users.append(user)
+            
+            # Create doctor profiles for the users
+            specializations = ["Cardiology", "Pediatrics", "General Practice"]
+            for i, user in enumerate(created_users):
+                doctor = Doctor(
+                    user_id=user.id,
+                    specialization=specializations[i],
+                    bio=f"Experienced {specializations[i]} specialist with over 10 years of practice",
+                    is_available=True,
+                    rating=4.5,
+                    consultation_fee=150.00,
+                    video_consultation_fee=100.00,
+                    phone_consultation_fee=80.00,
+                    chat_consultation_fee=50.00
+                )
+                db.add(doctor)
+            
+            db.commit()
+            logger.info(f"Created {len(created_users)} sample doctors")
+            return {"message": f"Created {len(created_users)} sample doctors"}
+        else:
+            # Create doctor profiles for existing doctor users who don't have one
+            existing_doctor_profiles = db.query(Doctor).all()
+            existing_user_ids = [doc.user_id for doc in existing_doctor_profiles]
+            
+            doctors_without_profiles = [user for user in doctor_users if user.id not in existing_user_ids]
+            
+            if doctors_without_profiles:
+                specializations = ["Cardiology", "Pediatrics", "General Practice", "Neurology", "Orthopedics"]
+                for i, user in enumerate(doctors_without_profiles):
+                    doctor = Doctor(
+                        user_id=user.id,
+                        specialization=specializations[i % len(specializations)],
+                        bio=f"Experienced {specializations[i % len(specializations)]} specialist",
+                        is_available=True,
+                        rating=4.5,
+                        consultation_fee=150.00,
+                        video_consultation_fee=100.00,
+                        phone_consultation_fee=80.00,
+                        chat_consultation_fee=50.00
+                    )
+                    db.add(doctor)
+                
+                db.commit()
+                logger.info(f"Created doctor profiles for {len(doctors_without_profiles)} existing users")
+                return {"message": f"Created doctor profiles for {len(doctors_without_profiles)} existing users"}
+            else:
+                return {"message": "Sample doctors already exist"}
+        
+    except Exception as e:
+        logger.error(f"Error adding sample doctors: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add sample doctors."
+        )
+
+
+@app.post("/add-doctor-profile-pictures")
+def add_doctor_profile_pictures(db: Session = Depends(get_db)):
+    """Add default profile pictures for doctors that don't have them."""
+    try:
+        # Get all doctors with their associated users
+        doctors = db.query(Doctor).options(joinedload(Doctor.user)).all()
+        
+        updated_count = 0
+        for doctor in doctors:
+            user = doctor.user
+            if user and not user.profile_picture:
+                # Set a default profile picture based on the doctor's name
+                default_avatar = f"/images/doctor-{doctor.id}.jpg"
+                user.profile_picture = default_avatar
+                updated_count += 1
+        
+        if updated_count > 0:
+            db.commit()
+            logger.info(f"Updated profile pictures for {updated_count} doctors")
+            return {"message": f"Updated profile pictures for {updated_count} doctors"}
+        else:
+            return {"message": "All doctors already have profile pictures"}
+        
+    except Exception as e:
+        logger.error(f"Error updating doctor profile pictures: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update doctor profile pictures."
+        )
 
 
 @app.get("/staff")
@@ -1275,7 +1640,7 @@ def list_medications(
         # Convert relative image_url to absolute URL
         image_url = med.image_url
         if image_url and not image_url.startswith('http'):
-            image_url = f"http://localhost:8000{image_url}"
+            image_url = f"http://localhost:8001{image_url}"
         
         medication_responses.append(MedicationResponse(
             id=med.id,
