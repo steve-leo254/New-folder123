@@ -157,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = (newToken: string) => {
-    console.log('AuthContext - Login called');
+    console.log('AuthContext - Login called with token:', newToken.substring(0, 20) + '...');
     try {
       const payload = parseJwt(newToken);
       
@@ -165,7 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Invalid token payload');
       }
 
-      console.log('AuthContext - Login successful, role:', payload.role);
+      console.log('AuthContext - Login successful, role:', payload.role, 'user:', payload.sub);
       
       localStorage.setItem('token', newToken);
       localStorage.setItem('authToken', newToken);
@@ -180,6 +180,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: payload.role,
       });
       setIsAuthenticated(true);
+      
+      console.log('AuthContext - State updated successfully');
     } catch (err) {
       console.error('AuthContext - Login failed, invalid token:', err);
       throw new Error('Invalid authentication token');

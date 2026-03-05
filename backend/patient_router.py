@@ -28,6 +28,103 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/patient", tags=["patient"])
 
+logger.info("Patient router initialized with profile endpoints")
+
+# Profile endpoints
+@router.get("/profile")
+async def get_patient_profile(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current patient profile."""
+    # Convert relative profile_picture URL to full URL if needed
+    profile_picture = current_user.profile_picture
+    if profile_picture and not profile_picture.startswith('http'):
+        profile_picture = f"http://localhost:8000{profile_picture}"
+    
+    # Get medical info and emergency contact
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+    emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == current_user.id).first()
+    
+    return {
+        "id": current_user.id,
+        "user_id": current_user.id,
+        "full_name": current_user.full_name,
+        "email": current_user.email,
+        "phone": current_user.phone,
+        "date_of_birth": current_user.date_of_birth,
+        "gender": current_user.gender,
+        "role": current_user.role.value,
+        "is_verified": current_user.is_verified,
+        "created_at": current_user.created_at,
+        "profile_picture": profile_picture,
+        "address": current_user.address,
+        "emergencyContact": emergency_contact.phone if emergency_contact else None,
+        "bloodType": medical_info.blood_type if medical_info else None,
+        "allergies": ', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None
+    }
+
+@router.put("/profile")
+async def update_patient_profile(
+    update_data: dict,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update current patient profile."""
+    # Update allowed fields
+    allowed_fields = ['full_name', 'phone', 'date_of_birth', 'gender', 'profile_picture', 'address']
+    for field, value in update_data.items():
+        if field in allowed_fields and hasattr(current_user, field):
+            setattr(current_user, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(current_user)
+        logger.info(f"Patient profile updated: {current_user.id}")
+        
+        # Log profile update
+        from activity_logger import create_activity_log
+        create_activity_log(
+            user_id=current_user.id,
+            action="Profile Update",
+            device="Web Application",
+            db=db
+        )
+        
+        # Convert relative profile_picture URL to full URL if needed
+        profile_picture = current_user.profile_picture
+        if profile_picture and not profile_picture.startswith('http'):
+            profile_picture = f"http://localhost:8000{profile_picture}"
+        
+        # Get medical info and emergency contact
+        medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
+        emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == current_user.id).first()
+        
+        return {
+            "id": current_user.id,
+            "user_id": current_user.id,
+            "full_name": current_user.full_name,
+            "email": current_user.email,
+            "phone": current_user.phone,
+            "date_of_birth": current_user.date_of_birth,
+            "gender": current_user.gender,
+            "role": current_user.role.value,
+            "is_verified": current_user.is_verified,
+            "created_at": current_user.created_at,
+            "profile_picture": profile_picture,
+            "address": current_user.address,
+            "emergencyContact": emergency_contact.phone if emergency_contact else None,
+            "bloodType": medical_info.blood_type if medical_info else None,
+            "allergies": medical_info.allergies if medical_info else None
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating patient profile: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update patient profile."
+        )
+
 logger.info("Patient router initialized with wishlist endpoints")
 
 # Pydantic Models
@@ -397,21 +494,36 @@ async def get_medical_info(
     """Get patient's medical information"""
     patient_id = current_user.id
     
-    # Get medical info for this patient
-    medical_info = medical_info_storage.get(patient_id, {
-        "id": patient_id,
-        "patient_id": patient_id,
-        "blood_type": None,
-        "height": None,
-        "weight": None,
-        "allergies": [],
-        "conditions": [],
-        "medications": [],
-        "created_at": "2024-01-01T00:00:00",
-        "updated_at": "2024-01-01T00:00:00"
-    })
+    # Get medical info from database
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == patient_id).first()
     
-    return medical_info
+    if not medical_info:
+        # Return empty medical info if none exists
+        return {
+            "id": patient_id,
+            "patient_id": patient_id,
+            "blood_type": None,
+            "height": None,
+            "weight": None,
+            "allergies": [],
+            "conditions": [],
+            "medications": [],
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+    
+    return {
+        "id": medical_info.id,
+        "patient_id": patient_id,
+        "blood_type": medical_info.blood_type,
+        "height": medical_info.height,
+        "weight": medical_info.weight,
+        "allergies": medical_info.allergies or [],
+        "conditions": medical_info.conditions or [],
+        "medications": medical_info.medications or [],
+        "created_at": medical_info.created_at.isoformat() if medical_info.created_at else datetime.now().isoformat(),
+        "updated_at": medical_info.updated_at.isoformat() if medical_info.updated_at else datetime.now().isoformat()
+    }
 
 @router.put("/medical-info")
 async def update_medical_info(
@@ -422,23 +534,55 @@ async def update_medical_info(
     """Update patient's medical information"""
     patient_id = current_user.id
     
-    from datetime import datetime
-    medical_info = {
-        "id": patient_id,
-        "patient_id": patient_id,
-        "blood_type": request.blood_type,
-        "height": request.height,
-        "weight": request.weight,
-        "allergies": request.allergies or [],
-        "conditions": request.conditions or [],
-        "medications": request.medications or [],
-        "created_at": "2024-01-01T00:00:00",
-        "updated_at": datetime.now().isoformat()
-    }
+    # Get existing medical info
+    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == patient_id).first()
     
-    medical_info_storage[patient_id] = medical_info
+    if medical_info:
+        # Update existing medical info - always update fields, even if empty
+        medical_info.blood_type = request.blood_type if request.blood_type is not None else medical_info.blood_type
+        medical_info.height = request.height if request.height is not None else medical_info.height
+        medical_info.weight = request.weight if request.weight is not None else medical_info.weight
+        medical_info.allergies = request.allergies if request.allergies is not None else medical_info.allergies
+        medical_info.conditions = request.conditions if request.conditions is not None else medical_info.conditions
+        medical_info.medications = request.medications if request.medications is not None else medical_info.medications
+        
+        medical_info.updated_at = datetime.now()
+    else:
+        # Create new medical info if none exists
+        medical_info = MedicalInfo(
+            patient_id=patient_id,
+            blood_type=request.blood_type,
+            height=request.height,
+            weight=request.weight,
+            allergies=request.allergies or [],
+            conditions=request.conditions or [],
+            medications=request.medications or []
+        )
+        db.add(medical_info)
     
-    return medical_info
+    try:
+        db.commit()
+        db.refresh(medical_info)
+        
+        return {
+            "id": medical_info.id,
+            "patient_id": patient_id,
+            "blood_type": medical_info.blood_type,
+            "height": medical_info.height,
+            "weight": medical_info.weight,
+            "allergies": medical_info.allergies or [],
+            "conditions": medical_info.conditions or [],
+            "medications": medical_info.medications or [],
+            "created_at": medical_info.created_at.isoformat(),
+            "updated_at": medical_info.updated_at.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error updating medical info: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update medical information."
+        )
 
 # Emergency Contact endpoints
 @router.get("/emergency-contact")

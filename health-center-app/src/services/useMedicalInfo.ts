@@ -107,13 +107,15 @@ export const useMedicalInfo = (): UseMedicalInfoReturn => {
       setError(null);
       
       // Map frontend data (camelCase) to backend format (snake_case)
-      const backendPayload: any = {};
-      if (data.bloodType !== undefined) backendPayload.blood_type = data.bloodType;
-      if (data.height !== undefined) backendPayload.height = data.height;
-      if (data.weight !== undefined) backendPayload.weight = data.weight;
-      if (data.allergies !== undefined) backendPayload.allergies = data.allergies;
-      if (data.conditions !== undefined) backendPayload.conditions = data.conditions;
-      if (data.medications !== undefined) backendPayload.medications = data.medications;
+      // Send empty strings for fields that should be cleared
+      const backendPayload: any = {
+        blood_type: data.bloodType !== undefined ? data.bloodType : '',
+        height: data.height !== undefined ? data.height : '',
+        weight: data.weight !== undefined ? data.weight : '',
+        allergies: data.allergies !== undefined ? data.allergies : [],
+        conditions: data.conditions !== undefined ? data.conditions : [],
+        medications: data.medications !== undefined ? data.medications : [],
+      };
       
       const updatedData = await apiService.updateMedicalInfo(backendPayload);
       

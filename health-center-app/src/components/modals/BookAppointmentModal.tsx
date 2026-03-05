@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Video, MapPin, User } from 'lucide-react';
+import { X, Calendar, Clock, Video, MapPin, User, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Button from '../ui/Button';
 import Alert from '../ui/Alert';
 import { StaffMember } from '../../types';
@@ -28,6 +29,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   patientId = '1',
   onSubmit,
 }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     date: '',
     time: '',
@@ -36,6 +38,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>(patientId.toString());
@@ -106,6 +109,10 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         type: formData.type,
         notes: formData.notes || undefined,
       });
+      
+      // Show success message
+      setSuccessMessage('Appointment booked successfully! You will receive a confirmation shortly.');
+      
       setFormData({
         date: '',
         time: '',
@@ -113,7 +120,13 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         notes: '',
       });
       setSelectedUserId(patientId.toString());
-      onClose();
+      
+      // Navigate to patient profile with success parameter
+      setTimeout(() => {
+        navigate('/patient/profile?appointment_success=true');
+        onClose();
+        setSuccessMessage(null);
+      }, 1500);
     } catch (error: any) {
       setServerError(
         error.response?.data?.detail ||
@@ -178,13 +191,36 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
             )}
           </div>
 
-          {serverError && (
-            <Alert
-              type="error"
-              message={serverError}
-              onClose={() => setServerError(null)}
-            />
-          )}
+          {successMessage && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: -50 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: -50 }}
+            className="fixed top-4 right-4 z-50 max-w-sm"
+          >
+            <div className="bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3">
+              <CheckCircle className="w-6 h-6" />
+              <div>
+                <p className="font-semibold">Appointment Booked Successfully!</p>
+                <p className="text-sm text-green-100">You will receive a confirmation shortly.</p>
+              </div>
+              <button
+                onClick={() => setSuccessMessage(null)}
+                className="text-green-100 hover:text-white ml-4"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {serverError && (
+          <Alert
+            type="error"
+            message={serverError}
+            onClose={() => setServerError(null)}
+          />
+        )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Patient Selection */}

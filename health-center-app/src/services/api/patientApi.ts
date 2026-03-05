@@ -377,7 +377,7 @@ function transformPatientData(data: any): PatientProfile {
     lastName,
     email: data.email || '',
     phone: data.phone || '',
-    date_of_birth: data.date_of_birth ? (new Date(data.date_of_birth).toISOString().split('T')[0]) : '',
+    date_of_birth: data.date_of_birth ? new Date(data.date_of_birth).toISOString().split('T')[0] : '',
     gender: data.gender || '',
     avatar: getFullImageUrl(data.profile_picture) || '',
     address: data.address || '',

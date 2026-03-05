@@ -100,11 +100,12 @@ export interface StaffRole {
   description: string;
   permissions: string[];
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
   requiresSpecialization?: boolean;
   requiresLicense?: boolean;
   defaultConsultationFee?: number;
+  customizable?: boolean;
 }
 
 export interface StaffMember {

@@ -62,33 +62,9 @@ class PrescriptionStatus(enum.Enum):
     FULFILLED = "fulfilled"
 
 
-class PaymentStatus(enum.Enum):
-    """Payment status enumeration."""
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
 # ============================================================================
 # ORM Models
 # ============================================================================
-
-class StaffRole(Base):
-    """Staff role model representing configurable staff roles with permissions."""
-    __tablename__ = "staff_roles"
-
-    id = Column(String(50), primary_key=True, index=True)
-    name = Column(String(100), nullable=False, unique=True, index=True)
-    description = Column(Text, nullable=False)
-    permissions = Column(JSON, nullable=False)  # List of permission strings
-    is_active = Column(Boolean, default=True, index=True)
-    requires_specialization = Column(Boolean, default=False)
-    requires_license = Column(Boolean, default=False)
-    default_consultation_fee = Column(Numeric(precision=10, scale=2), nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
 
 class User(Base):
     """User model representing patients, clinicians, and admins in Kiangombe."""
@@ -104,16 +80,20 @@ class User(Base):
     address = Column(String(255), nullable=True)
     profile_picture = Column(String(255), nullable=True)
     is_verified = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True, index=True)
     last_login = Column(DateTime, nullable=True)
     role = Column(Enum(Role), nullable=False, default=Role.PATIENT)
-    staff_role_id = Column(String(50), ForeignKey("staff_roles.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    last_login = Column(DateTime, nullable=True)
 
     # Relationships
-    staff_role = relationship("StaffRole", backref="users")
-    medical_info = relationship("MedicalInfo", uselist=False)
+    medical_info = relationship("MedicalInfo", uselist=False, back_populates="patient")
+    emergency_contact = relationship("EmergencyContact", uselist=False, back_populates="patient")
+    insurance = relationship("Insurance", uselist=False, back_populates="patient")
+    notification_settings = relationship("NotificationSettings", uselist=False, back_populates="patient")
+    security_settings = relationship("SecuritySettings", uselist=False, back_populates="patient")
+    
+    # Appointments
     appointments = relationship(
         "Appointment",
         back_populates="patient",
@@ -124,14 +104,19 @@ class User(Base):
         back_populates="clinician",
         foreign_keys="Appointment.clinician_id",
     )
+    
+    # Medical History
+    medical_history = relationship("MedicalHistory", foreign_keys="MedicalHistory.patient_id", back_populates="patient")
+    
+    # Staff Profiles
     doctor_profile = relationship("Doctor", back_populates="user", uselist=False)
     nurse_profile = relationship("Nurse", back_populates="user", uselist=False)
     receptionist_profile = relationship("Receptionist", back_populates="user", uselist=False)
     lab_technician_profile = relationship("LabTechnician", back_populates="user", uselist=False)
     pharmacist_profile = relationship("Pharmacist", back_populates="user", uselist=False)
-    payments = relationship("Payment", back_populates="user")
-    medical_history = relationship("MedicalHistory", back_populates="patient")
-    addresses = relationship("Address", back_populates="user")
+    
+    # Activity & Wishlist
+    activity_logs = relationship("ActivityLog", back_populates="user")
     wishlist_items = relationship("Wishlist", back_populates="user", cascade="all, delete-orphan")
 
 
@@ -223,39 +208,6 @@ class Pharmacist(Base):
     user = relationship("User", back_populates="pharmacist_profile")
 
 
-class MoodEntry(Base):
-    """Mood entry model for tracking user's daily mood."""
-    __tablename__ = "mood_entries"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    date = Column(Date, nullable=False, index=True)
-    mood = Column(Integer, nullable=False)  # 1-10 scale
-    energy = Column(Integer, nullable=False)  # 1-10 scale
-    anxiety = Column(Integer, nullable=False)  # 1-10 scale
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now())
-
-    # Relationships
-    user = relationship("User", backref="mood_entries")
-
-
-class GameResult(Base):
-    """Game result model for tracking mental health game performance."""
-    __tablename__ = "game_results"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    game = Column(String(50), nullable=False)  # memory, reaction, color, focus
-    score = Column(Integer, nullable=False)
-    level = Column(Integer, nullable=False)
-    metrics = Column(JSON, nullable=True)  # Additional game-specific metrics
-    timestamp = Column(DateTime, default=func.now(), index=True)
-
-    # Relationships
-    user = relationship("User", backref="game_results")
-
-
 class Appointment(Base):
     """Appointment model representing patient-clinician appointments."""
     __tablename__ = "appointments"
@@ -277,7 +229,6 @@ class Appointment(Base):
     patient = relationship("User", foreign_keys=[patient_id], back_populates="appointments")
     clinician = relationship("User", foreign_keys=[clinician_id], back_populates="consults")
     prescription = relationship("Prescription", back_populates="appointment", uselist=False)
-    payment = relationship("Payment", back_populates="appointment", uselist=False)
 
 
 class Prescription(Base):
@@ -314,48 +265,6 @@ class Prescription(Base):
         return self.issued_by_doctor.full_name if self.issued_by_doctor else None
 
 
-class Payment(Base):
-    """Payment model representing transactions for appointments."""
-    __tablename__ = "payments"
-
-    id = Column(Integer, primary_key=True, index=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    amount = Column(Numeric(precision=12, scale=2), nullable=False)
-    payment_method = Column(String(50), nullable=False)  # "card", "mpesa", "bank_transfer"
-    transaction_id = Column(String(100), unique=True, nullable=True, index=True)
-    status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING, index=True)
-    reference_number = Column(String(100), nullable=True)
-    payment_details = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # Relationships
-    appointment = relationship("Appointment", back_populates="payment")
-    user = relationship("User", back_populates="payments")
-
-
-class Address(Base):
-    """Address model for patient delivery and contact addresses."""
-    __tablename__ = "addresses"
-
-    id = Column(Integer, primary_key=True, index=True)
-    first_name = Column(String(100), nullable=False)
-    last_name = Column(String(100), nullable=False)
-    phone_number = Column(String(20), nullable=False)
-    address = Column(String(255), nullable=False)
-    additional_info = Column(String(255), nullable=True)
-    region = Column(String(100), nullable=True)
-    city = Column(String(100), nullable=False)
-    is_default = Column(Boolean, default=False, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # Relationships
-    user = relationship("User", back_populates="addresses")
-
-
 class Medication(Base):
     """Medication model for pharmacy inventory management."""
     __tablename__ = "medications"
@@ -387,39 +296,24 @@ class MedicalHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True)
+    type = Column(String(50), nullable=False)  # consultation, diagnosis, prescription, lab_result, vaccination
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
     diagnosis = Column(Text, nullable=True)
     symptoms = Column(Text, nullable=True)
     treatment_plan = Column(Text, nullable=True)
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    doctor_name = Column(String(120), nullable=False)
     notes = Column(Text, nullable=True)
-    attachments_json = Column(JSON, nullable=True)
+    attachments_json = Column(JSON, nullable=True)  # Legacy field
+    attachments = Column(JSON, nullable=True)  # New field for list of attachment file names
+    date = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    patient = relationship("User", back_populates="medical_history")
-
-
-class VideoConsultation(Base):
-    """Video consultation model for tracking video call sessions."""
-    __tablename__ = "video_consultations"
-
-    id = Column(Integer, primary_key=True, index=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False, unique=True, index=True)
-    room_id = Column(String(255), nullable=False, unique=True, index=True)
-    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    status = Column(String(50), default='waiting', index=True)  # waiting, active, ended
-    start_time = Column(DateTime, nullable=True)
-    end_time = Column(DateTime, nullable=True)
-    recording_url = Column(String(500), nullable=True)
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # Relationships
-    appointment = relationship("Appointment", foreign_keys=[appointment_id])
-    doctor = relationship("User", foreign_keys=[doctor_id])
-    patient = relationship("User", foreign_keys=[patient_id])
+    patient = relationship("User", foreign_keys=[patient_id], back_populates="medical_history")
+    doctor = relationship("User", foreign_keys=[doctor_id], backref="medical_records_created")
 
 
 # ============================================================================
@@ -442,7 +336,7 @@ class MedicalInfo(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    patient = relationship("User")
+    patient = relationship("User", back_populates="medical_info")
 
 
 class EmergencyContact(Base):
@@ -458,7 +352,7 @@ class EmergencyContact(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    patient = relationship("User", backref="emergency_contact")
+    patient = relationship("User", back_populates="emergency_contact")
 
 
 class Insurance(Base):
@@ -480,47 +374,7 @@ class Insurance(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    patient = relationship("User", backref="insurance")
-
-
-class DoctorEducation(Base):
-    """Doctor education and certifications."""
-    __tablename__ = "doctor_education"
-
-    id = Column(Integer, primary_key=True, index=True)
-    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
-    title = Column(String(200), nullable=False)  # e.g., "Doctor of Medicine"
-    institution = Column(String(200), nullable=False)  # e.g., "Harvard Medical School"
-    year = Column(String(4), nullable=True)  # Graduation year (optional)
-    type = Column(Enum('degree', 'certification', 'license', name='education_type'), nullable=False)
-    license_number = Column(String(50), nullable=True)
-    expiry_date = Column(String(10), nullable=True)  # YYYY-MM-DD format
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # Relationships
-    doctor = relationship("Doctor", backref="education")
-
-
-class DoctorContactInfo(Base):
-    """Doctor contact and professional information."""
-    __tablename__ = "doctor_contact_info"
-
-    id = Column(Integer, primary_key=True, index=True)
-    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, unique=True, index=True)
-    hospital = Column(String(200), nullable=True)
-    department = Column(String(100), nullable=True)
-    location = Column(String(300), nullable=True)  # Office location
-    languages = Column(JSON, nullable=True)  # List of languages
-    consultation_fee = Column(Numeric(precision=10, scale=2), nullable=True)
-    response_rate = Column(Numeric(precision=5, scale=2), default=98.0)
-    on_time_rate = Column(Numeric(precision=5, scale=2), default=95.0)
-    patient_satisfaction = Column(Numeric(precision=3, scale=2), default=4.9)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # Relationships
-    doctor = relationship("Doctor", backref="contact_info")
+    patient = relationship("User", back_populates="insurance")
 
 
 class DoctorAvailability(Base):
@@ -546,7 +400,7 @@ class DoctorAvailability(Base):
 
 
 class DoctorSettings(Base):
-    """Doctor profile and notification settings."""
+    """Doctor profile and notification settings - simplified for offline-first app."""
     __tablename__ = "doctor_settings"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -557,21 +411,13 @@ class DoctorSettings(Base):
     allow_online_booking = Column(Boolean, default=True)
     show_availability = Column(Boolean, default=True)
     
-    # Notification settings
+    # Notification settings (email/SMS focused)
     email_notifications = Column(Boolean, default=True)
     sms_notifications = Column(Boolean, default=True)
     appointment_reminders = Column(Boolean, default=True)
     new_appointment_requests = Column(Boolean, default=True)
     cancellation_alerts = Column(Boolean, default=True)
-    patient_messages = Column(Boolean, default=True)
     weekly_summary = Column(Boolean, default=False)
-    marketing_emails = Column(Boolean, default=False)
-    
-    # Consultation types enabled
-    in_person_consultations = Column(Boolean, default=True)
-    video_consultations = Column(Boolean, default=True)
-    phone_consultations = Column(Boolean, default=True)
-    chat_consultations = Column(Boolean, default=False)
     
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -594,7 +440,7 @@ class NotificationSettings(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    patient = relationship("User", backref="notification_settings")
+    patient = relationship("User", back_populates="notification_settings")
 
 
 class SecuritySettings(Base):
@@ -609,7 +455,7 @@ class SecuritySettings(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    patient = relationship("User", backref="security_settings")
+    patient = relationship("User", back_populates="security_settings")
 
 
 class ActivityLog(Base):
@@ -626,46 +472,7 @@ class ActivityLog(Base):
     created_at = Column(DateTime, default=func.now())
 
     # Relationships
-    user = relationship("User", backref="activity_logs")
-
-
-class ChatMessage(Base):
-    """Chat messages between patients and doctors."""
-    __tablename__ = "chat_messages"
-
-    id = Column(Integer, primary_key=True, index=True)
-    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    recipient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True, index=True)
-    message = Column(Text, nullable=False)
-    message_type = Column(String(20), default="text")  # text, image, file
-    is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=func.now(), index=True)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # Relationships
-    sender = relationship("User", foreign_keys=[sender_id], backref="sent_messages")
-    recipient = relationship("User", foreign_keys=[recipient_id], backref="received_messages")
-    appointment = relationship("Appointment", backref="chat_messages")
-
-
-class ChatRoom(Base):
-    """Chat rooms for ongoing conversations."""
-    __tablename__ = "chat_rooms"
-
-    id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True, index=True)
-    is_active = Column(Boolean, default=True)
-    last_message_at = Column(DateTime, default=func.now())
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # Relationships
-    patient = relationship("User", foreign_keys=[patient_id], backref="patient_chat_rooms")
-    doctor = relationship("User", foreign_keys=[doctor_id], backref="doctor_chat_rooms")
-    appointment = relationship("Appointment", backref="chat_room")
+    user = relationship("User", back_populates="activity_logs")
 
 
 class Wishlist(Base):

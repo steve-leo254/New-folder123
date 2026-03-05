@@ -51,13 +51,14 @@ export const useStaffRoles = () => {
         id: role.id,
         name: role.name,
         description: role.description,
-        permissions: role.permissions,
-        isActive: role.is_active,
-        createdAt: role.created_at,
-        updatedAt: role.updated_at,
-        requiresSpecialization: role.requires_specialization,
-        requiresLicense: role.requires_license,
-        defaultConsultationFee: role.default_consultation_fee,
+        permissions: [], // Predefined roles don't have custom permissions
+        isActive: role.isActive,
+        createdAt: new Date(role.createdAt),
+        updatedAt: new Date(role.updatedAt),
+        requiresSpecialization: role.requiresSpecialization || false,
+        requiresLicense: role.requiresLicense || false,
+        defaultConsultationFee: role.defaultConsultationFee || 0,
+        customizable: role.customizable || false,
       }));
       
       setRoles(transformedData);
@@ -72,16 +73,18 @@ export const useStaffRoles = () => {
   const createRole = async (roleData: Omit<StaffRole, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
       
-      // Transform field names to match backend expectations
+      // Transform frontend data to backend format
       const backendData = {
         name: roleData.name,
         description: roleData.description,
-        permissions: roleData.permissions,
-        is_active: roleData.isActive,
-        requires_specialization: roleData.requiresSpecialization,
-        requires_license: roleData.requiresLicense,
-        default_consultation_fee: roleData.defaultConsultationFee,
+        isActive: roleData.isActive,
+        requiresSpecialization: roleData.requiresSpecialization,
+        requiresLicense: roleData.requiresLicense,
+        defaultConsultationFee: roleData.defaultConsultationFee,
       };
       
       const response = await fetch(`${API_BASE_URL}/staff-roles`, {
@@ -98,26 +101,26 @@ export const useStaffRoles = () => {
         throw new Error(errorData.detail || 'Failed to create role');
       }
 
-      const newRole = await response.json();
-      
-      // Transform backend response to frontend format
-      const transformedRole = {
-        id: newRole.id,
-        name: newRole.name,
-        description: newRole.description,
-        permissions: newRole.permissions,
-        isActive: newRole.is_active,
-        createdAt: newRole.created_at,
-        updatedAt: newRole.updated_at,
-        requiresSpecialization: newRole.requires_specialization,
-        requiresLicense: newRole.requires_license,
-        defaultConsultationFee: newRole.default_consultation_fee,
+      const data = await response.json();
+      const transformedData = {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        permissions: data.permissions || [],
+        isActive: data.isActive,
+        createdAt: new Date(data.createdAt),
+        updatedAt: new Date(data.updatedAt),
+        requiresSpecialization: data.requiresSpecialization || false,
+        requiresLicense: data.requiresLicense || false,
+        defaultConsultationFee: data.defaultConsultationFee || 0,
+        customizable: data.customizable || false,
       };
-      
-      setRoles(prev => [...prev, transformedRole]);
-      return transformedRole;
+
+      setRoles(prev => [...prev, transformedData]);
+      return transformedData;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create role');
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error creating role:', err);
       throw err;
     }
   };
@@ -125,16 +128,18 @@ export const useStaffRoles = () => {
   const updateRole = async (id: string, roleData: Omit<StaffRole, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
       
-      // Transform field names to match backend expectations
+      // Transform frontend data to backend format
       const backendData = {
         name: roleData.name,
         description: roleData.description,
-        permissions: roleData.permissions,
-        is_active: roleData.isActive,
-        requires_specialization: roleData.requiresSpecialization,
-        requires_license: roleData.requiresLicense,
-        default_consultation_fee: roleData.defaultConsultationFee,
+        isActive: roleData.isActive,
+        requiresSpecialization: roleData.requiresSpecialization,
+        requiresLicense: roleData.requiresLicense,
+        defaultConsultationFee: roleData.defaultConsultationFee,
       };
       
       const response = await fetch(`${API_BASE_URL}/staff-roles/${id}`, {
@@ -151,26 +156,26 @@ export const useStaffRoles = () => {
         throw new Error(errorData.detail || 'Failed to update role');
       }
 
-      const updatedRole = await response.json();
-      
-      // Transform backend response to frontend format
-      const transformedRole = {
-        id: updatedRole.id,
-        name: updatedRole.name,
-        description: updatedRole.description,
-        permissions: updatedRole.permissions,
-        isActive: updatedRole.is_active,
-        createdAt: updatedRole.created_at,
-        updatedAt: updatedRole.updated_at,
-        requiresSpecialization: updatedRole.requires_specialization,
-        requiresLicense: updatedRole.requires_license,
-        defaultConsultationFee: updatedRole.default_consultation_fee,
+      const data = await response.json();
+      const transformedData = {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        permissions: data.permissions || [],
+        isActive: data.isActive,
+        createdAt: new Date(data.createdAt),
+        updatedAt: new Date(data.updatedAt),
+        requiresSpecialization: data.requiresSpecialization || false,
+        requiresLicense: data.requiresLicense || false,
+        defaultConsultationFee: data.defaultConsultationFee || 0,
+        customizable: data.customizable || false,
       };
-      
-      setRoles(prev => prev.map(role => role.id === id ? transformedRole : role));
-      return transformedRole;
+
+      setRoles(prev => prev.map(role => role.id === id ? transformedData : role));
+      return transformedData;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update role');
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error updating role:', err);
       throw err;
     }
   };
@@ -178,11 +183,14 @@ export const useStaffRoles = () => {
   const deleteRole = async (id: string) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
       const response = await fetch(`${API_BASE_URL}/staff-roles/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
         },
       });
 
@@ -193,7 +201,8 @@ export const useStaffRoles = () => {
 
       setRoles(prev => prev.filter(role => role.id !== id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete role');
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error deleting role:', err);
       throw err;
     }
   };

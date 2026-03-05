@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, X, Trash2, Pill, AlertCircle } from 'lucide-react';
+import { Plus, X, Trash2, Pill, AlertCircle, Save } from 'lucide-react';
 import Card from '../../ui/Card';
 import { useMedicalInfo, MedicalInfo } from '../../../services/useMedicalInfo';
 
 interface MedicalInfoSectionProps {
   isEditing: boolean;
-  formData: any;
-  onFormDataChange: (data: any) => void;
+  onSaveComplete?: () => void;
 }
 
-export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditing }) => {
+export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditing, onSaveComplete }) => {
   const { medicalInfo, loading, error, updateMedicalInfo, addItem, removeItem } = useMedicalInfo();
   const [formData, setFormData] = useState<MedicalInfo>({
     bloodType: '',
@@ -26,6 +25,9 @@ export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditin
     medication: '',
   });
 
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   // Update local form data when medical info changes
   useEffect(() => {
     if (medicalInfo) {
@@ -37,6 +39,14 @@ export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditin
       });
     }
   }, [medicalInfo]);
+
+  // Track changes
+  useEffect(() => {
+    if (medicalInfo) {
+      const changed = JSON.stringify(formData) !== JSON.stringify(medicalInfo);
+      setHasChanges(changed);
+    }
+  }, [formData, medicalInfo]);
 
   // Handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -50,13 +60,21 @@ export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditin
 
   // Save medical info
   const handleSave = async () => {
-    console.log('MedicalInfoSection: Saving medical data:', formData);
-    const result = await updateMedicalInfo(formData);
-    if (!result.success) {
-      // Handle error - you could show a toast or alert here
-      console.error('Failed to update medical info:', result.error);
-    } else {
-      console.log('MedicalInfoSection: Save successful');
+    if (!hasChanges) return;
+    
+    setIsSaving(true);
+    try {
+      console.log('MedicalInfoSection: Saving medical data:', formData);
+      const result = await updateMedicalInfo(formData);
+      if (!result.success) {
+        console.error('Failed to update medical info:', result.error);
+      } else {
+        console.log('MedicalInfoSection: Save successful');
+        setHasChanges(false);
+        if (onSaveComplete) onSaveComplete();
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -127,7 +145,19 @@ export const MedicalInfoSection: React.FC<MedicalInfoSectionProps> = ({ isEditin
     >
       {/* Basic Health Info */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">Basic Health Info</h3>
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Basic Health Info</h3>
+          {isEditing && hasChanges && (
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

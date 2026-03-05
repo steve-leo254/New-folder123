@@ -10,6 +10,7 @@ from starlette.responses import StreamingResponse
 from reportlab.pdfgen import canvas
 from typing import Annotated, List, Optional
 from pathlib import Path
+from decimal import Decimal
 
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,9 +24,9 @@ import models
 from database import engine, get_db
 from models import (
     User, Appointment, Prescription, Doctor, Medication,
-    Role, AppointmentStatus, VideoConsultation, StaffRole,
+    Role, AppointmentStatus,
     MedicalInfo, EmergencyContact, Insurance, NotificationSettings,
-    SecuritySettings, ActivityLog, ChatMessage, ChatRoom
+    SecuritySettings, ActivityLog, Wishlist
 )
 from auth_router import (
     router as auth_router, 
@@ -34,8 +35,8 @@ from auth_router import (
     bcrypt_context
 )
 from doctor_profile_router import router as doctor_profile_router
-from mental_health_router import router as mental_health_router
 from patient_router import router as patient_router
+from medical_history_router import router as medical_history_router
 from pgfunc import (
     dashboard_snapshot,
     get_appointments_for_user,
@@ -51,20 +52,10 @@ from pydantic_models import (
     MedicationCreateRequest,
     MedicationUpdateRequest,
     MedicationResponse,
-    StaffRoleCreate,
-    StaffRoleUpdate,
-    StaffRoleResponse,
     StaffCreateRequest,
     StaffResponse,
     DoctorCreateRequest,
     DoctorResponse,
-    PaymentRequest,
-    PaymentResponse,
-    VideoConsultationCreateRequest,
-    VideoConsultationUpdateRequest,
-    VideoTokenRequest,
-    VideoTokenResponse,
-    VideoConsultationResponse,
     ImageResponse,
     MessageResponse,
     # Patient Profile Models
@@ -79,12 +70,6 @@ from pydantic_models import (
     SecuritySettingsRequest,
     SecuritySettingsResponse,
     ActivityLogResponse,
-    # Chat Models
-    ChatMessageRequest,
-    ChatMessageResponse,
-    ChatRoomRequest,
-    ChatRoomResponse,
-    ChatRoomWithMessages,
 )
 
 # Load environment
@@ -120,7 +105,7 @@ except Exception as e:
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], 
+    allow_origins=["*"],  # Allow all origins during development
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -141,13 +126,13 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Include routers
 app.include_router(auth_router)
 app.include_router(doctor_profile_router)
-app.include_router(mental_health_router)
 app.include_router(patient_router)
+app.include_router(medical_history_router)
 
 
 def require_admin(*allowed_roles: Role):
     """Dependency to check if user has required admin roles."""
-    async def check_admin(user: User = Depends(get_current_active_user)) -> dict:
+    async def check_admin(user: User = Depends(get_current_active_user)) -> User:
         user_role = user.role
         
         if allowed_roles and user_role not in allowed_roles:
@@ -155,11 +140,7 @@ def require_admin(*allowed_roles: Role):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin access required"
             )
-        return {
-            "id": user.id,
-            "username": user.full_name,
-            "role": user.role.value
-        }
+        return user
     
     return check_admin
 
@@ -210,11 +191,87 @@ async def upload_image(current_user: User = Depends(get_current_active_user), fi
         db.commit()
         db.refresh(current_user)
         
-        logger.info(f"Image uploaded: {unique_filename} by user {current_user.id}")
+        logger.info(f"Profile image uploaded: {unique_filename} by user {current_user.id}")
         return {"message": "Image uploaded successfully", "img_url": img_url.strip()}
     except Exception as e:
         logger.error(f"Error uploading image: {str(e)}")
         raise HTTPException(status_code=500, detail="Error uploading image")
+
+
+@app.post("/upload-medication-image", response_model=ImageResponse, status_code=status.HTTP_201_CREATED)
+async def upload_medication_image(
+    current_user: User = Depends(require_admin(Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN, Role.PHARMACIST)),
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
+    """Upload medication image (does NOT update user profile)."""
+    try:
+        logger.info(f"=== MEDICATION IMAGE UPLOAD REQUEST ===")
+        logger.info(f"User: {current_user.full_name} (ID: {current_user.id}, Role: {current_user.role})")
+        logger.info(f"File: {file.filename}, Content-Type: {file.content_type}")
+        
+        # Validate filename
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No filename provided")
+        
+        # Validate file type
+        if not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Only image files are allowed")
+        
+        # Validate file size (e.g., max 5MB)
+        max_size = 5 * 1024 * 1024  # 5MB in bytes
+        content = await file.read()
+        logger.info(f"File size: {len(content)} bytes")
+        
+        if len(content) > max_size:
+            raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+        
+        # Generate unique filename
+        if "." not in file.filename:
+            raise HTTPException(status_code=400, detail="Invalid filename format")
+        file_extension = file.filename.split(".")[-1].lower()
+        if file_extension not in ["jpg", "jpeg", "png", "gif"]:
+            raise HTTPException(status_code=400, detail="Unsupported image format")
+        
+        # Test UUID generation
+        test_uuid = uuid.uuid4()
+        logger.info(f"UUID generation test: {test_uuid}")
+        
+        unique_filename = f"med_{test_uuid}.{file_extension}"  # Prefix with 'med_' for medication images
+        file_path = UPLOAD_DIR / unique_filename
+        
+        logger.info(f"Saving to: {file_path}")
+        
+        # Save file
+        with file_path.open("wb") as f:
+            f.write(content)
+        
+        # Generate full URL for frontend consumption
+        img_url = f"/uploads/{unique_filename}"
+        
+        # NOTE: We do NOT update the user's profile_picture for medication images
+        logger.info(f"Medication image uploaded successfully: {unique_filename} by user {current_user.id}")
+        return {"message": "Medication image uploaded successfully", "img_url": img_url.strip()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading medication image: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error uploading medication image: {str(e)}")
+
+
+@app.options("/upload-image")
+async def upload_image_options():
+    """Handle OPTIONS requests for upload endpoint."""
+    return {"message": "OPTIONS request handled"}
+
+
+@app.options("/upload-medication-image")
+async def upload_medication_image_options():
+    """Handle OPTIONS requests for medication upload endpoint."""
+    return {"message": "OPTIONS request handled"}
 
 
 # ============================================================================
@@ -283,6 +340,9 @@ def get_current_user_profile(
     medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
     emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == current_user.id).first()
     
+    # Get insurance information for ALL users (not just patients)
+    insurance = db.query(Insurance).filter(Insurance.patient_id == current_user.id).first()
+    
     return UserProfileResponse(
         id=current_user.id,
         full_name=current_user.full_name,
@@ -297,7 +357,17 @@ def get_current_user_profile(
         address=current_user.address,
         emergencyContact=emergency_contact.phone if emergency_contact else None,
         bloodType=medical_info.blood_type if medical_info else None,
-        allergies=', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None
+        allergies=', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None,
+        # Include insurance data for all users
+        insuranceProvider=insurance.provider if insurance else None,
+        insurancePolicyNumber=insurance.policy_number if insurance else None,
+        insuranceGroupNumber=insurance.group_number if insurance else None,
+        insuranceHolderName=insurance.holder_name if insurance else None,
+        insuranceType=insurance.insurance_type if insurance else 'standard',
+        insuranceQuarterlyLimit=float(insurance.quarterly_limit) if insurance and insurance.quarterly_limit else 0,
+        insuranceQuarterlyUsed=float(insurance.quarterly_used) if insurance and insurance.quarterly_used else 0,
+        insuranceCoverageStartDate=insurance.coverage_start_date.strftime('%Y-%m-%d') if insurance and insurance.coverage_start_date else None,
+        insuranceCoverageEndDate=insurance.coverage_end_date.strftime('%Y-%m-%d') if insurance and insurance.coverage_end_date else None
     )
 
 
@@ -313,6 +383,55 @@ def update_current_user_profile(
     for field, value in update_data.items():
         if field in allowed_fields and hasattr(current_user, field):
             setattr(current_user, field, value)
+    
+    # Handle insurance updates for ALL users
+    insurance_fields = [
+        'insuranceProvider', 'insurancePolicyNumber', 'insuranceGroupNumber', 
+        'insuranceHolderName', 'insuranceType', 'insuranceQuarterlyLimit', 
+        'insuranceQuarterlyUsed', 'insuranceCoverageStartDate', 'insuranceCoverageEndDate'
+    ]
+    
+    insurance_updates = {}
+    for field in insurance_fields:
+        if field in update_data:
+            insurance_updates[field] = update_data[field]
+    
+    if insurance_updates:
+        # Get or create insurance record for the user
+        insurance = db.query(Insurance).filter(Insurance.patient_id == current_user.id).first()
+        
+        if not insurance:
+            # Create new insurance record
+            insurance = Insurance(patient_id=current_user.id)
+            db.add(insurance)
+        
+        # Map frontend field names to backend model fields
+        field_mapping = {
+            'insuranceProvider': 'provider',
+            'insurancePolicyNumber': 'policy_number',
+            'insuranceGroupNumber': 'group_number',
+            'insuranceHolderName': 'holder_name',
+            'insuranceType': 'insurance_type',
+            'insuranceQuarterlyLimit': 'quarterly_limit',
+            'insuranceQuarterlyUsed': 'quarterly_used',
+            'insuranceCoverageStartDate': 'coverage_start_date',
+            'insuranceCoverageEndDate': 'coverage_end_date'
+        }
+        
+        # Update insurance fields
+        for frontend_field, backend_field in field_mapping.items():
+            if frontend_field in insurance_updates:
+                value = insurance_updates[frontend_field]
+                if value is not None and value != '':
+                    if backend_field in ['quarterly_limit', 'quarterly_used']:
+                        setattr(insurance, backend_field, value)
+                    elif backend_field in ['coverage_start_date', 'coverage_end_date']:
+                        if value and value != '':
+                            setattr(insurance, backend_field, datetime.strptime(value, '%Y-%m-%d'))
+                    else:
+                        setattr(insurance, backend_field, value)
+        
+        insurance.updated_at = datetime.utcnow()
     
     try:
         db.commit()
@@ -337,6 +456,9 @@ def update_current_user_profile(
         medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
         emergency_contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == current_user.id).first()
         
+        # Get insurance information for ALL users
+        insurance = db.query(Insurance).filter(Insurance.patient_id == current_user.id).first()
+        
         return UserProfileResponse(
             id=current_user.id,
             full_name=current_user.full_name,
@@ -351,7 +473,17 @@ def update_current_user_profile(
             address=current_user.address,
             emergencyContact=emergency_contact.phone if emergency_contact else None,
             bloodType=medical_info.blood_type if medical_info else None,
-            allergies=medical_info.allergies if medical_info else None
+            allergies=medical_info.allergies if medical_info else None,
+            # Include insurance data for all users
+            insuranceProvider=insurance.provider if insurance else None,
+            insurancePolicyNumber=insurance.policy_number if insurance else None,
+            insuranceGroupNumber=insurance.group_number if insurance else None,
+            insuranceHolderName=insurance.holder_name if insurance else None,
+            insuranceType=insurance.insurance_type if insurance else 'standard',
+            insuranceQuarterlyLimit=float(insurance.quarterly_limit) if insurance and insurance.quarterly_limit else 0,
+            insuranceQuarterlyUsed=float(insurance.quarterly_used) if insurance and insurance.quarterly_used else 0,
+            insuranceCoverageStartDate=insurance.coverage_start_date.strftime('%Y-%m-%d') if insurance and insurance.coverage_start_date else None,
+            insuranceCoverageEndDate=insurance.coverage_end_date.strftime('%Y-%m-%d') if insurance and insurance.coverage_end_date else None
         )
     except SQLAlchemyError as e:
         db.rollback()
@@ -404,6 +536,23 @@ def create_appointment(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Clinician does not exist."
+        )
+
+    # Validate scheduled_at is in the future
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    if payload.scheduled_at <= now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Appointment time must be in the future"
+        )
+    
+    # Validate business hours (9 AM - 6 PM)
+    appointment_hour = payload.scheduled_at.hour
+    if appointment_hour < 9 or appointment_hour > 18:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Appointments can only be booked between 9:00 AM and 6:00 PM"
         )
 
     appt = Appointment(
@@ -1506,6 +1655,175 @@ def list_staff(current_user: User = Depends(get_current_active_user), db: Sessio
     return result
 
 
+@app.get("/staff-roles")
+def get_staff_roles(current_user: User = Depends(get_current_active_user)):
+    """Get available staff roles."""
+    # For now, return predefined staff roles with descriptions
+    # TODO: In future, this could fetch from a database table for custom roles
+    staff_roles = [
+        {
+            "id": "doctor",
+            "name": "Doctor",
+            "description": "Medical doctor who can diagnose, treat, and prescribe medications",
+            "isActive": True,
+            "createdAt": datetime.utcnow().isoformat(),
+            "updatedAt": datetime.utcnow().isoformat(),
+            "customizable": True,
+            "requiresSpecialization": True,
+            "requiresLicense": True,
+            "defaultConsultationFee": 1000.00
+        },
+        {
+            "id": "nurse",
+            "name": "Nurse",
+            "description": "Nursing staff who assists doctors and provides patient care",
+            "isActive": True,
+            "createdAt": datetime.utcnow().isoformat(),
+            "updatedAt": datetime.utcnow().isoformat(),
+            "customizable": True,
+            "requiresSpecialization": True,
+            "requiresLicense": True,
+            "defaultConsultationFee": 500.00
+        },
+        {
+            "id": "receptionist",
+            "name": "Receptionist",
+            "description": "Front desk staff who handles patient registration and appointments",
+            "isActive": True,
+            "createdAt": datetime.utcnow().isoformat(),
+            "updatedAt": datetime.utcnow().isoformat(),
+            "customizable": True,
+            "requiresSpecialization": False,
+            "requiresLicense": False,
+            "defaultConsultationFee": 0.00
+        },
+        {
+            "id": "lab_technician",
+            "name": "Lab Technician",
+            "description": "Laboratory staff who conducts medical tests and analyses",
+            "isActive": True,
+            "createdAt": datetime.utcnow().isoformat(),
+            "updatedAt": datetime.utcnow().isoformat(),
+            "customizable": True,
+            "requiresSpecialization": True,
+            "requiresLicense": True,
+            "defaultConsultationFee": 300.00
+        },
+        {
+            "id": "pharmacist",
+            "name": "Pharmacist",
+            "description": "Pharmacy staff who dispenses medications and manages inventory",
+            "isActive": True,
+            "createdAt": datetime.utcnow().isoformat(),
+            "updatedAt": datetime.utcnow().isoformat(),
+            "customizable": True,
+            "requiresSpecialization": True,
+            "requiresLicense": True,
+            "defaultConsultationFee": 400.00
+        }
+    ]
+    
+    logger.info(f"Returning {len(staff_roles)} staff roles")
+    return staff_roles
+
+
+@app.post("/staff-roles")
+def create_staff_role(
+    role_data: dict,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new custom staff role."""
+    # Check if user has permission to create roles
+    if current_user.role not in [Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can create staff roles"
+        )
+    
+    # Validate required fields
+    required_fields = ["name", "description"]
+    for field in required_fields:
+        if field not in role_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing required field: {field}"
+            )
+    
+    # Create new role with generated ID
+    new_role = {
+        "id": f"custom_{datetime.utcnow().timestamp()}",
+        "name": role_data["name"],
+        "description": role_data["description"],
+        "isActive": role_data.get("isActive", True),
+        "createdAt": datetime.utcnow().isoformat(),
+        "updatedAt": datetime.utcnow().isoformat(),
+        "customizable": True,
+        "requiresSpecialization": role_data.get("requiresSpecialization", False),
+        "requiresLicense": role_data.get("requiresLicense", False),
+        "defaultConsultationFee": role_data.get("defaultConsultationFee", 0.0)
+    }
+    
+    logger.info(f"Created new staff role: {new_role['name']}")
+    return new_role
+
+
+@app.put("/staff-roles/{role_id}")
+def update_staff_role(
+    role_id: str,
+    role_data: dict,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update an existing staff role."""
+    # Check if user has permission to update roles
+    if current_user.role not in [Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can update staff roles"
+        )
+    
+    # For now, return a success response
+    # TODO: In future, this would update a database record
+    updated_role = {
+        "id": role_id,
+        "name": role_data.get("name", "Updated Role"),
+        "description": role_data.get("description", "Updated description"),
+        "isActive": role_data.get("isActive", True),
+        "updatedAt": datetime.utcnow().isoformat(),
+        "customizable": True,
+        "requiresSpecialization": role_data.get("requiresSpecialization", False),
+        "requiresLicense": role_data.get("requiresLicense", False),
+        "defaultConsultationFee": role_data.get("defaultConsultationFee", 0.0)
+    }
+    
+    logger.info(f"Updated staff role: {role_id}")
+    return updated_role
+
+
+@app.delete("/staff-roles/{role_id}")
+def delete_staff_role(
+    role_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a staff role."""
+    # Check if user has permission to delete roles
+    if current_user.role not in [Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete staff roles"
+        )
+    
+    # Prevent deletion of predefined system roles
+    predefined_roles = ["doctor", "nurse", "receptionist", "lab_technician", "pharmacist"]
+    if role_id in predefined_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete predefined system roles"
+        )
+    
+    logger.info(f"Deleted staff role: {role_id}")
+    return {"message": "Role deleted successfully"}
+
+
 @app.post(
     "/doctors",
     response_model=DoctorResponse,
@@ -1545,6 +1863,11 @@ def create_doctor_endpoint(
 
     try:
         db.add(doctor)
+        
+        # Update user's profile picture if provided
+        if payload.profile_picture:
+            user.profile_picture = payload.profile_picture
+        
         db.commit()
         db.refresh(doctor)
         logger.info(f"Doctor profile created: ID {doctor.id}")
@@ -1559,54 +1882,8 @@ def create_doctor_endpoint(
 
 
 # ============================================================================
-# Payment Routes
+# Medication Routes
 # ============================================================================
-
-@app.post("/payments", response_model=PaymentResponse)
-def process_payment(
-    payload: PaymentRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-) -> PaymentResponse:
-    """Process payment for an appointment (STUB - integrate with payment gateway)."""
-    # Verify appointment exists and belongs to current user
-    appointment = db.query(Appointment).filter(
-        Appointment.id == payload.appointment_id,
-        Appointment.patient_id == current_user.id
-    ).first()
-    
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found or unauthorized."
-        )
-
-    # TODO: Integrate with Stripe, M-Pesa, or other payment provider
-    # For now, return a stub response
-    transaction_id = str(uuid.uuid4())
-    
-    logger.info(f"Payment initiated: Transaction {transaction_id}, Amount {payload.amount}")
-    
-    return PaymentResponse(
-        transaction_id=transaction_id,
-        status="pending",
-        amount=payload.amount,
-        message="Payment processing initiated. Please check email for confirmation."
-    )
-
-
-@app.get("/payments/history")
-def get_payment_history(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-) -> dict:
-    """Get user's payment history (STUB)."""
-    # TODO: Implement once Payment model is created
-    return {
-        "user_id": current_user.id,
-        "payments": [],
-        "message": "Payment history feature coming soon"
-    }
 
 @app.get("/medications", response_model=List[MedicationResponse])
 def list_medications(
@@ -1640,7 +1917,7 @@ def list_medications(
         # Convert relative image_url to absolute URL
         image_url = med.image_url
         if image_url and not image_url.startswith('http'):
-            image_url = f"http://localhost:8001{image_url}"
+            image_url = f"http://localhost:8000{image_url}"
         
         medication_responses.append(MedicationResponse(
             id=med.id,
@@ -1676,6 +1953,9 @@ def create_medication(
     """Create new medication (admin/pharmacist only)."""
     logger.info("=== MEDICATION CREATION REQUEST RECEIVED ===")
     logger.info(f"Payload: {payload}")
+    logger.info(f"Payload type: {type(payload)}")
+    logger.info(f"Price type: {type(payload.price)}")
+    logger.info(f"Price value: {payload.price}")
     logger.info(f"User has admin access")
     # Check if medication with same name already exists
     existing = db.query(Medication).filter(
@@ -1692,6 +1972,12 @@ def create_medication(
     in_stock = payload.stock > 0
     
     try:
+        logger.info("Creating Medication object...")
+        logger.info(f"Name: {payload.name}")
+        logger.info(f"Category: {payload.category}")
+        logger.info(f"Price: {payload.price} (type: {type(payload.price)})")
+        logger.info(f"Stock: {payload.stock}")
+        
         medication = Medication(
             name=payload.name,
             category=payload.category,
@@ -1706,6 +1992,7 @@ def create_medication(
             image_url=payload.image_url,
             in_stock=in_stock,
         )
+        logger.info("Medication object created successfully")
     except Exception as e:
         logger.error(f"Error creating medication object with image_url: {str(e)}")
         # If image_url column doesn't exist, create without it
@@ -1893,433 +2180,22 @@ def dashboard_summary(
 
 
 # ============================================================================
-# Video Consultation Routes
-# ============================================================================
-
-@app.post("/video-consultations", response_model=dict)
-def initialize_video_consultation(
-    payload: VideoConsultationCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-) -> dict:
-    """Initialize a video consultation session."""
-    # Verify appointment exists
-    appointment = db.query(Appointment).filter(
-        Appointment.id == payload.appointment_id
-    ).first()
-    
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found"
-        )
-    
-    # Check authorization
-    if current_user.role == Role.PATIENT and appointment.patient_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this appointment"
-        )
-    elif current_user.role == Role.CLINICIAN_ADMIN and appointment.clinician_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this appointment"
-        )
-    
-    # Check if session already exists
-    existing = db.query(VideoConsultation).filter(
-        VideoConsultation.appointment_id == payload.appointment_id
-    ).first()
-    
-    if existing:
-        return {
-            "id": existing.id,
-            "appointmentId": existing.appointment_id,
-            "roomId": existing.room_id,
-            "doctorId": existing.doctor_id,
-            "patientId": existing.patient_id,
-            "status": existing.status,
-            "startTime": existing.start_time.isoformat() if existing.start_time else None,
-            "endTime": existing.end_time.isoformat() if existing.end_time else None,
-            "recordingUrl": existing.recording_url,
-            "notes": existing.notes,
-        }
-    
-    # Create new session
-    room_id = f"room-{payload.appointment_id}-{uuid.uuid4().hex[:8]}"
-    
-    session = VideoConsultation(
-        appointment_id=payload.appointment_id,
-        room_id=room_id,
-        doctor_id=appointment.clinician_id,
-        patient_id=appointment.patient_id,
-        status='waiting'
-    )
-    
-    try:
-        db.add(session)
-        db.commit()
-        db.refresh(session)
-        logger.info(f"Video consultation session created: ID {session.id}, Room {room_id}")
-        
-        return {
-            "id": session.id,
-            "appointmentId": session.appointment_id,
-            "roomId": session.room_id,
-            "doctorId": session.doctor_id,
-            "patientId": session.patient_id,
-            "status": session.status,
-            "startTime": session.start_time.isoformat() if session.start_time else None,
-            "endTime": session.end_time.isoformat() if session.end_time else None,
-            "recordingUrl": session.recording_url,
-            "notes": session.notes,
-        }
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error creating video consultation: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to initialize video consultation"
-        )
-
-
-@app.get("/video-consultations/{session_id}")
-def get_video_consultation(
-    session_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-) -> dict:
-    """Get video consultation session details."""
-    session = db.query(VideoConsultation).filter(
-        VideoConsultation.id == session_id
-    ).first()
-    
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video consultation session not found"
-        )
-    
-    # Check authorization
-    if current_user.id not in [session.doctor_id, session.patient_id]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this session"
-        )
-    
-    return {
-        "id": session.id,
-        "appointmentId": session.appointment_id,
-        "roomId": session.room_id,
-        "doctorId": session.doctor_id,
-        "patientId": session.patient_id,
-        "status": session.status,
-        "startTime": session.start_time.isoformat() if session.start_time else None,
-        "endTime": session.end_time.isoformat() if session.end_time else None,
-        "recordingUrl": session.recording_url,
-        "notes": session.notes,
-    }
-
-
-@app.get("/video-consultations/{session_id}/token")
-def get_video_token(
-    session_id: int,
-    uid: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-) -> dict:
-    """Get Agora token for video consultation."""
-    session = db.query(VideoConsultation).filter(
-        VideoConsultation.id == session_id
-    ).first()
-    
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video consultation session not found"
-        )
-    
-    # Check authorization
-    if current_user.id not in [session.doctor_id, session.patient_id]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this session"
-        )
-    
-    # TODO: Integrate with Agora SDK to generate real token
-    # For now, return a mock token
-    mock_token = f"mock_token_{session_id}_{uid}_{uuid.uuid4().hex[:16]}"
-    
-    return {
-        "token": mock_token,
-        "uid": uid,
-        "appId": "mock_agora_app_id",
-        "channelName": session.room_id,
-    }
-
-
-@app.patch("/video-consultations/{session_id}")
-def update_video_consultation(
-    session_id: int,
-    payload: VideoConsultationUpdateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-) -> dict:
-    """Update video consultation session."""
-    session = db.query(VideoConsultation).filter(
-        VideoConsultation.id == session_id
-    ).first()
-    
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video consultation session not found"
-        )
-    
-    # Check authorization
-    if current_user.id not in [session.doctor_id, session.patient_id]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this session"
-        )
-    
-    try:
-        if payload.status:
-            session.status = payload.status
-            if payload.status == 'active' and not session.start_time:
-                session.start_time = datetime.now()
-            elif payload.status == 'ended' and not session.end_time:
-                session.end_time = datetime.now()
-        
-        if payload.notes:
-            session.notes = payload.notes
-        
-        db.commit()
-        db.refresh(session)
-        logger.info(f"Video consultation updated: ID {session.id}, Status {session.status}")
-        
-        return {
-            "id": session.id,
-            "appointmentId": session.appointment_id,
-            "roomId": session.room_id,
-            "doctorId": session.doctor_id,
-            "patientId": session.patient_id,
-            "status": session.status,
-            "startTime": session.start_time.isoformat() if session.start_time else None,
-            "endTime": session.end_time.isoformat() if session.end_time else None,
-            "recordingUrl": session.recording_url,
-            "notes": session.notes,
-        }
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error updating video consultation: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update video consultation"
-        )
-
-# Staff Role Management Routes
-# ============================================================================
-
-@app.get("/staff-roles", response_model=List[StaffRoleResponse])
-def list_staff_roles(
-    status_filter: Optional[bool] = None,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin(Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN))
-) -> List[models.StaffRole]:
-    """List all staff roles (super admin and clinical admin)."""
-    query = db.query(models.StaffRole)
-    
-    if status_filter is not None:
-        query = query.filter(models.StaffRole.is_active == status_filter)
-    
-    roles = query.order_by(models.StaffRole.name).all()
-    return roles
-
-
-@app.post("/staff-roles", response_model=StaffRoleResponse, status_code=status.HTTP_201_CREATED)
-def create_staff_role(
-    payload: StaffRoleCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin(Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN))
-) -> models.StaffRole:
-    """Create a new staff role (super admin only)."""
-    # Check if role name already exists
-    existing_role = db.query(models.StaffRole).filter(models.StaffRole.name == payload.name).first()
-    if existing_role:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Role name already exists"
-        )
-    
-    # Generate role ID
-    role_id = f"role_{uuid.uuid4().hex[:8]}"
-    
-    new_role = models.StaffRole(
-        id=role_id,
-        name=payload.name,
-        description=payload.description,
-        permissions=payload.permissions,
-        is_active=payload.is_active,
-        requires_specialization=payload.requires_specialization,
-        requires_license=payload.requires_license,
-        default_consultation_fee=payload.default_consultation_fee
-    )
-    
-    try:
-        db.add(new_role)
-        db.commit()
-        db.refresh(new_role)
-        logger.info(f"Staff role created: {new_role.name}")
-        return new_role
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error creating staff role: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create staff role"
-        )
-
-
-@app.get("/staff-roles/{role_id}", response_model=StaffRoleResponse)
-def get_staff_role(
-    role_id: str,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin(Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN))
-) -> models.StaffRole:
-    """Get a specific staff role (super admin and clinical admin)."""
-    role = db.query(models.StaffRole).filter(models.StaffRole.id == role_id).first()
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Staff role not found"
-        )
-    return role
-
-
-@app.put("/staff-roles/{role_id}", response_model=StaffRoleResponse)
-def update_staff_role(
-    role_id: str,
-    payload: StaffRoleUpdate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin(Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN))
-) -> models.StaffRole:
-    """Update a staff role (super admin and clinical admin)."""
-    role = db.query(models.StaffRole).filter(models.StaffRole.id == role_id).first()
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Staff role not found"
-        )
-    
-    # Check if new name conflicts with existing role
-    if payload.name and payload.name != role.name:
-        existing_role = db.query(models.StaffRole).filter(
-            models.StaffRole.name == payload.name,
-            models.StaffRole.id != role_id
-        ).first()
-        if existing_role:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Role name already exists"
-            )
-    
-    # Update role fields
-    update_data = payload.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(role, field, value)
-    
-    try:
-        db.commit()
-        db.refresh(role)
-        logger.info(f"Staff role updated: {role.name}")
-        return role
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error updating staff role: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update staff role"
-        )
-
-
-@app.delete("/staff-roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_staff_role(
-    role_id: str,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin(Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN))
-):
-    """Delete a staff role (super admin and clinical admin)."""
-    role = db.query(models.StaffRole).filter(models.StaffRole.id == role_id).first()
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Staff role not found"
-        )
-    
-    # Check if role is in use
-    users_with_role = db.query(User).filter(User.staff_role_id == role_id).count()
-    if users_with_role > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete role: {users_with_role} users are assigned to this role"
-        )
-    
-    try:
-        db.delete(role)
-        db.commit()
-        logger.info(f"Staff role deleted: {role.name}")
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error deleting staff role: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete staff role"
-        )
-
-
-# ============================================================================
-# Staff Creation (Updated)
+# Staff Creation (Simplified)
 # ============================================================================
 
 @app.post("/staff", response_model=StaffResponse, status_code=status.HTTP_201_CREATED)
 def create_staff_member(
     payload: StaffCreateRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin(Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN))
+    current_user: User = Depends(require_admin(Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN))
 ) -> User:
-    """Create a new staff member with role-based validation."""
-    # Find the staff role
-    staff_role = db.query(models.StaffRole).filter(
-        models.StaffRole.name == payload.account.role,
-        models.StaffRole.is_active == True
-    ).first()
-    
-    if not staff_role:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Staff role '{payload.account.role}' not found or inactive"
-        )
-    
+    """Create a new staff member with simplified role validation."""
     # Check if email already exists
     existing_user = db.query(User).filter(User.email == payload.account.email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email is already registered"
-        )
-    
-    # Validate role requirements
-    if staff_role.requires_specialization and not payload.profile.specialization:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Specialization is required for this role"
-        )
-    
-    if staff_role.requires_license and not payload.profile.license_number:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="License number is required for this role"
         )
     
     # Map role name to enum
@@ -2331,12 +2207,13 @@ def create_staff_member(
         "pharmacist": Role.PHARMACIST,
     }
     
-    user_role = role_mapping.get(payload.account.role.lower())
-    if not user_role:
+    if payload.account.role not in role_mapping:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid role: {payload.account.role}"
         )
+    
+    user_role = role_mapping[payload.account.role]
     
     # Create user
     new_user = User(
@@ -2344,11 +2221,9 @@ def create_staff_member(
         email=payload.account.email,
         password_hash=bcrypt_context.hash(payload.account.password),
         phone=payload.account.phone,
-        gender=payload.account.gender,
-        date_of_birth=payload.account.date_of_birth,
         role=user_role,
-        staff_role_id=staff_role.id,
-        profile_picture=payload.account.profile_image
+        is_verified=True,
+        is_active=True
     )
     
     try:
@@ -2358,61 +2233,55 @@ def create_staff_member(
         
         # Create role-specific profile
         if user_role == Role.DOCTOR:
-            doctor_profile = Doctor(
+            doctor = Doctor(
                 user_id=new_user.id,
                 specialization=payload.profile.specialization,
                 bio=payload.profile.bio,
                 license_number=payload.profile.license_number,
-                consultation_fee=payload.profile.consultation_fee or staff_role.default_consultation_fee,
-                is_available=payload.profile.is_available
+                consultation_fee=payload.profile.consultation_fee
             )
-            db.add(doctor_profile)
+            db.add(doctor)
         elif user_role == Role.NURSE:
-            nurse_profile = Nurse(
+            nurse = Nurse(
                 user_id=new_user.id,
                 specialization=payload.profile.specialization,
                 bio=payload.profile.bio,
-                license_number=payload.profile.license_number,
-                is_available=payload.profile.is_available
+                license_number=payload.profile.license_number
             )
-            db.add(nurse_profile)
-        elif user_role == Role.RECEPTIONIST:
-            receptionist_profile = Receptionist(
-                user_id=new_user.id,
-                bio=payload.profile.bio,
-                is_available=payload.profile.is_available
-            )
-            db.add(receptionist_profile)
+            db.add(nurse)
         elif user_role == Role.LAB_TECHNICIAN:
-            lab_profile = LabTechnician(
+            lab_tech = LabTechnician(
                 user_id=new_user.id,
                 specialization=payload.profile.specialization,
                 bio=payload.profile.bio,
-                license_number=payload.profile.license_number,
-                is_available=payload.profile.is_available
+                license_number=payload.profile.license_number
             )
-            db.add(lab_profile)
+            db.add(lab_tech)
         elif user_role == Role.PHARMACIST:
-            pharmacist_profile = Pharmacist(
+            pharmacist = Pharmacist(
                 user_id=new_user.id,
                 specialization=payload.profile.specialization,
                 bio=payload.profile.bio,
-                license_number=payload.profile.license_number,
-                is_available=payload.profile.is_available
+                license_number=payload.profile.license_number
             )
-            db.add(pharmacist_profile)
+            db.add(pharmacist)
+        elif user_role == Role.RECEPTIONIST:
+            receptionist = Receptionist(
+                user_id=new_user.id,
+                bio=payload.profile.bio
+            )
+            db.add(receptionist)
         
         db.commit()
-        logger.info(f"Staff member created: {new_user.email} with role {payload.account.role}")
         
-        # Return staff response
+        logger.info(f"Staff member created: {new_user.email} ({user_role.value})")
+        
         return StaffResponse(
             id=new_user.id,
-            full_name=new_user.full_name,
             email=new_user.email,
+            full_name=new_user.full_name,
             phone=new_user.phone,
-            role=payload.account.role,
-            staff_role=StaffRoleResponse.model_validate(staff_role),
+            role=new_user.role.value,
             specialization=payload.profile.specialization,
             is_available=payload.profile.is_available,
             created_at=new_user.created_at
@@ -2426,110 +2295,6 @@ def create_staff_member(
             detail="Failed to create staff member"
         )
 
-
-# ============================================================================
-# Patient Profile Endpoints
-# ============================================================================
-
-@app.get("/api/patient/profile", response_model=UserProfileResponse)
-async def get_patient_profile(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get current patient's profile information."""
-    if current_user.role != Role.PATIENT:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only patients can access patient profile"
-        )
-    
-    # Get medical info for blood type and allergies
-    medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
-    
-    # Create medical info record if it doesn't exist
-    if not medical_info:
-        medical_info = MedicalInfo(
-            patient_id=current_user.id,
-            blood_type=None,
-            height=None,
-            weight=None,
-            allergies=[],
-            conditions=[],
-            medications=[]
-        )
-        db.add(medical_info)
-        db.commit()
-        db.refresh(medical_info)
-        logger.info(f"Created new medical info record for patient {current_user.id}")
-    
-    logger.info(f"Fetched medical info for patient {current_user.id}: {medical_info}")
-    
-    return UserProfileResponse(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        phone=current_user.phone,
-        date_of_birth=current_user.date_of_birth,
-        gender=current_user.gender,
-        role=current_user.role.value,
-        is_verified=current_user.is_verified,
-        created_at=current_user.created_at,
-        profile_picture=current_user.profile_picture,
-        address=current_user.address,
-        bloodType=medical_info.blood_type if medical_info else None,
-        allergies=', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None
-    )
-    logger.info(f"Profile response for patient {current_user.id}: bloodType={medical_info.blood_type if medical_info else None}, allergies={', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None}")
-
-@app.put("/api/patient/profile", response_model=UserProfileResponse)
-async def update_patient_profile(
-    profile_update: dict,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Update current patient's profile information."""
-    if current_user.role != Role.PATIENT:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only patients can update patient profile"
-        )
-    
-    # Update allowed fields
-    allowed_fields = ['full_name', 'phone', 'profile_picture', 'gender', 'date_of_birth', 'address']
-    for field, value in profile_update.items():
-        if field in allowed_fields and hasattr(current_user, field):
-            setattr(current_user, field, value)
-    
-    try:
-        db.commit()
-        db.refresh(current_user)
-        logger.info(f"Patient profile updated: {current_user.email}")
-        
-        # Get updated medical info for response
-        medical_info = db.query(MedicalInfo).filter(MedicalInfo.patient_id == current_user.id).first()
-        
-        return UserProfileResponse(
-            id=current_user.id,
-            email=current_user.email,
-            full_name=current_user.full_name,
-            phone=current_user.phone,
-            date_of_birth=current_user.date_of_birth,
-            gender=current_user.gender,
-            role=current_user.role.value,
-            is_verified=current_user.is_verified,
-            created_at=current_user.created_at,
-            profile_picture=current_user.profile_picture,
-            address=current_user.address,
-            bloodType=medical_info.blood_type if medical_info else None,
-            allergies=', '.join(medical_info.allergies) if medical_info and medical_info.allergies else None
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Database error updating patient profile: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update profile"
-        )
 
 # ============================================================================
 # Patient Profile Endpoints
@@ -2984,251 +2749,6 @@ async def get_activity_logs(
     return activity_logs
 
 # ============================================================================
-# Chat Endpoints
-# ============================================================================
-
-@app.post("/api/chat/rooms", response_model=ChatRoomResponse)
-async def create_chat_room(
-    room_request: ChatRoomRequest,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Create a new chat room between patient and doctor."""
-    # Verify the doctor exists and is actually a doctor
-    doctor = db.query(User).filter(
-        User.id == room_request.doctor_id,
-        User.role == Role.DOCTOR
-    ).first()
-    
-    if not doctor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Doctor not found"
-        )
-    
-    # Check if chat room already exists
-    existing_room = db.query(ChatRoom).filter(
-        ChatRoom.patient_id == current_user.id,
-        ChatRoom.doctor_id == room_request.doctor_id,
-        ChatRoom.appointment_id == room_request.appointment_id,
-        ChatRoom.is_active == True
-    ).first()
-    
-    if existing_room:
-        return existing_room
-    
-    # Create new chat room
-    chat_room = ChatRoom(
-        patient_id=current_user.id,
-        doctor_id=room_request.doctor_id,
-        appointment_id=room_request.appointment_id
-    )
-    
-    try:
-        db.add(chat_room)
-        db.commit()
-        db.refresh(chat_room)
-        logger.info(f"Chat room created between patient {current_user.id} and doctor {room_request.doctor_id}")
-        return chat_room
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Database error creating chat room: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create chat room"
-        )
-
-@app.get("/api/chat/rooms", response_model=List[ChatRoomResponse])
-async def get_chat_rooms(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get all chat rooms for the current user."""
-    if current_user.role == Role.PATIENT:
-        rooms = db.query(ChatRoom).filter(
-            ChatRoom.patient_id == current_user.id,
-            ChatRoom.is_active == True
-        ).order_by(ChatRoom.last_message_at.desc()).all()
-    else:
-        rooms = db.query(ChatRoom).filter(
-            ChatRoom.doctor_id == current_user.id,
-            ChatRoom.is_active == True
-        ).order_by(ChatRoom.last_message_at.desc()).all()
-    
-    return rooms
-
-@app.get("/api/chat/rooms/{room_id}", response_model=ChatRoomWithMessages)
-async def get_chat_room_with_messages(
-    room_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get chat room details with all messages."""
-    # Verify user has access to this chat room
-    room = db.query(ChatRoom).filter(ChatRoom.id == room_id).first()
-    
-    if not room:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chat room not found"
-        )
-    
-    if current_user.role == Role.PATIENT and room.patient_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this chat room"
-        )
-    
-    if current_user.role == Role.DOCTOR and room.doctor_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this chat room"
-        )
-    
-    # Get all messages for this room
-    messages = db.query(ChatMessage).filter(
-        ChatMessage.appointment_id == room.appointment_id
-    ).order_by(ChatMessage.created_at.asc()).all()
-    
-    room_response = ChatRoomWithMessages(
-        **room.__dict__,
-        messages=messages
-    )
-    
-    return room_response
-
-@app.post("/api/chat/messages", response_model=ChatMessageResponse)
-async def send_message(
-    message_request: ChatMessageRequest,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Send a message to another user."""
-    # Verify recipient exists
-    recipient = db.query(User).filter(User.id == message_request.recipient_id).first()
-    
-    if not recipient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Recipient not found"
-        )
-    
-    # Verify appointment exists if provided
-    if message_request.appointment_id:
-        appointment = db.query(Appointment).filter(
-            Appointment.id == message_request.appointment_id
-        ).first()
-        
-        if not appointment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Appointment not found"
-            )
-    
-    # Create message
-    message = ChatMessage(
-        sender_id=current_user.id,
-        recipient_id=message_request.recipient_id,
-        appointment_id=message_request.appointment_id,
-        message=message_request.message,
-        message_type=message_request.message_type
-    )
-    
-    try:
-        db.add(message)
-        db.commit()
-        db.refresh(message)
-        
-        # Update chat room's last_message_at if applicable
-        if message_request.appointment_id:
-            chat_room = db.query(ChatRoom).filter(
-                ChatRoom.appointment_id == message_request.appointment_id
-            ).first()
-            
-            if chat_room:
-                chat_room.last_message_at = message.created_at
-                db.commit()
-        
-        logger.info(f"Message sent from {current_user.id} to {message_request.recipient_id}")
-        return message
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Database error sending message: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send message"
-        )
-
-@app.get("/api/chat/messages/{recipient_id}", response_model=List[ChatMessageResponse])
-async def get_messages_with_user(
-    recipient_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get all messages between current user and specified recipient."""
-    # Verify recipient exists
-    recipient = db.query(User).filter(User.id == recipient_id).first()
-    
-    if not recipient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Recipient not found"
-        )
-    
-    # Get messages between the two users
-    messages = db.query(ChatMessage).filter(
-        or_(
-            and_(ChatMessage.sender_id == current_user.id, ChatMessage.recipient_id == recipient_id),
-            and_(ChatMessage.sender_id == recipient_id, ChatMessage.recipient_id == current_user.id)
-        )
-    ).order_by(ChatMessage.created_at.asc()).all()
-    
-    # Mark messages as read if they were sent to current user
-    unread_messages = [msg for msg in messages if msg.recipient_id == current_user.id and not msg.is_read]
-    for msg in unread_messages:
-        msg.is_read = True
-    
-    if unread_messages:
-        db.commit()
-    
-    return messages
-
-@app.put("/api/chat/messages/{message_id}/read")
-async def mark_message_as_read(
-    message_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Mark a message as read."""
-    message = db.query(ChatMessage).filter(ChatMessage.id == message_id).first()
-    
-    if not message:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Message not found"
-        )
-    
-    # Only recipient can mark message as read
-    if message.recipient_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only message recipient can mark as read"
-        )
-    
-    message.is_read = True
-    
-    try:
-        db.commit()
-        return {"message": "Message marked as read"}
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Database error marking message as read: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to mark message as read"
-        )
-
-# ============================================================================
 # Application Entry Point
 # ============================================================================
 
@@ -3237,7 +2757,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8001,
+        port=8000,
         reload=True,
         log_level="info"
     )

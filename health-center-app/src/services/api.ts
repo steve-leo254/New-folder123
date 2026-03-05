@@ -121,16 +121,13 @@ export const apiService = {
     const { data } = await api.get('/medications', { params });
     return data;
   },
-  createMedication: async (payload: unknown) => {
-    const { data } = await api.post('/medications', payload);
-    return data;
-  },
-  updateMedication: async (medicationId: string | number, payload: unknown) => {
-    const { data } = await api.put(`/medications/${medicationId}`, payload);
-    return data;
-  },
-  createMedicine: async (payload: unknown) => {
-    const { data } = await api.post('/medicines', payload);
+  createMedication: async (payload: any) => {
+    // Convert price to string to ensure proper Decimal handling on backend
+    const processedPayload = {
+      ...payload,
+      price: payload.price?.toString() || '0.00',
+    };
+    const { data } = await api.post('/medications', processedPayload);
     return data;
   },
   createPrescription: async (payload: unknown) => {
@@ -141,8 +138,12 @@ export const apiService = {
     const { data } = await api.get('/prescriptions');
     return data;
   },
-  updateMedicine: async (medicineId: string | number, payload: unknown) => {
-    const { data } = await api.put(`/medicines/${medicineId}`, payload);
+  updateMedication: async (medicationId: string | number, payload: unknown) => {
+    const { data } = await api.put(`/medications/${medicationId}`, payload);
+    return data;
+  },
+  deleteMedication: async (medicationId: string | number) => {
+    const { data } = await api.delete(`/medications/${medicationId}`);
     return data;
   },
   getBilling: async (params?: Record<string, unknown>) => {
@@ -166,17 +167,33 @@ export const apiService = {
     return data;
   },
   addMedicalItem: async (type: 'allergy' | 'condition' | 'medication', value: string) => {
-    // Convert singular to plural form for backend
+    // Get current medical info first
+    const { data: currentData } = await api.get('/api/patient/medical-info');
     const itemType = type === 'allergy' ? 'allergies' : 
                    type === 'condition' ? 'conditions' : 'medications';
-    const { data } = await api.post(`/api/patient/medical-info/${itemType}`, { value });
+    
+    // Add new item to array
+    const updatedArray = [...(currentData[itemType] || []), value];
+    
+    // Update entire medical info
+    const { data } = await api.put('/api/patient/medical-info', {
+      [itemType]: updatedArray
+    });
     return data;
   },
   removeMedicalItem: async (type: 'allergy' | 'condition' | 'medication', index: number) => {
-    // Convert singular to plural form for backend
+    // Get current medical info first
+    const { data: currentData } = await api.get('/api/patient/medical-info');
     const itemType = type === 'allergy' ? 'allergies' : 
                    type === 'condition' ? 'conditions' : 'medications';
-    const { data } = await api.delete(`/api/patient/medical-info/${itemType}/${index}`);
+    
+    // Remove item from array
+    const updatedArray = (currentData[itemType] || []).filter((_: any, i: number) => i !== index);
+    
+    // Update entire medical info
+    const { data } = await api.put('/api/patient/medical-info', {
+      [itemType]: updatedArray
+    });
     return data;
   },
   // Emergency Contact endpoints

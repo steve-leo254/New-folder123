@@ -311,6 +311,8 @@ def authenticate_user(email: str, password: str, db: Session):
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User does not exist")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is deactivated. Please contact administrator.")
     if not bcrypt_context.verify(password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid password")
     return user
@@ -521,6 +523,39 @@ async def reset_password_with_code(reset_request: ResetPasswordWithCodeRequest, 
     
     logger.info(f"Password reset successfully for user: {user.full_name}")
     return {"message": "Password has been reset successfully"}
+
+@router.post("/users/{user_id}/toggle-status", status_code=status.HTTP_200_OK)
+async def toggle_user_status(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Toggle user active status (admin only)."""
+    # Check if current user is admin
+    if current_user.role.value not in ['CLINICIAN_ADMIN', 'SUPER_ADMIN']:
+        raise HTTPException(status_code=403, detail="Only administrators can toggle user status")
+    
+    # Get target user
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prevent admin from deactivating themselves
+    if target_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot deactivate your own account")
+    
+    # Toggle status
+    target_user.is_active = not target_user.is_active
+    db.commit()
+    
+    action = "deactivated" if not target_user.is_active else "activated"
+    logger.info(f"User {target_user.full_name} ({target_user.email}) {action} by admin {current_user.full_name}")
+    
+    return {
+        "message": f"User {target_user.full_name} has been {action}",
+        "user_id": target_user.id,
+        "is_active": target_user.is_active
+    }
 
 @router.post("/reset-password/{token}", status_code=status.HTTP_200_OK)
 async def reset_password(token: str, reset_password_request: ResetPasswordRequest, db: Session = Depends(get_db)):

@@ -84,7 +84,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
             </div>
             <div className="flex items-center justify-center text-sm text-gray-600">
               <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-              {calculateAge(formData.dateOfBirth)} years old
+              {calculateAge(formData.date_of_birth)} years old
             </div>
           </div>
         </div>

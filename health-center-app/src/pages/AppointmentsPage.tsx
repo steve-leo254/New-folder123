@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, User, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import AppointmentForm from '../components/features/AppointmentForm';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -12,6 +13,7 @@ import { useAppointments } from '../services/useAppointment';
 import { getFullImageUrl } from '../utils/imageUtils';
 
 const AppointmentsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,11 +75,16 @@ const AppointmentsPage: React.FC = () => {
     [formattedDoctors, searchTerm, filterSpecialization]
   );
 
-  // Get upcoming appointments (scheduled status)
+  // Get upcoming appointments (scheduled status AND future date)
   const upcomingAppointments = useMemo(
     () =>
       appointments
-        .filter(apt => apt.status === 'scheduled')
+        .filter(apt => {
+          const aptDate = new Date(apt.date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Set to start of day
+          return apt.status === 'scheduled' && aptDate >= today;
+        })
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, 5),
     [appointments]
@@ -252,7 +259,7 @@ const AppointmentsPage: React.FC = () => {
                 <Calendar className="w-5 h-5 mr-2" />
                 Schedule New Appointment
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/medical-history')}>
                 <User className="w-5 h-5 mr-2" />
                 View Medical History
               </Button>

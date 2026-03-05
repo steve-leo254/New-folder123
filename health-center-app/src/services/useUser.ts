@@ -16,6 +16,16 @@ export interface UserProfile {
   emergencyContact?: string;
   bloodType?: string;
   allergies?: string;
+  // Insurance fields (for all users, not just patients)
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+  insuranceGroupNumber?: string;
+  insuranceHolderName?: string;
+  insuranceType?: string;
+  insuranceQuarterlyLimit?: number;
+  insuranceQuarterlyUsed?: number;
+  insuranceCoverageStartDate?: string;
+  insuranceCoverageEndDate?: string;
 }
 
 export const useUser = () => {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Image as ImageIcon } from 'lucide-react';
 import Button from '../ui/Button';
 import Alert from '../ui/Alert';
+import { API_BASE_URL } from '../../services/config';
 
 interface AddMedicationModalProps {
   isOpen: boolean;
@@ -19,9 +20,10 @@ interface AddMedicationModalProps {
     supplier?: string;
     image_url?: string;
   }) => Promise<void>;
+  editingMedication?: any;
 }
 
-const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose, onSubmit }) => {
+const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose, onSubmit, editingMedication }) => {
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -42,6 +44,42 @@ const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Populate form when editing medication
+  React.useEffect(() => {
+    if (editingMedication) {
+      setFormData({
+        name: editingMedication.name || '',
+        category: editingMedication.category || '',
+        dosage: editingMedication.dosage || '',
+        price: editingMedication.price || 0,
+        stock: editingMedication.stock || 0,
+        description: editingMedication.description || '',
+        prescription_required: editingMedication.prescription_required || false,
+        expiry_date: editingMedication.expiry_date || editingMedication.expiryDate || '',
+        batch_number: editingMedication.batch_number || editingMedication.batchNumber || '',
+        supplier: editingMedication.supplier || '',
+        image_url: editingMedication.image_url || editingMedication.image || '',
+      });
+      setImagePreview(editingMedication.image_url || editingMedication.image || '');
+    } else {
+      // Reset form when not editing
+      setFormData({
+        name: '',
+        category: '',
+        dosage: '',
+        price: 0,
+        stock: 0,
+        description: '',
+        prescription_required: false,
+        expiry_date: '',
+        batch_number: '',
+        supplier: '',
+        image_url: '',
+      });
+      setImagePreview('');
+    }
+  }, [editingMedication, isOpen]);
 
   const categories = [
     'Antibiotics',
@@ -103,23 +141,49 @@ const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8001/upload-image', {
+      // Get token from localStorage (try both possible keys)
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+      
+      console.log('Uploading medication image with token:', token.substring(0, 20) + '...');
+      console.log('API_BASE_URL being used:', API_BASE_URL);
+      
+      const response = await fetch('http://localhost:8000/upload-medication-image', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload image');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || errorData.message || 'Failed to upload image';
+        console.error('Medication image upload error:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
+      console.log('Medication image upload success:', result);
       setFormData(prev => ({ ...prev, image_url: result.img_url }));
       setServerError(null);
     } catch (error) {
-      setServerError('Failed to upload image. Please try again.');
+      console.error('Medication image upload error:', error);
+      let errorMessage = 'Failed to upload image. Please try again.';
+      
+      if (error instanceof Error) {
+        // Handle specific network errors
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          errorMessage = `Network error: Unable to connect to server at ${API_BASE_URL}. Please check if the backend is running.`;
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setServerError(errorMessage);
       setImagePreview('');
       setImageFile(null);
     } finally {
@@ -178,7 +242,9 @@ const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Add New Medication</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {editingMedication ? 'Edit Medication' : 'Add New Medication'}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -419,7 +485,7 @@ const AddMedicationModal: React.FC<AddMedicationModalProps> = ({ isOpen, onClose
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Adding...' : 'Add Medication'}
+              {loading ? (editingMedication ? 'Updating...' : 'Adding...') : (editingMedication ? 'Update Medication' : 'Add Medication')}
             </Button>
           </div>
         </form>

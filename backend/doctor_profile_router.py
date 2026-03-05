@@ -1,8 +1,6 @@
 """
 Doctor Profile API endpoints
 Handles CRUD operations for doctor profile sections including:
-- Education & Certifications
-- Contact Information  
 - Availability Schedule
 - Settings & Preferences
 """
@@ -14,12 +12,9 @@ from datetime import datetime
 
 from database import get_db
 from models import (
-    Doctor, DoctorEducation, DoctorContactInfo, 
-    DoctorAvailability, DoctorSettings, User
+    Doctor, DoctorAvailability, DoctorSettings, User
 )
 from pydantic_models import (
-    DoctorEducationRequest, DoctorEducationResponse,
-    DoctorContactInfoRequest, DoctorContactInfoResponse,
     DoctorAvailabilityRequest, DoctorAvailabilityResponse,
     DoctorSettingsRequest, DoctorSettingsResponse
 )
@@ -68,181 +63,6 @@ def create_doctor_profile_for_user(current_user: User, db: Session) -> Doctor:
     db.refresh(doctor)
     
     return doctor
-
-# ============================================================================
-# EDUCATION & CERTIFICATIONS
-# ============================================================================
-
-@router.get("/education", response_model=List[DoctorEducationResponse])
-async def get_education(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get doctor's education and certifications."""
-    doctor = get_doctor_profile(current_user, db)
-    education = db.query(DoctorEducation).filter(
-        DoctorEducation.doctor_id == doctor.id
-    ).order_by(DoctorEducation.year.desc()).all()
-    return education
-
-@router.post("/education", response_model=DoctorEducationResponse)
-async def add_education(
-    education_data: DoctorEducationRequest,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Add new education/certification."""
-    doctor = get_doctor_profile(current_user, db)
-    
-    education = DoctorEducation(
-        doctor_id=doctor.id,
-        **education_data.dict()
-    )
-    db.add(education)
-    db.commit()
-    db.refresh(education)
-    
-    # Log activity
-    from activity_logger import create_activity_log
-    create_activity_log(
-        user_id=current_user.id,
-        action="Added Education/Certification",
-        device="Web Application",
-        db=db
-    )
-    
-    return education
-
-@router.put("/education/{education_id}", response_model=DoctorEducationResponse)
-async def update_education(
-    education_id: int,
-    education_data: DoctorEducationRequest,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Update education/certification."""
-    doctor = get_doctor_profile(current_user, db)
-    
-    education = db.query(DoctorEducation).filter(
-        DoctorEducation.id == education_id,
-        DoctorEducation.doctor_id == doctor.id
-    ).first()
-    
-    if not education:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Education record not found"
-        )
-    
-    for field, value in education_data.dict().items():
-        setattr(education, field, value)
-    
-    db.commit()
-    db.refresh(education)
-    
-    # Log activity
-    from activity_logger import create_activity_log
-    create_activity_log(
-        user_id=current_user.id,
-        action="Updated Education/Certification",
-        device="Web Application",
-        db=db
-    )
-    
-    return education
-
-@router.delete("/education/{education_id}")
-async def delete_education(
-    education_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Delete education/certification."""
-    doctor = get_doctor_profile(current_user, db)
-    
-    education = db.query(DoctorEducation).filter(
-        DoctorEducation.id == education_id,
-        DoctorEducation.doctor_id == doctor.id
-    ).first()
-    
-    if not education:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Education record not found"
-        )
-    
-    db.delete(education)
-    db.commit()
-    
-    # Log activity
-    from activity_logger import create_activity_log
-    create_activity_log(
-        user_id=current_user.id,
-        action="Deleted Education/Certification",
-        device="Web Application",
-        db=db
-    )
-    
-    return {"message": "Education record deleted successfully"}
-
-# ============================================================================
-# CONTACT INFORMATION
-# ============================================================================
-
-@router.get("/contact", response_model=DoctorContactInfoResponse)
-async def get_contact_info(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get doctor's contact information."""
-    doctor = get_doctor_profile(current_user, db)
-    
-    contact_info = db.query(DoctorContactInfo).filter(
-        DoctorContactInfo.doctor_id == doctor.id
-    ).first()
-    
-    if not contact_info:
-        # Create default contact info
-        contact_info = DoctorContactInfo(doctor_id=doctor.id)
-        db.add(contact_info)
-        db.commit()
-        db.refresh(contact_info)
-    
-    return contact_info
-
-@router.put("/contact", response_model=DoctorContactInfoResponse)
-async def update_contact_info(
-    contact_data: DoctorContactInfoRequest,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Update doctor's contact information."""
-    doctor = get_doctor_profile(current_user, db)
-    
-    contact_info = db.query(DoctorContactInfo).filter(
-        DoctorContactInfo.doctor_id == doctor.id
-    ).first()
-    
-    if not contact_info:
-        contact_info = DoctorContactInfo(doctor_id=doctor.id)
-        db.add(contact_info)
-    
-    for field, value in contact_data.dict().items():
-        setattr(contact_info, field, value)
-    
-    db.commit()
-    db.refresh(contact_info)
-    
-    # Log activity
-    from activity_logger import create_activity_log
-    create_activity_log(
-        user_id=current_user.id,
-        action="Updated Contact Information",
-        device="Web Application",
-        db=db
-    )
-    
-    return contact_info
 
 # ============================================================================
 # AVAILABILITY SCHEDULE

@@ -8,6 +8,7 @@ import { useUser } from '../services/useUser';
 import { useAuth } from '../services/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../services/config';
+import { SimpleInsuranceSection } from '../components/profile/sections/SimpleInsuranceSection';
 
 const ProfilePage: React.FC = () => {
   const { token } = useAuth();
@@ -24,7 +25,17 @@ const ProfilePage: React.FC = () => {
     address: '',
     emergencyContact: '',
     bloodType: '',
-    allergies: ''
+    allergies: '',
+    // Insurance fields
+    insuranceProvider: '',
+    insurancePolicyNumber: '',
+    insuranceGroupNumber: '',
+    insuranceHolderName: '',
+    insuranceType: 'standard',
+    insuranceQuarterlyLimit: 0,
+    insuranceQuarterlyUsed: 0,
+    insuranceCoverageStartDate: '',
+    insuranceCoverageEndDate: ''
   });
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -49,7 +60,17 @@ const ProfilePage: React.FC = () => {
         address: user.address || '',
         emergencyContact: user.emergencyContact || '',
         bloodType: user.bloodType || '',
-        allergies: user.allergies || ''
+        allergies: user.allergies || '',
+        // Insurance fields
+        insuranceProvider: user.insuranceProvider || '',
+        insurancePolicyNumber: user.insurancePolicyNumber || '',
+        insuranceGroupNumber: user.insuranceGroupNumber || '',
+        insuranceHolderName: user.insuranceHolderName || '',
+        insuranceType: user.insuranceType || 'standard',
+        insuranceQuarterlyLimit: user.insuranceQuarterlyLimit || 0,
+        insuranceQuarterlyUsed: user.insuranceQuarterlyUsed || 0,
+        insuranceCoverageStartDate: user.insuranceCoverageStartDate || '',
+        insuranceCoverageEndDate: user.insuranceCoverageEndDate || ''
       });
     }
   }, [user]);
@@ -71,7 +92,17 @@ const ProfilePage: React.FC = () => {
         address: formData.address,
         emergencyContact: formData.emergencyContact,
         bloodType: formData.bloodType,
-        allergies: formData.allergies
+        allergies: formData.allergies,
+        // Insurance fields
+        insuranceProvider: formData.insuranceProvider,
+        insurancePolicyNumber: formData.insurancePolicyNumber,
+        insuranceGroupNumber: formData.insuranceGroupNumber,
+        insuranceHolderName: formData.insuranceHolderName,
+        insuranceType: formData.insuranceType,
+        insuranceQuarterlyLimit: formData.insuranceQuarterlyLimit,
+        insuranceQuarterlyUsed: formData.insuranceQuarterlyUsed,
+        insuranceCoverageStartDate: formData.insuranceCoverageStartDate,
+        insuranceCoverageEndDate: formData.insuranceCoverageEndDate
       });
       setSaveMessage({ type: 'success', message: 'Profile updated successfully!' });
       setIsEditing(false);
@@ -102,7 +133,7 @@ const ProfilePage: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/upload-image', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/upload-image`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -345,6 +376,12 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
           </Card>
+
+          <SimpleInsuranceSection
+            isEditing={isEditing}
+            formData={formData}
+            onFormDataChange={setFormData}
+          />
 
           {isEditing && (
             <div className="flex gap-4">

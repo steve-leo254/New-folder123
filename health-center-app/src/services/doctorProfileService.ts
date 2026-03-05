@@ -207,6 +207,12 @@ export const handleProfileError = (error: any, defaultMessage: string) => {
   console.error('Profile API Error:', error);
   console.error('Error response data:', JSON.stringify(error.response?.data, null, 2));
   console.error('Error status:', error.response?.status);
+  
+  // Handle network errors specifically
+  if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+    throw new Error('Unable to connect to the server. Please check if the backend is running on http://localhost:8000');
+  }
+  
   const message = error.response?.data?.detail || error.response?.data?.message || defaultMessage;
   throw new Error(message);
 };

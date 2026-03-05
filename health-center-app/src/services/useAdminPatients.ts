@@ -82,9 +82,13 @@ export const useAdminPatients = () => {
     setError(null);
     
     try {
+      console.log('Fetching patients from /patients endpoint...');
       const response = await apiClient.get<PatientRecord[]>(
         `/patients`
       );
+      
+      console.log('Raw response from backend:', response);
+      console.log('Response data length:', response.data?.length);
 
       // Transform the response to match expected format
       const allPatients = response.data.map((patient: any) => {

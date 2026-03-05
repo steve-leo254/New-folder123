@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, // ✅ Changed from User
@@ -53,6 +53,7 @@ const sections: SectionConfig[] = [
 const PatientProfile: React.FC = () => {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -95,6 +96,25 @@ const PatientProfile: React.FC = () => {
       navigate('/login');
     }
   }, [token, navigate]);
+
+  // Check for appointment success message
+  useEffect(() => {
+    const appointmentSuccess = searchParams.get('appointment_success');
+    if (appointmentSuccess === 'true') {
+      setSaveMessage({
+        type: 'success',
+        message: 'Appointment booked successfully! You can view your appointment details in the "My Appointments" section.'
+      });
+      
+      // Clear the URL parameter
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('appointment_success');
+      navigate(`${window.location.pathname}?${newSearchParams.toString()}`, { replace: true });
+      
+      // Clear the message after 5 seconds
+      setTimeout(() => setSaveMessage(null), 5000);
+    }
+  }, [searchParams, navigate]);
 
   // Initialize form data when patient data loads
   useEffect(() => {
@@ -258,15 +278,62 @@ const PatientProfile: React.FC = () => {
   };
 
   // Calculate age
-  const calculateAge = (dob: string) => {
-    const today = new Date();
-    const birthDate = new Date(dob);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+  const calculateAge = (dob: string | null | undefined) => {
+    console.log('calculateAge received dob:', dob, 'type:', typeof dob); // Debug log
+    
+    if (!dob || dob.trim() === '') {
+      console.log('No date of birth provided, returning 0');
+      return 0; // Return 0 if no date of birth
     }
-    return age;
+    
+    // Try different date formats
+    let birthDate: Date;
+    
+    try {
+      // Handle ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.sssZ)
+      if (dob.includes('T')) {
+        birthDate = new Date(dob);
+      }
+      // Handle format from database (YYYY-MM-DD)
+      else if (dob.includes('-') && dob.length >= 8) {
+        birthDate = new Date(dob);
+      }
+      // Handle other formats
+      else {
+        birthDate = new Date(dob);
+      }
+      
+      console.log('Parsed birthDate:', birthDate); // Debug log
+      console.log('birthDate.getTime():', birthDate.getTime()); // Debug log
+      console.log('birthDate.toString():', birthDate.toString()); // Debug log
+      
+      // Check if the date is valid
+      if (isNaN(birthDate.getTime())) {
+        console.log('Invalid date detected, returning 0');
+        return 0; // Return 0 if invalid date
+      }
+      
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      // Adjust age if birthday hasn't occurred yet this year
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      console.log('Today:', today);
+      console.log('Birth year:', birthDate.getFullYear());
+      console.log('Month diff:', monthDiff);
+      console.log('Day diff:', today.getDate() - birthDate.getDate());
+      console.log('Calculated age:', age); // Debug log
+      
+      // Ensure age is not negative
+      return Math.max(0, age);
+    } catch (error) {
+      console.error('Error calculating age:', error);
+      return 0;
+    }
   };
 
   // Loading state
@@ -384,8 +451,7 @@ const PatientProfile: React.FC = () => {
               {activeSection === 'medical' && (
                 <MedicalInfoSection 
                   isEditing={isEditing}
-                  formData={formData}
-                  onFormDataChange={setFormData}
+                  onSaveComplete={() => console.log('Medical info saved')}
                 />
               )}
 

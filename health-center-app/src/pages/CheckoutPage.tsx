@@ -20,8 +20,10 @@ const CheckoutPage: React.FC = () => {
   // Calculate insurance discount
   const insuranceDiscount = useInsuranceDiscount(subtotal);
 
-  const tax = subtotal * 0.16; // 16% VAT
-  const total = subtotal + deliveryFee + tax - insuranceDiscount.discountAmount;
+  // Tax should be calculated on amount AFTER insurance discount
+  const amountAfterDiscount = Number((subtotal - insuranceDiscount.discountAmount).toFixed(2));
+  const tax = Number((amountAfterDiscount * 0.16).toFixed(2)); // 16% VAT
+  const total = Number((amountAfterDiscount + deliveryFee + tax).toFixed(2));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

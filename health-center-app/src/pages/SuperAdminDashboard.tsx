@@ -37,6 +37,7 @@ import AddUserModal from "../components/modals/AddUserModal";
 import AddStaffModal from "../components/modals/AddStaffModal";
 import BookAppointmentModal from "../components/modals/BookAppointmentModal";
 import AddMedicationModal from "../components/modals/AddMedicationModal";
+import { Edit2, Trash2 } from "lucide-react";
 import RoleManagementPage from "./RoleManagementPage";
 import Alert from "../components/ui/Alert";
 import { apiService } from "../services/api";
@@ -66,6 +67,7 @@ const SuperDashboardPage: React.FC = () => {
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [isBookAppointmentOpen, setIsBookAppointmentOpen] = useState(false);
   const [isMedicationModalOpen, setIsMedicationModalOpen] = useState(false);
+  const [editingMedication, setEditingMedication] = useState<any>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [toast, setToast] = useState<{
     type: "success" | "error";
@@ -92,6 +94,7 @@ const SuperDashboardPage: React.FC = () => {
     medications,
     isLoading: medicationsLoading,
     fetchMedications,
+    updateMedication,
   } = useMedications();
   const {
     billings,
@@ -394,6 +397,61 @@ const SuperDashboardPage: React.FC = () => {
       default:
         return "bg-gray-100 text-gray-600";
     }
+  };
+
+  const handleEditMedication = (medication: any) => {
+    setEditingMedication(medication);
+    setIsMedicationModalOpen(true);
+  };
+
+  const handleDeleteMedication = async (medicationId: string | number) => {
+    if (window.confirm('Are you sure you want to delete this medication?')) {
+      try {
+        await apiService.deleteMedication(medicationId);
+        setToast({
+          type: "success",
+          message: "Medication deleted successfully"
+        });
+        fetchMedications();
+      } catch (error) {
+        setToast({
+          type: "error",
+          message: "Failed to delete medication"
+        });
+      }
+    }
+  };
+
+  const handleMedicationSubmit = async (medicationData: any) => {
+    try {
+      if (editingMedication) {
+        await updateMedication(editingMedication.id, medicationData);
+        setToast({
+          type: "success",
+          message: "Medication updated successfully"
+        });
+      } else {
+        await apiService.createMedication(medicationData);
+        setToast({
+          type: "success",
+          message: "Medication added successfully"
+        });
+      }
+      setIsMedicationModalOpen(false);
+      setEditingMedication(null);
+      fetchMedications();
+      refreshSummary();
+    } catch (error: any) {
+      setToast({
+        type: "error",
+        message: editingMedication ? "Failed to update medication" : "Failed to add medication"
+      });
+    }
+  };
+
+  const handleOpenMedicationModal = () => {
+    setEditingMedication(null);
+    setIsMedicationModalOpen(true);
   };
 
   return (
@@ -948,7 +1006,7 @@ const SuperDashboardPage: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-900">
                 Medication Management
               </h2>
-              <Button onClick={() => setIsMedicationModalOpen(true)}>
+              <Button onClick={handleOpenMedicationModal}>
                 <Pill className="w-4 h-4 mr-2" />
                 Add Medication
               </Button>
@@ -1063,6 +1121,9 @@ const SuperDashboardPage: React.FC = () => {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Status
                             </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -1100,6 +1161,25 @@ const SuperDashboardPage: React.FC = () => {
                                     ? "Low Stock"
                                     : "In Stock"}
                                 </Badge>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div className="flex space-x-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditMedication(medication)}
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteMedication(medication.id)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -1496,25 +1576,12 @@ const SuperDashboardPage: React.FC = () => {
       />
       <AddMedicationModal
         isOpen={isMedicationModalOpen}
-        onClose={() => setIsMedicationModalOpen(false)}
-        onSubmit={async (medicationData) => {
-          try {
-            await apiService.createMedicine(medicationData);
-            setToast({
-              type: "success",
-              message: "Medication added successfully",
-            });
-            fetchMedications();
-            refreshSummary();
-            setIsMedicationModalOpen(false);
-          } catch (error: any) {
-            setToast({
-              type: "error",
-              message:
-                error.response?.data?.detail || "Failed to add medication",
-            });
-          }
+        onClose={() => {
+          setIsMedicationModalOpen(false);
+          setEditingMedication(null);
         }}
+        onSubmit={handleMedicationSubmit}
+        editingMedication={editingMedication}
       />
     </div>
   );

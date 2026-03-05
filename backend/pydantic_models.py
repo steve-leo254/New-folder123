@@ -3,8 +3,8 @@ Pydantic models and request/response schemas for Kiangombe Patient Center API.
 Organized by feature/concern for better maintainability.
 """
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
 from decimal import Decimal
@@ -51,46 +51,6 @@ class PrescriptionStatus(str, Enum):
 
 
 # ============================================================================
-# Staff Role Models
-# ============================================================================
-
-class StaffRoleBase(BaseModel):
-    """Base staff role model."""
-    name: str = Field(..., min_length=1, max_length=100)
-    description: str = Field(..., min_length=1, max_length=500)
-    permissions: List[str] = Field(default_factory=list)
-    is_active: bool = True
-    requires_specialization: bool = False
-    requires_license: bool = False
-    default_consultation_fee: Optional[Decimal] = Field(None, ge=0)
-
-
-class StaffRoleCreate(StaffRoleBase):
-    """Staff role creation request."""
-    pass
-
-
-class StaffRoleUpdate(BaseModel):
-    """Staff role update request."""
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, min_length=1, max_length=500)
-    permissions: Optional[List[str]] = None
-    is_active: Optional[bool] = None
-    requires_specialization: Optional[bool] = None
-    requires_license: Optional[bool] = None
-    default_consultation_fee: Optional[Decimal] = Field(None, ge=0)
-
-
-class StaffRoleResponse(StaffRoleBase):
-    """Staff role response."""
-    id: str
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# ============================================================================
 # Staff Creation Models (Updated)
 # ============================================================================
 
@@ -102,7 +62,7 @@ class StaffAccountCreate(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     gender: Optional[str] = Field(None, max_length=20)
     date_of_birth: Optional[datetime] = None
-    role: str  # This will be the role name from StaffRole
+    role: str  # This will be the role name (doctor, nurse, etc.)
     profile_image: Optional[str] = None  # URL to profile image
 
 
@@ -128,7 +88,6 @@ class StaffResponse(BaseModel):
     email: str
     phone: Optional[str]
     role: str
-    staff_role: Optional[StaffRoleResponse] = None
     specialization: Optional[str]
     is_available: bool
     created_at: datetime
@@ -249,6 +208,17 @@ class UserProfileResponse(BaseModel):
     medications: Optional[List[str]] = []
     status: Optional[str] = 'active'
     
+    # Insurance fields (for all users, not just patients)
+    insuranceProvider: Optional[str] = None
+    insurancePolicyNumber: Optional[str] = None
+    insuranceGroupNumber: Optional[str] = None
+    insuranceHolderName: Optional[str] = None
+    insuranceType: Optional[str] = 'standard'
+    insuranceQuarterlyLimit: Optional[float] = 0
+    insuranceQuarterlyUsed: Optional[float] = 0
+    insuranceCoverageStartDate: Optional[str] = None
+    insuranceCoverageEndDate: Optional[str] = None
+    
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -357,6 +327,7 @@ class DoctorCreateRequest(BaseModel):
     consultation_fee: Optional[Decimal] = None
     rating: Optional[Decimal] = None
     is_available: bool = True
+    profile_picture: Optional[str] = None
 
 
 class DoctorUpdateRequest(BaseModel):
@@ -560,7 +531,7 @@ class MedicationCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
     category: str = Field(..., min_length=1, max_length=100)
     dosage: Optional[str] = Field(None, max_length=100)
-    price: Decimal = Field(..., gt=0)
+    price: Union[str, Decimal, float] = Field(..., gt=0)
     stock: int = Field(default=0, ge=0)
     description: Optional[str] = None
     prescription_required: bool = False
@@ -569,13 +540,28 @@ class MedicationCreateRequest(BaseModel):
     supplier: Optional[str] = Field(None, max_length=150)
     image_url: Optional[str] = Field(None, max_length=500)
 
+    @field_validator('price', mode='before')
+    @classmethod
+    def validate_price(cls, v):
+        if isinstance(v, str):
+            try:
+                return Decimal(v)
+            except (ValueError, TypeError):
+                raise ValueError('Invalid price format')
+        elif isinstance(v, (int, float)):
+            return Decimal(str(v))
+        elif isinstance(v, Decimal):
+            return v
+        else:
+            raise ValueError('Price must be a number or decimal string')
+
 
 class MedicationUpdateRequest(BaseModel):
     """Update medication request."""
     name: Optional[str] = Field(None, min_length=1, max_length=150)
     category: Optional[str] = Field(None, min_length=1, max_length=100)
     dosage: Optional[str] = Field(None, max_length=100)
-    price: Optional[Decimal] = Field(None, gt=0)
+    price: Optional[Union[str, Decimal, float]] = Field(None, gt=0)
     stock: Optional[int] = Field(None, ge=0)
     description: Optional[str] = None
     prescription_required: Optional[bool] = None
@@ -583,6 +569,23 @@ class MedicationUpdateRequest(BaseModel):
     batch_number: Optional[str] = Field(None, max_length=100)
     supplier: Optional[str] = Field(None, max_length=150)
     image_url: Optional[str] = Field(None, max_length=500)
+
+    @field_validator('price', mode='before')
+    @classmethod
+    def validate_price(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            try:
+                return Decimal(v)
+            except (ValueError, TypeError):
+                raise ValueError('Invalid price format')
+        elif isinstance(v, (int, float)):
+            return Decimal(str(v))
+        elif isinstance(v, Decimal):
+            return v
+        else:
+            raise ValueError('Price must be a number or decimal string')
 
 
 class MedicationResponse(BaseModel):
@@ -918,5 +921,40 @@ class ChatRoomWithMessages(BaseModel):
     updated_at: datetime
     messages: List[ChatMessageResponse] = []
 
+    class Config:
+        from_attributes = True
+
+
+class MedicalHistoryCreateRequest(BaseModel):
+    """Create medical history record request."""
+    type: str = Field(..., enum=['consultation', 'diagnosis', 'prescription', 'lab_result', 'vaccination'])
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str = Field(..., min_length=1)
+    notes: Optional[str] = None
+    attachments: Optional[List[str]] = None
+
+class MedicalHistoryUpdateRequest(BaseModel):
+    """Update medical history record request."""
+    type: Optional[str] = Field(None, enum=['consultation', 'diagnosis', 'prescription', 'lab_result', 'vaccination'])
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, min_length=1)
+    notes: Optional[str] = None
+    attachments: Optional[List[str]] = None
+
+class MedicalHistoryResponse(BaseModel):
+    """Medical history record response."""
+    id: int
+    patient_id: int
+    type: str
+    title: str
+    description: str
+    doctor_id: int
+    doctor_name: str
+    notes: Optional[str] = None
+    attachments: Optional[List[str]] = None
+    date: datetime
+    created_at: datetime
+    updated_at: datetime
+    
     class Config:
         from_attributes = True

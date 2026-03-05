@@ -72,7 +72,7 @@ export const LoginPage: React.FC = () => {
       const { access_token } = response.data;
       setTokenInContext(access_token);
       
-      // Redirect based on user role
+      // Parse JWT to get role for immediate redirect
       const tokenPayload = JSON.parse(atob(access_token.split('.')[1]));
       const userRole = tokenPayload.role;
       

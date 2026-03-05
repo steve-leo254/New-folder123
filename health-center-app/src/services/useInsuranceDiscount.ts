@@ -55,7 +55,7 @@ export const useInsuranceDiscount = (subtotal: number): InsuranceDiscount => {
       }
     }
 
-    const discountAmount = subtotal * discountPercentage;
+    const discountAmount = Number((subtotal * discountPercentage).toFixed(2));
 
     return {
       hasInsurance,

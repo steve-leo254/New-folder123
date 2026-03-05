@@ -38,6 +38,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Doctor } from '../types';
 import { formatCurrency } from '../services/formatCurrency';
 import { useDoctorProfileById } from '../hooks/useDoctorProfileById';
+import { useAppointments } from '../services/useAppointment';
+import { useAuth } from '../services/AuthContext';
 
   interface Message {
     id: string;

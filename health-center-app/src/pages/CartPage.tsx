@@ -31,8 +31,10 @@ const CartPage: React.FC = () => {
   }
 
   // Calculate totals with insurance discount
-  const tax = total * 0.16;
-  const finalTotal = total + tax - insuranceDiscount.discountAmount;
+  // Tax should be calculated on amount AFTER insurance discount
+  const amountAfterDiscount = Number((total - insuranceDiscount.discountAmount).toFixed(2));
+  const tax = Number((amountAfterDiscount * 0.16).toFixed(2));
+  const finalTotal = Number((amountAfterDiscount + tax).toFixed(2));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
