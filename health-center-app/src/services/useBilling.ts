@@ -133,6 +133,71 @@ export const useBilling = () => {
     return calculated;
   }, []);
 
+  const updateBillingStatus = useCallback(
+    async (id: string | number, status: 'pending' | 'paid' | 'refunded', notes?: string) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await apiService.updateBillingStatus(id, { status, notes });
+        const updated = normalizeBilling(response);
+        setBillings(prev => 
+          prev.map(record => 
+            record.id === id ? updated : record
+          )
+        );
+        
+        // Update stats if we have them
+        if (stats) {
+          const updatedStats = calculateStats([
+            ...billings.filter(r => r.id !== id),
+            updated
+          ]);
+          setStats(updatedStats);
+        }
+        
+        return updated;
+      } catch (err) {
+        const axiosError = err as AxiosError<{ detail?: string }>;
+        const errorMessage = axiosError.response?.data?.detail || 'Failed to update billing status';
+        setError(errorMessage);
+        console.error('Error updating billing status:', axiosError);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [billings, stats]
+  );
+
+  const createBilling = useCallback(
+    async (billingData: BillingCreateRequest) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await apiService.createBilling(billingData);
+        const newBilling = normalizeBilling(response);
+        setBillings(prev => [...prev, newBilling]);
+        
+        // Update stats
+        if (stats) {
+          const updatedStats = calculateStats([...billings, newBilling]);
+          setStats(updatedStats);
+        }
+        
+        return newBilling;
+      } catch (err) {
+        const axiosError = err as AxiosError<{ detail?: string }>;
+        const errorMessage = axiosError.response?.data?.detail || 'Failed to create billing record';
+        setError(errorMessage);
+        console.error('Error creating billing record:', axiosError);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [billings, stats]
+  );
+
   return {
     isLoading,
     billings,
@@ -140,5 +205,7 @@ export const useBilling = () => {
     error,
     fetchBillings,
     calculateStats,
+    updateBillingStatus,
+    createBilling,
   };
 };

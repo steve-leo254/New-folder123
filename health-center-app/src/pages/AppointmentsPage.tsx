@@ -40,17 +40,25 @@ const AppointmentsPage: React.FC = () => {
             id: staffMember.id.toString(),
             user_id: staffMember.id.toString(),
             fullName: staffMember.fullName,
+            name: staffMember.fullName, // Alias for fullName
             email: staffMember.email || '',
             phone: staffMember.phone || '',
             specialization: doctor.specialization,
-            experience: 0,
-            rating: doctor.rating,
-            avatar: getFullImageUrl(staffMember.avatar) || '/images/doctor-default.jpg',
+            specialty: doctor.specialization, // Alias for specialization
             bio: doctor.bio || 'Professional healthcare provider',
-            isAvailable: true,
-            patientsCount: 0,
-            availability: [],
+            rating: doctor.rating,
+            isAvailable: doctor.isAvailable,
+            available: doctor.isAvailable, // Alias for isAvailable
             consultationFee: doctor.consultationFee,
+            video_consultation_fee: doctor.video_consultation_fee,
+            phone_consultation_fee: doctor.phone_consultation_fee,
+            chat_consultation_fee: doctor.chat_consultation_fee,
+            patientsCount: 0,
+            reviewCount: doctor.reviewCount,
+            experience: doctor.experience,
+            avatar: getFullImageUrl(staffMember.avatar) || '/images/doctor-default.jpg',
+            license_number: doctor.license_number,
+            education: doctor.education,
           };
         }),
     [staff]
@@ -75,7 +83,7 @@ const AppointmentsPage: React.FC = () => {
     [formattedDoctors, searchTerm, filterSpecialization]
   );
 
-  // Get upcoming appointments (scheduled status AND future date)
+  // Get upcoming appointments (scheduled status AND future date) - limited to 3 most recent
   const upcomingAppointments = useMemo(
     () =>
       appointments
@@ -85,8 +93,8 @@ const AppointmentsPage: React.FC = () => {
           today.setHours(0, 0, 0, 0); // Set to start of day
           return apt.status === 'scheduled' && aptDate >= today;
         })
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(0, 5),
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 3), // Show only 3 most recent appointments
     [appointments]
   );
 

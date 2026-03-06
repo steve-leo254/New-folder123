@@ -117,6 +117,24 @@ export const apiService = {
     const { data } = await api.put(`/appointments/${appointmentId}`, { status: 'cancelled' });
     return data;
   },
+  processPayment: async (appointmentId: string | number, payload: {
+    payment_method: string;
+    payment_amount: number;
+    transaction_id?: string;
+  }) => {
+    const { data } = await api.post(`/appointments/${appointmentId}/payment`, payload);
+    return data;
+  },
+  getBillingPayments: async (params?: {
+    payment_status?: string;
+    start_date?: string;
+    end_date?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const { data } = await api.get('/billing/payments', { params });
+    return data;
+  },
   getMedications: async (params?: Record<string, unknown>) => {
     const { data } = await api.get('/medications', { params });
     return data;
@@ -149,6 +167,14 @@ export const apiService = {
   getBilling: async (params?: Record<string, unknown>) => {
     const { data } = await api.get('/billing', { params });
     return data;
+  },
+  createBilling: async (billingData: any) => {
+    const response = await api.post('/billing', billingData);
+    return response.data;
+  },
+  updateBillingStatus: async (id: string | number, data: { status: string; notes?: string }) => {
+    const response = await api.patch(`/billing/payments/${id}`, data);
+    return response.data;
   },
   // Medical Info endpoints
   getMedicalInfo: async () => {

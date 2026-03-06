@@ -42,6 +42,7 @@ import RoleManagementPage from "./RoleManagementPage";
 import Alert from "../components/ui/Alert";
 import { apiService } from "../services/api";
 import PatientRecordsManagement from "../components/admin/PatientRecordsManagement";
+import BillingManagement from "../components/admin/BillingManagement";
 import {
   XAxis,
   YAxis,
@@ -1199,146 +1200,7 @@ const SuperDashboardPage: React.FC = () => {
 
         {/* Billing Tab */}
         {activeTab === "billing" && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Billing & Revenue
-              </h2>
-              <div className="flex space-x-2">
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Report
-                </Button>
-                <Button>
-                  
-                  Generate Invoice
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">
-                    Total Revenue
-                  </h3>
-                  <DollarSign className="w-5 h-5 text-green-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">Ksh 108,600</p>
-                <p className="text-xs text-green-600 mt-1">
-                  +12% from last month
-                </p>
-              </Card>
-
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">
-                    Pending Payments
-                  </h3>
-                  <Clock className="w-5 h-5 text-yellow-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">Ksh 8,450</p>
-                <p className="text-xs text-yellow-600 mt-1">12 invoices</p>
-              </Card>
-
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-600">
-                    Overdue Payments
-                  </h3>
-                  <AlertCircle className="w-5 h-5 text-red-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">Ksh 2,350</p>
-                <p className="text-xs text-red-600 mt-1">5 invoices</p>
-              </Card>
-            </div>
-
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Recent Transactions
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Invoice ID
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Patient
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Service
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Amount
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    <tr>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          #INV001234
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">John Doe</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          Cardiology Consultation
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">Ksh 150</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          Jan 15, 2024
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="success">Paid</Badge>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          #INV001235
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">Jane Smith</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          Prescription Medication
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">Ksh 85</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          Jan 14, 2024
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="warning">Pending</Badge>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </div>
+          <BillingManagement />
         )}
 
         {/* Roles Tab */}

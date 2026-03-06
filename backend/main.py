@@ -57,6 +57,9 @@ from pydantic_models import (
     DoctorCreateRequest,
     DoctorResponse,
     ImageResponse,
+    PaymentProcessRequest,
+    PaymentResponse,
+    PaymentStatus,
     MessageResponse,
     # Patient Profile Models
     MedicalInfoRequest,
@@ -561,6 +564,10 @@ def create_appointment(
         visit_type=payload.visit_type,
         scheduled_at=payload.scheduled_at,
         triage_notes=payload.triage_notes,
+        cost=payload.cost,
+        payment_status='unpaid',
+        payment_method=payload.payment_method,
+        payment_amount=payload.payment_amount or payload.cost,
     )
     
     try:
@@ -584,6 +591,12 @@ def create_appointment(
             'triage_notes': appt.triage_notes,
             'cost': float(appt.cost) if appt.cost else 0.0,
             'cancellation_reason': appt.cancellation_reason,
+            'payment_status': appt.payment_status,
+            'payment_method': appt.payment_method,
+            'payment_amount': float(appt.payment_amount) if appt.payment_amount else 0.0,
+            'transaction_id': appt.transaction_id,
+            'payment_date': appt.payment_date,
+            'invoice_number': appt.invoice_number,
             'created_at': appt.created_at,
             'updated_at': appt.updated_at
         }
@@ -596,6 +609,239 @@ def create_appointment(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create appointment."
+        )
+
+
+@app.post(
+    "/appointments/{appointment_id}/payment",
+    response_model=PaymentResponse,
+    dependencies=[Depends(get_current_active_user)],
+)
+def process_appointment_payment(
+    appointment_id: int,
+    payload: PaymentProcessRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Process payment for an appointment."""
+    
+    # Get appointment
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Appointment not found"
+        )
+    
+    # Check permissions
+    if current_user.role == Role.PATIENT and appt.patient_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Can only process payment for your own appointments"
+        )
+    
+    # Generate invoice number if not exists
+    if not appt.invoice_number:
+        import uuid
+        appt.invoice_number = f"INV-{uuid.uuid4().hex[:8].upper()}"
+    
+    # Update payment details
+    appt.payment_status = PaymentStatus.PAID.value
+    appt.payment_method = payload.payment_method
+    appt.payment_amount = payload.payment_amount
+    appt.transaction_id = payload.transaction_id
+    appt.payment_date = datetime.now()
+    
+    try:
+        db.commit()
+        db.refresh(appt)
+        
+        logger.info(f"Payment processed for appointment {appointment_id}")
+        return PaymentResponse(
+            appointment_id=appt.id,
+            payment_status=PaymentStatus.PAID,
+            payment_method=appt.payment_method,
+            payment_amount=appt.payment_amount,
+            transaction_id=appt.transaction_id,
+            payment_date=appt.payment_date,
+            invoice_number=appt.invoice_number
+        )
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error processing payment: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process payment"
+        )
+
+
+@app.get(
+    "/billing/payments",
+    response_model=None,
+    dependencies=[Depends(get_current_active_user)],
+)
+def get_billing_payments(
+    page: int = 1,
+    limit: int = 10,
+    payment_status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all payments for billing with pagination (SuperAdmin only)."""
+    
+    # Debug logging
+    logger.info(f"Billing access attempt - User: {current_user.full_name}, Role: {current_user.role}, Role type: {type(current_user.role)}")
+    logger.info(f"Role value: {current_user.role.value if hasattr(current_user.role, 'value') else current_user.role}")
+    
+    # Check if user is admin
+    if current_user.role.value not in ['super_admin', 'clinician_admin']:
+        logger.warning(f"Access denied for user {current_user.full_name} with role {current_user.role}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    logger.info(f"Access granted for user {current_user.full_name}")
+    
+    # Build base query - now includes ALL appointments with payment status
+    query = db.query(Appointment)
+    
+    # Filter by payment status if provided (but don't exclude unpaid by default)
+    if payment_status and payment_status != 'all':
+        query = query.filter(Appointment.payment_status == payment_status)
+    
+    # Filter by date range if provided
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            query = query.filter(Appointment.created_at >= start_dt)
+        except ValueError:
+            pass  # Invalid date format, ignore filter
+    
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query = query.filter(Appointment.created_at <= end_dt)
+        except ValueError:
+            pass  # Invalid date format, ignore filter
+    
+    # Get total count for pagination
+    total_count = query.count()
+    
+    # Apply pagination
+    offset = (page - 1) * limit
+    appointments = query.offset(offset).limit(limit).all()
+    
+    payments_data = []
+    for appt in appointments:
+        patient = db.query(User).filter(User.id == appt.patient_id).first()
+        clinician = db.query(User).filter(User.id == appt.clinician_id).first()
+        
+        payments_data.append({
+            'id': appt.id,
+            'invoice_number': appt.invoice_number,
+            'patient_name': patient.full_name if patient else 'Unknown',
+            'patient_id': appt.patient_id,
+            'clinician_name': clinician.full_name if clinician else 'Unknown',
+            'clinician_id': appt.clinician_id,
+            'payment_status': appt.payment_status,
+            'payment_method': appt.payment_method,
+            'payment_amount': float(appt.payment_amount) if appt.payment_amount else 0.0,
+            'transaction_id': appt.transaction_id,
+            'payment_date': appt.payment_date,
+            'scheduled_at': appt.scheduled_at,
+            'created_at': appt.created_at,
+            'updated_at': appt.updated_at,
+            'cost': float(appt.cost) if appt.cost else 0.0,
+            'cancellation_reason': appt.cancellation_reason
+        })
+    
+    # Return paginated response
+    return {
+        'payments': payments_data,
+        'pagination': {
+            'page': page,
+            'limit': limit,
+            'total': total_count,
+            'pages': (total_count + limit - 1) // limit,  # Ceiling division
+            'has_next': offset + limit < total_count,
+            'has_prev': page > 1
+        }
+    }
+
+
+@app.get(
+    "/billing",
+    response_model=None,
+    dependencies=[Depends(get_current_active_user)],
+)
+def get_billing_summary(
+    page: int = 1,
+    limit: int = 10,
+    payment_status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get billing summary (alias for payments endpoint)."""
+    # Redirect to payments endpoint with pagination
+    return get_billing_payments(
+        page=page, 
+        limit=limit, 
+        payment_status=payment_status, 
+        start_date=start_date, 
+        end_date=end_date,
+        db=db, 
+        current_user=current_user
+    )
+
+
+@app.post("/admin/cleanup-unpaid", dependencies=[Depends(get_current_active_user)])
+def cleanup_unpaid_appointments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Cancel unpaid appointments older than 15 minutes (Admin only)."""
+    
+    # Check if user is admin
+    if current_user.role.value not in ['super_admin', 'clinician_admin']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    # Find unpaid appointments older than 15 minutes
+    from datetime import timedelta
+    cutoff_time = datetime.now() - timedelta(minutes=15)
+    
+    unpaid_appointments = db.query(Appointment).filter(
+        Appointment.payment_status == 'unpaid',
+        Appointment.created_at < cutoff_time,
+        Appointment.status == AppointmentStatus.SCHEDULED
+    ).all()
+    
+    cancelled_count = 0
+    for appt in unpaid_appointments:
+        appt.status = AppointmentStatus.CANCELLED
+        appt.cancellation_reason = "Automatically cancelled due to non-payment"
+        cancelled_count += 1
+    
+    try:
+        db.commit()
+        logger.info(f"Cancelled {cancelled_count} unpaid appointments")
+        return {
+            "message": f"Cancelled {cancelled_count} unpaid appointments older than 15 minutes",
+            "cancelled_count": cancelled_count
+        }
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error cleaning up unpaid appointments: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cleanup unpaid appointments"
         )
 
 

@@ -36,9 +36,10 @@ class AppointmentStatus(str, Enum):
 
 class PaymentStatus(str, Enum):
     """Payment statuses."""
+    UNPAID = "unpaid"
     PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
+    PAID = "paid"
+    REFUNDED = "refunded"
     FAILED = "failed"
 
 
@@ -235,6 +236,8 @@ class AppointmentCreateRequest(BaseModel):
     triage_notes: Optional[str] = None
     specialization: Optional[str] = None
     cost: Decimal = Decimal("0.0")
+    payment_method: Optional[str] = None  # 'mpesa', 'card', 'cash', 'insurance'
+    payment_amount: Optional[Decimal] = None
 
 
 class AppointmentRescheduleRequest(BaseModel):
@@ -247,6 +250,12 @@ class AppointmentUpdateRequest(BaseModel):
     status: Optional[AppointmentStatus] = None
     triage_notes: Optional[str] = None
     cost: Optional[Decimal] = None
+    payment_status: Optional[PaymentStatus] = None
+    payment_method: Optional[str] = None
+    payment_amount: Optional[Decimal] = None
+    transaction_id: Optional[str] = None
+    payment_date: Optional[datetime] = None
+    invoice_number: Optional[str] = None
 
 
 class AppointmentResponse(BaseModel):
@@ -261,6 +270,12 @@ class AppointmentResponse(BaseModel):
     triage_notes: Optional[str] = None
     cost: Decimal
     cancellation_reason: Optional[str] = None
+    payment_status: str
+    payment_method: Optional[str] = None
+    payment_amount: Decimal
+    transaction_id: Optional[str] = None
+    payment_date: Optional[datetime] = None
+    invoice_number: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -270,6 +285,27 @@ class AppointmentResponse(BaseModel):
 class AppointmentCancelRequest(BaseModel):
     """Cancel appointment request."""
     cancellation_reason: Optional[str] = None
+
+
+class PaymentProcessRequest(BaseModel):
+    """Process payment request."""
+    appointment_id: int
+    payment_method: str  # 'mpesa', 'card', 'cash', 'insurance'
+    payment_amount: Decimal
+    transaction_id: Optional[str] = None
+
+
+class PaymentResponse(BaseModel):
+    """Payment response model."""
+    appointment_id: int
+    payment_status: PaymentStatus
+    payment_method: str
+    payment_amount: Decimal
+    transaction_id: Optional[str] = None
+    payment_date: Optional[datetime] = None
+    invoice_number: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================

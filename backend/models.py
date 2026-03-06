@@ -92,19 +92,17 @@ class User(Base):
     insurance = relationship("Insurance", uselist=False, back_populates="patient")
     notification_settings = relationship("NotificationSettings", uselist=False, back_populates="patient")
     security_settings = relationship("SecuritySettings", uselist=False, back_populates="patient")
-    
+
     # Appointments
     appointments = relationship(
         "Appointment",
         back_populates="patient",
         foreign_keys="Appointment.patient_id",
+        cascade="all, delete-orphan"
     )
-    consults = relationship(
-        "Appointment",
-        back_populates="clinician",
-        foreign_keys="Appointment.clinician_id",
-    )
-    
+
+    # Relationships
+
     # Medical History
     medical_history = relationship("MedicalHistory", foreign_keys="MedicalHistory.patient_id", back_populates="patient")
     
@@ -118,6 +116,42 @@ class User(Base):
     # Activity & Wishlist
     activity_logs = relationship("ActivityLog", back_populates="user")
     wishlist_items = relationship("Wishlist", back_populates="user", cascade="all, delete-orphan")
+    
+    # Payments (as patient)
+    payments = relationship("Payment", foreign_keys="Payment.patient_id", back_populates="patient")
+    
+    # Consultations (as clinician)
+    consults = relationship("Appointment", foreign_keys="Appointment.clinician_id", back_populates="clinician")
+
+
+class Payment(Base):
+    """Payment model representing M-Pesa and other payment transactions."""
+    __tablename__ = "payments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False, index=True)
+    
+    # Transaction details
+    transaction_id = Column(String(100), unique=True, nullable=False, index=True)  # M-Pesa transaction ID
+    amount = Column(Numeric(precision=10, scale=2), nullable=False)  # Payment amount
+    payment_method = Column(String(50), nullable=False, default='mpesa')  # 'mpesa', 'card', 'cash', 'insurance'
+    payment_status = Column(String(20), default='pending', index=True)  # 'pending', 'paid', 'refunded', 'failed', 'cancelled'
+    
+    # M-Pesa specific fields
+    phone_number = Column(String(20), nullable=True, index=True)  # Patient phone number for M-Pesa
+    mpesa_receipt_number = Column(String(100), nullable=True, index=True)  # M-Pesa receipt number
+    
+    # Timestamps
+    payment_date = Column(DateTime, nullable=True, index=True)  # When payment was made
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    patient = relationship("User", foreign_keys=[patient_id], back_populates="payments")
+    doctor = relationship("User", foreign_keys=[doctor_id], back_populates="payments")
+    appointment = relationship("Appointment", back_populates="payments")
 
 
 class Doctor(Base):
@@ -222,6 +256,15 @@ class Appointment(Base):
     triage_notes = Column(Text, nullable=True)
     cost = Column(Numeric(precision=10, scale=2), default=0.0)
     cancellation_reason = Column(Text, nullable=True)
+    
+    # Payment fields
+    payment_status = Column(String(20), default='unpaid', index=True)  # 'unpaid', 'paid', 'refunded', 'pending'
+    payment_method = Column(String(50), nullable=True)  # 'mpesa', 'card', 'cash', 'insurance'
+    payment_amount = Column(Numeric(precision=10, scale=2), default=0.0)
+    transaction_id = Column(String(100), unique=True, nullable=True)
+    payment_date = Column(DateTime, nullable=True)
+    invoice_number = Column(String(50), unique=True, nullable=True)
+    
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -229,6 +272,7 @@ class Appointment(Base):
     patient = relationship("User", foreign_keys=[patient_id], back_populates="appointments")
     clinician = relationship("User", foreign_keys=[clinician_id], back_populates="consults")
     prescription = relationship("Prescription", back_populates="appointment", uselist=False)
+    payments = relationship("Payment", back_populates="appointment")
 
 
 class Prescription(Base):
