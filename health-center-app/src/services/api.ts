@@ -135,6 +135,26 @@ export const apiService = {
     const { data } = await api.get('/billing/payments', { params });
     return data;
   },
+  createMedicationPayment: async (paymentData: {
+    transaction_id: string;
+    patient_id: number;
+    amount: number;
+    payment_method: string;
+    phone_number: string;
+    items: Array<{
+      medication_id: string;
+      name: string;
+      quantity: number;
+      price: number;
+    }>;
+    subtotal: number;
+    delivery_fee: number;
+    payment_status: string;
+  }) => {
+    const { data } = await api.post('/medications/payments', paymentData);
+    return data;
+  },
+
   getMedications: async (params?: Record<string, unknown>) => {
     const { data } = await api.get('/medications', { params });
     return data;

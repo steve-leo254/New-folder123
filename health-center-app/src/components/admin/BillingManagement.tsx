@@ -29,12 +29,14 @@ interface Payment {
   amount: number;
   appointmentDate: string;
   appointmentTime: string;
-  appointmentType: string;
+  appointmentType: 'video' | 'in-person';
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded';
   createdAt: string;
   updatedAt: string;
   paymentMethod: 'mpesa' | 'card' | 'cash';
   notes?: string;
+  type?: 'Appointment' | 'Medication Purchase';
+  isMedication?: boolean;
 }
 
 interface BillingManagementProps {
@@ -87,12 +89,14 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
         amount: payment.payment_amount || payment.cost || 0,
         appointmentDate: payment.scheduled_at ? new Date(payment.scheduled_at).toLocaleDateString('en-CA') : '',
         appointmentTime: payment.scheduled_at ? new Date(payment.scheduled_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
-        appointmentType: 'in-person', // Default, not available from API
+        appointmentType: payment.is_medication ? 'in-person' : 'in-person', // Default, not available from API
         status: mapPaymentStatus(payment.payment_status),
         createdAt: payment.created_at || payment.payment_date || new Date().toISOString(),
         updatedAt: payment.updated_at || payment.payment_date || new Date().toISOString(),
         paymentMethod: mapPaymentMethod(payment.payment_method),
         notes: payment.cancellation_reason || '',
+        type: payment.type || 'Appointment',
+        isMedication: payment.is_medication || false,
       }));
 
       setPayments(transformedPayments);
@@ -466,13 +470,13 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Appointment
+                  Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date/Time
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -512,12 +516,18 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
                       <p className="text-sm font-semibold text-gray-900">{formatCurrency(payment.amount)}</p>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        payment.isMedication 
+                          ? 'bg-purple-100 text-purple-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {payment.type}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
                         <p>{payment.appointmentDate}</p>
                         <p className="text-xs text-gray-500">{payment.appointmentTime}</p>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          {payment.appointmentType}
-                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -527,9 +537,6 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
                         {statusConfig[payment.status].icon}
                         {statusConfig[payment.status].label}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <p className="text-sm text-gray-900">{formatDate(payment.createdAt)}</p>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">

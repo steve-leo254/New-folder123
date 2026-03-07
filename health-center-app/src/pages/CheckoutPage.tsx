@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CreditCard, Shield, CheckCircle } from 'lucide-react';
+import { Smartphone, Shield, CheckCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import CheckoutForm from '../components/features/checkoutForm';
+import MpesaPaymentModal from '../pages/MpesaPaymentModal';
 import { useShoppingCart } from '../services/CartContext';
 import { useInsuranceDiscount } from '../services/useInsuranceDiscount';
 import { formatCurrency } from '../services/formatCurrency';
 
 const CheckoutPage: React.FC = () => {
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const cart = useShoppingCart();
 
   // Provide defaults if context is not available
@@ -24,6 +24,19 @@ const CheckoutPage: React.FC = () => {
   const amountAfterDiscount = Number((subtotal - insuranceDiscount.discountAmount).toFixed(2));
   const tax = Number((amountAfterDiscount * 0.16).toFixed(2)); // 16% VAT
   const total = Number((amountAfterDiscount + deliveryFee + tax).toFixed(2));
+
+  const handlePaymentSuccess = () => {
+    // Clear cart and redirect or show success message
+    if (cart) {
+      cart.clearCart();
+    }
+    // You could redirect to a success page here
+    console.log('Payment successful!');
+  };
+
+  const handlePaymentFailed = () => {
+    console.log('Payment failed');
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -97,10 +110,6 @@ const CheckoutPage: React.FC = () => {
               </div>
             </div>
           </Card>
-
-          {showPaymentForm && (
-            <CheckoutForm onClose={() => setShowPaymentForm(false)} />
-          )}
         </div>
 
         <div className="space-y-6">
@@ -159,9 +168,9 @@ const CheckoutPage: React.FC = () => {
             
             <Button
               className="w-full mt-6"
-              onClick={() => setShowPaymentForm(true)}
+              onClick={() => setShowPaymentModal(true)}
             >
-              <CreditCard className="w-4 h-4 mr-2" />
+              <Smartphone className="w-4 h-4 mr-2" />
               Proceed to Payment
             </Button>
           </Card>
@@ -177,6 +186,19 @@ const CheckoutPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* M-Pesa Payment Modal */}
+      <MpesaPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        amount={Math.round(total)}
+        onPaymentSuccess={handlePaymentSuccess}
+        onPaymentFailed={handlePaymentFailed}
+        doctorName="Pharmacy"
+        appointmentDate={new Date().toLocaleDateString('en-CA')}
+        appointmentTime={new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+        appointmentType="Medication Purchase"
+      />
     </div>
   );
 };

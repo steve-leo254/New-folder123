@@ -514,8 +514,13 @@ def create_appointment(
 ) -> Appointment:
     """Create new appointment (patients can book for themselves, admins can book for anyone)."""
     
+    # Debug logging
+    logger.info(f"Appointment creation attempt - User: {current_user.full_name}, Role: {current_user.role}")
+    logger.info(f"Payload: {payload}")
+    
     # Check permissions: patients can only book for themselves
     if current_user.role == Role.PATIENT and payload.patient_id != current_user.id:
+        logger.warning(f"Patient {current_user.full_name} trying to book for patient_id {payload.patient_id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Patients can only book appointments for themselves"
@@ -528,6 +533,7 @@ def create_appointment(
     ).first()
     
     if not patient:
+        logger.warning(f"Patient not found with ID: {payload.patient_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Patient does not exist."
@@ -536,6 +542,7 @@ def create_appointment(
     # Verify clinician exists
     clinician = db.query(User).filter(User.id == payload.clinician_id).first()
     if not clinician:
+        logger.warning(f"Clinician not found with ID: {payload.clinician_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Clinician does not exist."
@@ -544,7 +551,10 @@ def create_appointment(
     # Validate scheduled_at is in the future
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
+    logger.info(f"Scheduled time: {payload.scheduled_at}, Current time: {now}")
+    
     if payload.scheduled_at <= now:
+        logger.warning(f"Appointment time {payload.scheduled_at} is not in the future")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Appointment time must be in the future"
@@ -552,7 +562,10 @@ def create_appointment(
     
     # Validate business hours (9 AM - 6 PM)
     appointment_hour = payload.scheduled_at.hour
+    logger.info(f"Appointment hour: {appointment_hour} (must be 9-18)")
+    
     if appointment_hour < 9 or appointment_hour > 18:
+        logger.warning(f"Appointment hour {appointment_hour} outside business hours (9-18)")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Appointments can only be booked between 9:00 AM and 6:00 PM"
@@ -675,6 +688,60 @@ def process_appointment_payment(
         )
 
 
+@app.post("/medications/payments", dependencies=[Depends(get_current_active_user)])
+def create_medication_payment(
+    payment_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a medication payment record and integrate with billing."""
+    
+    try:
+        # Create a billing record for medication purchase
+        # For now, we'll create a simplified appointment-like record for billing
+        
+        # Generate a unique transaction ID if not provided
+        transaction_id = payment_data.get('transaction_id') or f"MED{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        # Create a billing record (using Appointment table for simplicity)
+        # In future, we might want a separate medication_payments table
+        billing_record = Appointment(
+            patient_id=current_user.id,
+            clinician_id=1,  # Default to admin or pharmacist
+            visit_type='medication_purchase',
+            scheduled_at=datetime.now(),
+            status=AppointmentStatus.COMPLETED,
+            cost=payment_data.get('amount', 0),
+            payment_method=payment_data.get('payment_method', 'mpesa'),
+            payment_amount=payment_data.get('amount', 0),
+            transaction_id=transaction_id,
+            payment_status='paid',
+            payment_date=datetime.now(),
+            invoice_number=f"MED-{transaction_id[3:11]}",  # Extract part of transaction ID
+            triage_notes=f"Medication purchase: {len(payment_data.get('items', []))} items"
+        )
+        
+        db.add(billing_record)
+        db.commit()
+        db.refresh(billing_record)
+        
+        logger.info(f"Created medication payment record: {transaction_id} for user {current_user.id}")
+        
+        return {
+            "success": True,
+            "message": "Medication payment processed successfully",
+            "transaction_id": transaction_id,
+            "billing_id": billing_record.id
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating medication payment: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process medication payment"
+        )
+
+
 @app.get(
     "/billing/payments",
     response_model=None,
@@ -739,6 +806,9 @@ def get_billing_payments(
         patient = db.query(User).filter(User.id == appt.patient_id).first()
         clinician = db.query(User).filter(User.id == appt.clinician_id).first()
         
+        # Determine if this is a medication purchase or appointment
+        is_medication = appt.visit_type == 'medication_purchase'
+        
         payments_data.append({
             'id': appt.id,
             'invoice_number': appt.invoice_number,
@@ -755,7 +825,10 @@ def get_billing_payments(
             'created_at': appt.created_at,
             'updated_at': appt.updated_at,
             'cost': float(appt.cost) if appt.cost else 0.0,
-            'cancellation_reason': appt.cancellation_reason
+            'cancellation_reason': appt.cancellation_reason,
+            'visit_type': appt.visit_type,
+            'is_medication': is_medication,
+            'type': 'Medication Purchase' if is_medication else 'Appointment'
         })
     
     # Return paginated response

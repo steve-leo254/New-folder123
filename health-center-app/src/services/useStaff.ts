@@ -15,6 +15,13 @@ export interface StaffMember {
     isAvailable: boolean;
     rating: number;
     consultationFee: number;
+    reviewCount?: number;
+    experience?: number;
+    license_number?: string;
+    education?: string;
+    video_consultation_fee?: number;
+    phone_consultation_fee?: number;
+    chat_consultation_fee?: number;
   };
   patientsCount: number;
 }

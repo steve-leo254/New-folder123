@@ -50,9 +50,9 @@ const AppointmentsPage: React.FC = () => {
             isAvailable: doctor.isAvailable,
             available: doctor.isAvailable, // Alias for isAvailable
             consultationFee: doctor.consultationFee,
-            video_consultation_fee: doctor.video_consultation_fee,
-            phone_consultation_fee: doctor.phone_consultation_fee,
-            chat_consultation_fee: doctor.chat_consultation_fee,
+            video_consultation_fee: doctor.video_consultation_fee || doctor.consultationFee,
+            phone_consultation_fee: doctor.phone_consultation_fee || doctor.consultationFee,
+            chat_consultation_fee: doctor.chat_consultation_fee || doctor.consultationFee,
             patientsCount: 0,
             reviewCount: doctor.reviewCount,
             experience: doctor.experience,
