@@ -1,0 +1,300 @@
+@startuml Kiangombe Health Center ERD
+
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+' Main Entities
+entity "Users" as users {
+  * **id** : Integer PK
+  * **full_name** : String(120)
+  * **email** : String(120) UK
+  * **password_hash** : String(255)
+  * **phone** : String(20)
+  * **gender** : String(20)
+  * **date_of_birth** : DateTime
+  * **address** : String(255)
+  * **profile_picture** : String(255)
+  * **is_verified** : Boolean
+  * **is_active** : Boolean
+  * **last_login** : DateTime
+  * **role** : Enum
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Doctors" as doctors {
+  * **id** : Integer PK
+  * **user_id** : Integer FK
+  * **specialization** : String(120)
+  * **bio** : Text
+  * **rating** : Decimal(3,2)
+  * **license_number** : String(50) UK
+  * **is_available** : Boolean
+  * **consultation_fee** : Decimal(10,2)
+  * **video_consultation_fee** : Decimal(10,2)
+  * **phone_consultation_fee** : Decimal(10,2)
+  * **chat_consultation_fee** : Decimal(10,2)
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Appointments" as appointments {
+  * **id** : Integer PK
+  * **patient_id** : Integer FK
+  * **clinician_id** : Integer FK
+  * **visit_type** : String(80)
+  * **specialization** : String(80)
+  * **scheduled_at** : DateTime
+  * **status** : Enum
+  * **triage_notes** : Text
+  * **cost** : Decimal(10,2)
+  * **cancellation_reason** : Text
+  * **payment_status** : String(20)
+  * **payment_method** : String(50)
+  * **payment_amount** : Decimal(10,2)
+  * **transaction_id** : String(100) UK
+  * **payment_date** : DateTime
+  * **invoice_number** : String(50) UK
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Prescriptions" as prescriptions {
+  * **id** : Integer PK
+  * **appointment_id** : Integer FK
+  * **patient_id** : Integer FK
+  * **issued_by_doctor_id** : Integer FK
+  * **pharmacy_name** : String(120)
+  * **medications_json** : JSON
+  * **status** : Enum
+  * **qr_code_path** : String(255)
+  * **issued_date** : DateTime
+  * **expiry_date** : DateTime
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Medications" as medications {
+  * **id** : Integer PK
+  * **name** : String(150)
+  * **category** : String(100)
+  * **dosage** : String(100)
+  * **price** : Decimal(10,2)
+  * **stock** : Integer
+  * **description** : Text
+  * **prescription_required** : Boolean
+  * **expiry_date** : DateTime
+  * **batch_number** : String(100) UK
+  * **supplier** : String(150)
+  * **image_url** : String(500)
+  * **in_stock** : Boolean
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Payments" as payments {
+  * **id** : Integer PK
+  * **patient_id** : Integer FK
+  * **doctor_id** : Integer FK
+  * **appointment_id** : Integer FK
+  * **transaction_id** : String(100) UK
+  * **amount** : Decimal(10,2)
+  * **payment_method** : String(50)
+  * **payment_status** : String(20)
+  * **phone_number** : String(20)
+  * **mpesa_receipt_number** : String(100)
+  * **payment_date** : DateTime
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Medical History" as medical_history {
+  * **id** : Integer PK
+  * **patient_id** : Integer FK
+  * **appointment_id** : Integer FK
+  * **type** : String(50)
+  * **title** : String(200)
+  * **description** : Text
+  * **diagnosis** : Text
+  * **symptoms** : Text
+  * **treatment_plan** : Text
+  * **doctor_id** : Integer FK
+  * **doctor_name** : String(120)
+  * **notes** : Text
+  * **attachments** : JSON
+  * **date** : DateTime
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+' Staff Profiles
+entity "Nurses" as nurses {
+  * **id** : Integer PK
+  * **user_id** : Integer FK
+  * **specialization** : String(120)
+  * **bio** : Text
+  * **license_number** : String(50) UK
+  * **is_available** : Boolean
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Receptionists" as receptionists {
+  * **id** : Integer PK
+  * **user_id** : Integer FK
+  * **bio** : Text
+  * **is_available** : Boolean
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Lab Technicians" as lab_technicians {
+  * **id** : Integer PK
+  * **user_id** : Integer FK
+  * **specialization** : String(120)
+  * **bio** : Text
+  * **license_number** : String(50) UK
+  * **is_available** : Boolean
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Pharmacists" as pharmacists {
+  * **id** : Integer PK
+  * **user_id** : Integer FK
+  * **specialization** : String(120)
+  * **bio** : Text
+  * **license_number** : String(50) UK
+  * **is_available** : Boolean
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+' Patient Profile Tables
+entity "Medical Info" as medical_info {
+  * **id** : Integer PK
+  * **patient_id** : Integer FK UK
+  * **blood_type** : String(10)
+  * **height** : String(20)
+  * **weight** : String(20)
+  * **allergies** : JSON
+  * **conditions** : JSON
+  * **medications** : JSON
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Emergency Contacts" as emergency_contacts {
+  * **id** : Integer PK
+  * **patient_id** : Integer FK UK
+  * **name** : String(120)
+  * **phone** : String(20)
+  * **relation** : String(50)
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Insurance" as insurance {
+  * **id** : Integer PK
+  * **patient_id** : Integer FK UK
+  * **provider** : String(120)
+  * **policy_number** : String(100)
+  * **group_number** : String(100)
+  * **holder_name** : String(120)
+  * **insurance_type** : String(50)
+  * **quarterly_limit** : Decimal(10,2)
+  * **quarterly_used** : Decimal(10,2)
+  * **coverage_start_date** : DateTime
+  * **coverage_end_date** : DateTime
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+' Support Tables
+entity "Activity Logs" as activity_logs {
+  * **id** : Integer PK
+  * **user_id** : Integer FK
+  * **action** : String(200)
+  * **device** : String(200)
+  * **location** : String(200)
+  * **ip_address** : String(45)
+  * **timestamp** : DateTime
+  * **created_at** : DateTime
+}
+
+entity "Wishlists" as wishlists {
+  * **id** : Integer PK
+  * **user_id** : Integer FK
+  * **medication_id** : Integer FK
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Doctor Availability" as doctor_availability {
+  * **id** : Integer PK
+  * **doctor_id** : Integer FK
+  * **day** : Enum
+  * **is_open** : Boolean
+  * **start_time** : String(5)
+  * **end_time** : String(5)
+  * **break_start** : String(5)
+  * **break_end** : String(5)
+  * **appointment_duration** : Integer
+  * **buffer_time** : Integer
+  * **max_appointments_per_day** : Integer
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+entity "Doctor Settings" as doctor_settings {
+  * **id** : Integer PK
+  * **doctor_id** : Integer FK UK
+  * **show_profile_to_patients** : Boolean
+  * **show_rating_reviews** : Boolean
+  * **allow_online_booking** : Boolean
+  * **show_availability** : Boolean
+  * **email_notifications** : Boolean
+  * **sms_notifications** : Boolean
+  * **appointment_reminders** : Boolean
+  * **new_appointment_requests** : Boolean
+  * **cancellation_alerts** : Boolean
+  * **weekly_summary** : Boolean
+  * **created_at** : DateTime
+  * **updated_at** : DateTime
+}
+
+' Relationships
+users ||--o{ doctors : "has profile"
+users ||--o{ nurses : "has profile"
+users ||--o{ receptionists : "has profile"
+users ||--o{ lab_technicians : "has profile"
+users ||--o{ pharmacists : "has profile"
+users ||--o{ appointments : "patient has"
+users ||--o{ appointments : "clinician conducts"
+users ||--o{ prescriptions : "patient receives"
+users ||--o{ prescriptions : "doctor issues"
+users ||--o{ payments : "patient makes"
+users ||--o{ payments : "doctor receives"
+users ||--o{ medical_history : "patient has"
+users ||--o{ medical_history : "doctor creates"
+users ||--|| medical_info : "has"
+users ||--|| emergency_contacts : "has"
+users ||--|| insurance : "has"
+users ||--o{ activity_logs : "performs"
+users ||--o{ wishlists : "has"
+
+appointments ||--o{ prescriptions : "may have"
+appointments ||--o{ payments : "generates"
+appointments ||--o{ medical_history : "generates"
+
+medications ||--o{ prescriptions : "prescribed in"
+medications ||--o{ wishlists : "in"
+
+doctors ||--o{ doctor_availability : "has schedule"
+doctors ||--|| doctor_settings : "has settings"
+
+' Notes
+note "PK = Primary Key\nFK = Foreign Key\nUK = Unique Key\nJSON = JSON data type\nEnum = Enumeration" as notes
+
+@enduml
