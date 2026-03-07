@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Button from '../ui/Button';
 import { apiService } from '../../services/api';
+import { useBilling } from '../../services/useBilling';
 
 interface Payment {
   id: string;
@@ -49,9 +50,11 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<Payment['status'] | 'all'>('all');
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -60,6 +63,7 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
     has_next: false,
     has_prev: false
   });
+  const { updateBillingStatus } = useBilling();
 
   // Fetch real billing data from API
   const fetchBillingData = async (page = 1, limit = 10) => {
@@ -250,38 +254,53 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
   // Handle payment status update
   const handleStatusUpdate = async (paymentId: string, newStatus: Payment['status']) => {
     try {
-      // Map frontend status to backend status
-      const backendStatus = mapFrontendToBackendStatus(newStatus);
+      setUpdatingStatus(paymentId);
+      setStatusMessage(null);
       
-      // Update payment status via API
-      await apiService.updateBillingStatus(paymentId, { 
-        status: backendStatus,
-        notes: newStatus === 'cancelled' ? 'Cancelled by admin' : undefined
-      });
+      // Map frontend status to backend status
+      const backendStatus = mapFrontendToBackendStatus(newStatus) as 'pending' | 'paid' | 'refunded';
+      
+      // Update payment status using the billing hook
+      await updateBillingStatus(paymentId, backendStatus, newStatus === 'cancelled' ? 'Cancelled by admin' : undefined);
       
       // Refresh data to get updated state
       await fetchBillingData();
+
+      // Show success message
+      setStatusMessage({
+        type: 'success',
+        message: `Payment status updated to ${newStatus} successfully`
+      });
 
       if (onPaymentUpdate) {
         onPaymentUpdate(paymentId, newStatus);
       }
     } catch (error) {
       console.error('Error updating payment status:', error);
-      // Optionally show error message to user
+      setStatusMessage({
+        type: 'error',
+        message: 'Failed to update payment status. Please try again.'
+      });
+    } finally {
+      setUpdatingStatus(null);
+      // Clear message after 3 seconds
+      setTimeout(() => setStatusMessage(null), 3000);
     }
   };
 
   // Helper function to map frontend status to backend status
-  const mapFrontendToBackendStatus = (status: Payment['status']): string => {
+  const mapFrontendToBackendStatus = (status: Payment['status']): 'pending' | 'paid' | 'refunded' => {
     switch (status) {
       case 'completed':
         return 'paid';
       case 'pending':
         return 'pending';
+      case 'processing':
+        return 'pending'; // Processing maps to pending in backend
       case 'failed':
-        return 'failed';
+        return 'pending'; // Failed maps to pending so it can be retried
       case 'cancelled':
-        return 'cancelled';
+        return 'pending'; // Cancelled maps to pending in backend
       case 'refunded':
         return 'refunded';
       default:
@@ -407,6 +426,31 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
 
       {/* Filters and Search */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        {/* Status Message */}
+        <AnimatePresence>
+          {statusMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className={`mb-4 p-4 rounded-lg border ${
+                statusMessage.type === 'success' 
+                  ? 'bg-green-50 border-green-200 text-green-800' 
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {statusMessage.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5" />
+                ) : (
+                  <XCircle className="w-5 h-5" />
+                )}
+                <span className="font-medium">{statusMessage.message}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
@@ -817,10 +861,20 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
                           handleStatusUpdate(selectedPayment.id, 'completed');
                           setShowDetailsModal(false);
                         }}
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        disabled={updatingStatus === selectedPayment.id}
+                        className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
                       >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Confirm Payment
+                        {updatingStatus === selectedPayment.id ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Confirm Payment
+                          </>
+                        )}
                       </Button>
                       <Button
                         variant="outline"
@@ -828,10 +882,20 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
                           handleStatusUpdate(selectedPayment.id, 'cancelled');
                           setShowDetailsModal(false);
                         }}
-                        className="text-red-600 border-red-600 hover:bg-red-50"
+                        disabled={updatingStatus === selectedPayment.id}
+                        className="text-red-600 border-red-600 hover:bg-red-50 disabled:opacity-50"
                       >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Cancel Payment
+                        {updatingStatus === selectedPayment.id ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Cancel Payment
+                          </>
+                        )}
                       </Button>
                     </>
                   )}

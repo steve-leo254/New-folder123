@@ -110,7 +110,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins during development
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -870,6 +870,68 @@ def get_billing_summary(
         db=db, 
         current_user=current_user
     )
+
+
+@app.patch(
+    "/billing/payments/{payment_id}",
+    response_model=None,
+    dependencies=[Depends(get_current_active_user)],
+)
+def update_billing_payment_status(
+    payment_id: int,
+    status_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update payment status for billing (Admin only)."""
+    
+    # Check if user is admin
+    if current_user.role.value not in ['super_admin', 'clinician_admin']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin users can update payment status"
+        )
+    
+    # Get the appointment/payment record
+    appointment = db.query(Appointment).filter(Appointment.id == payment_id).first()
+    if not appointment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment record not found"
+        )
+    
+    # Update payment status
+    new_status = status_data.get('status')
+    notes = status_data.get('notes')
+    
+    if new_status:
+        appointment.payment_status = new_status
+        appointment.updated_at = datetime.now()
+        
+        # Add notes to triage_notes if provided
+        if notes:
+            appointment.cancellation_reason = notes
+    
+    try:
+        db.commit()
+        db.refresh(appointment)
+        
+        logger.info(f"Payment status updated for payment {payment_id} to {new_status} by {current_user.full_name}")
+        
+        return {
+            'id': appointment.id,
+            'payment_status': appointment.payment_status,
+            'updated_at': appointment.updated_at,
+            'message': 'Payment status updated successfully'
+        }
+        
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error updating payment status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update payment status"
+        )
 
 
 @app.post("/admin/cleanup-unpaid", dependencies=[Depends(get_current_active_user)])

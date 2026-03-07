@@ -3,14 +3,13 @@ import { motion } from 'framer-motion';
 import Card from '../../ui/Card';
 import { useAppointments } from '../../../services/useAppointment';
 import { Calendar, Clock, Video, MapPin, CheckCircle, XCircle } from 'lucide-react';
-import Badge from '../../ui/Badge';
 
 interface AppointmentsSectionProps {
   patientId: string | number;
 }
 
 export const AppointmentsSection: React.FC<AppointmentsSectionProps> = ({ patientId }) => {
-  const { appointments, loading } = useAppointments();
+  const { appointments, isLoading } = useAppointments();
 
   // Filter appointments for this patient
   const patientAppointments = appointments.filter((apt: any) => apt.patientId === patientId);
@@ -22,6 +21,28 @@ export const AppointmentsSection: React.FC<AppointmentsSectionProps> = ({ patien
       case 'cancelled': return 'bg-red-100 text-red-800';
       case 'upcoming': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'unpaid': return 'bg-red-100 text-red-800';
+      case 'cancelled': return 'bg-gray-100 text-gray-800';
+      case 'refunded': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPaymentStatusText = (status: string) => {
+    switch (status) {
+      case 'paid': return 'Payment Completed';
+      case 'pending': return 'Payment Pending';
+      case 'unpaid': return 'Payment Pending';
+      case 'cancelled': return 'Payment Cancelled';
+      case 'refunded': return 'Payment Refunded';
+      default: return 'Payment Pending';
     }
   };
 
@@ -37,7 +58,7 @@ export const AppointmentsSection: React.FC<AppointmentsSectionProps> = ({ patien
     return type === 'video' ? <Video className="w-4 h-4" /> : <MapPin className="w-4 h-4" />;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <motion.div
         key='appointments'
@@ -87,12 +108,12 @@ export const AppointmentsSection: React.FC<AppointmentsSectionProps> = ({ patien
                           {appointment.type} Appointment
                         </span>
                       </div>
-                      <Badge variant={getStatusColor(appointment.status)}>
+                      <div className={`px-2 py-1 text-xs rounded-full ${getStatusColor(appointment.status)}`}>
                         <div className='flex items-center space-x-1'>
                           {getStatusIcon(appointment.status)}
                           <span className='capitalize'>{appointment.status}</span>
                         </div>
-                      </Badge>
+                      </div>
                     </div>
                     
                     <div className='space-y-2'>
@@ -119,9 +140,9 @@ export const AppointmentsSection: React.FC<AppointmentsSectionProps> = ({ patien
                   
                   {appointment.paymentStatus && (
                     <div className='ml-4'>
-                      <Badge variant={appointment.paymentStatus === 'paid' ? 'success' : 'warning'}>
-                        {appointment.paymentStatus === 'paid' ? 'Paid' : 'Payment Pending'}
-                      </Badge>
+                      <div className={`px-2 py-1 text-xs rounded-full ${getPaymentStatusColor(appointment.paymentStatus)}`}>
+                        {getPaymentStatusText(appointment.paymentStatus)}
+                      </div>
                     </div>
                   )}
                 </div>

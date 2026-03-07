@@ -40,6 +40,23 @@ const normalizeAppointment = (appointment: any): AppointmentRecord => {
   const date = scheduledAt instanceof Date ? scheduledAt.toISOString().split('T')[0] : new Date(scheduledAt).toISOString().split('T')[0];
   const time = scheduledAt instanceof Date ? scheduledAt.toTimeString().slice(0, 5) : new Date(scheduledAt).toTimeString().slice(0, 5);
   
+  // For medication purchases, if status is completed, payment should be marked as paid
+  let paymentStatus = appointment.payment_status || appointment.paymentStatus;
+  
+  // Special handling for medication purchases
+  if (appointment.visit_type === 'medication_purchase') {
+    // If it's a medication purchase and completed, it should be paid
+    if (appointment.status === 'completed' && (!paymentStatus || paymentStatus === 'pending')) {
+      paymentStatus = 'paid';
+    }
+    // If payment status is still not set, default to paid for medication purchases
+    else if (!paymentStatus) {
+      paymentStatus = 'paid';
+    }
+  } else if (!paymentStatus) {
+    paymentStatus = 'pending';
+  }
+  
   return {
     id: appointment.id,
     patientId: appointment.patient_id || appointment.patientId,
@@ -51,7 +68,7 @@ const normalizeAppointment = (appointment: any): AppointmentRecord => {
     status: appointment.status || 'scheduled',
     type: appointment.visit_type || appointment.type || 'in-person',
     notes: appointment.triage_notes || appointment.notes,
-    paymentStatus: appointment.payment_status || appointment.paymentStatus || 'pending',
+    paymentStatus: paymentStatus,
     createdAt: appointment.created_at || appointment.createdAt,
     updatedAt: appointment.updated_at || appointment.updatedAt,
   };

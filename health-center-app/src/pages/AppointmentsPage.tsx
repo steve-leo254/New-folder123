@@ -23,6 +23,29 @@ const AppointmentsPage: React.FC = () => {
   const { staff, loading: staffLoading, fetchStaff } = useStaff();
   const { appointments, isLoading: appointmentsLoading, fetchAppointments, error: appointmentsError } = useAppointments();
 
+  // Payment status helper functions
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'unpaid': return 'bg-red-100 text-red-800';
+      case 'cancelled': return 'bg-gray-100 text-gray-800';
+      case 'refunded': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPaymentStatusText = (status: string) => {
+    switch (status) {
+      case 'paid': return 'Payment Completed';
+      case 'pending': return 'Payment Pending';
+      case 'unpaid': return 'Payment Pending';
+      case 'cancelled': return 'Payment Cancelled';
+      case 'refunded': return 'Payment Refunded';
+      default: return 'Payment Pending';
+    }
+  };
+
   // Load data on component mount
   useEffect(() => {
     fetchStaff();
@@ -230,8 +253,8 @@ const AppointmentsPage: React.FC = () => {
 
                   return (
                     <div key={appointment.id} className="border-l-4 border-primary-500 pl-4 py-2">
-                      <div className="flex items-center justify-between">
-                        <div>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
                           <p className="font-medium text-gray-900">{formattedDate}</p>
                           <p className="text-sm text-gray-600 flex items-center mt-1">
                             <Clock className="w-4 h-4 mr-1" />
@@ -242,21 +265,35 @@ const AppointmentsPage: React.FC = () => {
                               Dr. {appointment.doctorName}
                             </p>
                           )}
+                          {appointment.notes && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {appointment.notes}
+                            </p>
+                          )}
                         </div>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          appointment.type === 'video' 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : 'bg-green-100 text-green-800'
-                        }`}>
-                          {appointment.type || 'In-Person'}
-                        </span>
+                        <div className="flex flex-col items-end space-y-2">
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            appointment.type === 'video' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {appointment.type || 'In-Person'}
+                          </span>
+                          {appointment.paymentStatus && (
+                            <div className={`px-2 py-1 text-xs rounded-full ${getPaymentStatusColor(appointment.paymentStatus)}`}>
+                              {getPaymentStatusText(appointment.paymentStatus)}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-sm text-gray-500">No upcoming appointments scheduled</p>
+              <div className="text-center py-8">
+                <p className="text-gray-500">No upcoming appointments found</p>
+              </div>
             )}
           </Card>
 
