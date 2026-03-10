@@ -30,11 +30,18 @@ const AppointmentsPage: React.FC = () => {
   // Merge appointments from both hooks for real-time updates
   const allAppointments = useMemo(() => {
     const combined = [...dbAppointments, ...realtimeAppointments];
-    // Remove duplicates by ID
-    const unique = combined.filter((apt, index, self) => 
-      combined.findIndex(a => a.id === apt.id) === index
-    );
-    return unique;
+    // Remove duplicates by ID - keep the most recent version
+    const uniqueMap = new Map();
+    combined.forEach(apt => {
+      if (apt.id) {
+        // If appointment already exists, keep the one with more recent updated_at
+        const existing = uniqueMap.get(apt.id);
+        if (!existing || new Date(apt.updated_at || apt.createdAt || 0) > new Date(existing.updated_at || existing.createdAt || 0)) {
+          uniqueMap.set(apt.id, apt);
+        }
+      }
+    });
+    return Array.from(uniqueMap.values());
   }, [dbAppointments, realtimeAppointments]);
 
   // Payment status helper functions
@@ -130,7 +137,16 @@ const AppointmentsPage: React.FC = () => {
           today.setHours(0, 0, 0, 0); // Set to start of day
           return apt.status === 'scheduled' && aptDate >= today;
         })
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .sort((a, b) => {
+          // Primary sort: by date ascending (soonest first)
+          const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+          if (dateCompare !== 0) return dateCompare;
+          
+          // Secondary sort: by time ascending (earliest first)
+          const timeA = a.time || '00:00';
+          const timeB = b.time || '00:00';
+          return timeA.localeCompare(timeB);
+        })
         .slice(0, 3), // Show only 3 most recent appointments
     [allAppointments]
   );
@@ -250,20 +266,20 @@ const AppointmentsPage: React.FC = () => {
             ) : upcomingAppointments.length > 0 ? (
               <div className="space-y-3">
                 {upcomingAppointments.map((appointment) => {
-                  // Parse and format the appointment date/time
-                  const appointmentDateTime = appointment.date;
-                  const formattedDate = appointmentDateTime ? new Date(appointmentDateTime).toLocaleDateString('en-US', {
+                  // Format the appointment date
+                  const formattedDate = appointment.date ? new Date(appointment.date).toLocaleDateString('en-US', {
                     weekday: 'short',
                     month: 'short',
                     day: 'numeric',
                     year: 'numeric'
-                  }) : appointment.date || 'Date TBD';
+                  }) : 'Date TBD';
                   
-                  const formattedTime = appointmentDateTime ? new Date(appointmentDateTime).toLocaleTimeString('en-US', {
+                  // Format the time - use appointment.time which is in HH:MM format
+                  const formattedTime = appointment.time ? new Date(`2000-01-01T${appointment.time}`).toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
                     hour12: true
-                  }) : appointment.time || 'Time TBD';
+                  }) : 'Time TBD';
 
                   return (
                     <div key={appointment.id} className="border-l-4 border-primary-500 pl-4 py-2">

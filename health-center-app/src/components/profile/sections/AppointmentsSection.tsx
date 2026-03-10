@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import Card from '../../ui/Card';
 import { useAppointments } from '../../../services/useAppointment';
-import { Calendar, Clock, Video, MapPin, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, Clock, Video, MapPin, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface AppointmentsSectionProps {
   patientId: string | number;
@@ -10,9 +10,41 @@ interface AppointmentsSectionProps {
 
 export const AppointmentsSection: React.FC<AppointmentsSectionProps> = ({ patientId }) => {
   const { appointments, isLoading } = useAppointments();
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const appointmentsPerPage = 5; // Show 5 appointments per page
 
   // Filter appointments for this patient
   const patientAppointments = appointments.filter((apt: any) => apt.patientId === patientId);
+  
+  // Sort appointments by date (newest first) for better user experience
+  const sortedAppointments = useMemo(() => {
+    return [...patientAppointments].sort((a, b) => {
+      const dateA = new Date(a.date + ' ' + (a.time || '00:00'));
+      const dateB = new Date(b.date + ' ' + (b.time || '00:00'));
+      return dateB.getTime() - dateA.getTime(); // Newest first
+    });
+  }, [patientAppointments]);
+  
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedAppointments.length / appointmentsPerPage);
+  const startIndex = (currentPage - 1) * appointmentsPerPage;
+  const endIndex = startIndex + appointmentsPerPage;
+  const currentAppointments = sortedAppointments.slice(startIndex, endIndex);
+  
+  // Pagination controls
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+  
+  const goToPreviousPage = () => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
+  };
+  
+  const goToNextPage = () => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -87,17 +119,23 @@ export const AppointmentsSection: React.FC<AppointmentsSectionProps> = ({ patien
       className='space-y-6'
     >
       <Card className='p-6'>
-        <h3 className='text-lg font-semibold text-gray-900 mb-6'>My Appointments</h3>
+        <h3 className='text-lg font-semibold text-gray-900 mb-6'>
+          My Appointments 
+          <span className='text-sm text-gray-500 ml-2'>
+            ({sortedAppointments.length} total)
+          </span>
+        </h3>
         
-        {patientAppointments.length === 0 ? (
+        {sortedAppointments.length === 0 ? (
           <div className='text-center py-8'>
             <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <p className='text-gray-500'>No appointments scheduled</p>
             <p className='text-sm text-gray-400 mt-2'>Patient ID: {patientId}</p>
           </div>
         ) : (
-          <div className='space-y-4'>
-            {patientAppointments.map((appointment: any) => (
+          <>
+            <div className='space-y-4'>
+              {currentAppointments.map((appointment: any) => (
               <div key={appointment.id} className='border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow'>
                 <div className='flex items-start justify-between'>
                   <div className='flex-1'>
@@ -148,7 +186,50 @@ export const AppointmentsSection: React.FC<AppointmentsSectionProps> = ({ patien
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className='flex items-center justify-between mt-6 pt-4 border-t border-gray-200'>
+                <div className='text-sm text-gray-500'>
+                  Showing {startIndex + 1} to {Math.min(endIndex, sortedAppointments.length)} of {sortedAppointments.length} appointments
+                </div>
+                <div className='flex items-center space-x-2'>
+                  <button
+                    onClick={goToPreviousPage}
+                    disabled={currentPage === 1}
+                    className='p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+                  >
+                    <ChevronLeft className='w-4 h-4' />
+                  </button>
+                  
+                  <div className='flex items-center space-x-1'>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => goToPage(page)}
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-500 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={goToNextPage}
+                    disabled={currentPage === totalPages}
+                    className='p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+                  >
+                    <ChevronRight className='w-4 h-4' />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </Card>
     </motion.div>
