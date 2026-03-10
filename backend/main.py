@@ -48,6 +48,7 @@ from pgfunc import (
 from pydantic_models import (
     CreateUserRequest, UserProfileResponse, Token, LoginUserRequest, 
     AppointmentCreateRequest, AppointmentUpdateRequest, AppointmentResponse, AppointmentRescheduleRequest,
+    AppointmentPaymentRequest,
     PrescriptionCreateRequest, PrescriptionUpdateRequest, PrescriptionResponse,
     PrescriptionStatus,
     MedicationCreateRequest,
@@ -570,16 +571,29 @@ def create_appointment(
             detail="Appointments can only be booked between 9:00 AM and 6:00 PM"
         )
 
+    # Require payment confirmation for appointment booking
+    if not payload.payment_amount or payload.payment_amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment amount is required to book an appointment"
+        )
+    
+    if not payload.payment_method:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment method is required to book an appointment"
+        )
+
+    # Create appointment with pending payment status
     appt = Appointment(
         patient_id=payload.patient_id,
         clinician_id=payload.clinician_id,
         visit_type=payload.visit_type,
         scheduled_at=payload.scheduled_at,
         triage_notes=payload.triage_notes,
-        cost=payload.cost,
-        payment_status='unpaid',
-        payment_method=payload.payment_method,
         payment_amount=payload.payment_amount or payload.cost,
+        payment_status='pending',  # Changed from 'unpaid' to 'pending'
+        payment_method=payload.payment_method,
     )
     
     try:
@@ -601,7 +615,7 @@ def create_appointment(
             'scheduled_at': appt.scheduled_at,
             'status': appt.status.value if appt.status else 'scheduled',
             'triage_notes': appt.triage_notes,
-            'cost': float(appt.cost) if appt.cost else 0.0,
+            'cost': float(appt.payment_amount) if appt.payment_amount else 0.0,
             'cancellation_reason': appt.cancellation_reason,
             'payment_status': appt.payment_status,
             'payment_method': appt.payment_method,
@@ -684,6 +698,103 @@ def process_appointment_payment(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process payment"
+        )
+
+
+@app.post("/appointments/payments", dependencies=[Depends(get_current_active_user)])
+def create_appointment_payment(
+    payment_data: AppointmentPaymentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Process appointment payment via M-Pesa or other methods."""
+    try:
+        logger.info(f"=== APPOINTMENT PAYMENT REQUEST RECEIVED ===")
+        logger.info(f"Payment data: {payment_data}")
+        
+        appointment_id = payment_data.appointment_id
+        amount = payment_data.amount
+        payment_method = payment_data.payment_method
+        phone_number = payment_data.phone_number
+        
+        # Validate appointment exists and belongs to user
+        appointment = db.query(Appointment).filter(
+            Appointment.id == appointment_id,
+            Appointment.patient_id == current_user.id
+        ).first()
+        
+        if not appointment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Appointment not found"
+            )
+        
+        if appointment.payment_status == 'paid':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Appointment already paid"
+            )
+        
+        # Process M-Pesa payment (mock implementation)
+        if payment_method == 'mpesa':
+            if not phone_number:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Phone number is required for M-Pesa payment"
+                )
+            
+            # Generate transaction ID
+            transaction_id = f"MPESA-{uuid.uuid4().hex[:12].upper()}"
+            
+            # Update appointment with payment details
+            appointment.payment_status = 'paid'
+            appointment.payment_method = PaymentMethod.MPESA
+            appointment.transaction_id = transaction_id
+            appointment.mpesa_phone_number = phone_number
+            appointment.mpesa_receipt_number = f"RCP-{uuid.uuid4().hex[:10].upper()}"
+            appointment.payment_date = datetime.now()
+            
+            db.commit()
+            db.refresh(appointment)
+            
+            return {
+                "success": True,
+                "message": "Payment processed successfully",
+                "transaction_id": transaction_id,
+                "receipt_number": appointment.mpesa_receipt_number,
+                "appointment_id": appointment.id,
+                "amount": float(amount),
+                "payment_method": "mpesa"
+            }
+        
+        # Handle other payment methods
+        else:
+            transaction_id = f"PAY-{uuid.uuid4().hex[:12].upper()}"
+            appointment.payment_status = 'paid'
+            appointment.payment_method = payment_method
+            appointment.transaction_id = transaction_id
+            appointment.payment_date = datetime.now()
+            
+            db.commit()
+            db.refresh(appointment)
+            
+            return {
+                "success": True,
+                "message": "Payment processed successfully",
+                "transaction_id": transaction_id,
+                "appointment_id": appointment.id,
+                "amount": float(amount),
+                "payment_method": payment_method
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing appointment payment: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Payment processing failed: {str(e)}"
         )
 
 
@@ -823,7 +934,7 @@ def get_billing_payments(
             'scheduled_at': appt.scheduled_at,
             'created_at': appt.created_at,
             'updated_at': appt.updated_at,
-            'cost': float(appt.cost) if appt.cost else 0.0,
+            'cost': float(appt.payment_amount) if appt.payment_amount else 0.0,
             'cancellation_reason': appt.cancellation_reason,
             'visit_type': appt.visit_type,
             'is_medication': is_medication,

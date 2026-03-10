@@ -99,15 +99,15 @@ class StaffCreateRequest(BaseModel):
 class StaffResponse(BaseModel):
     """Staff member response."""
     id: int
-    fullName: str = Field(alias="full_name")  # Map database full_name to frontend fullName
+    full_name: str
     email: str
     phone: Optional[str]
     role: str
     specialization: Optional[str]
-    isAvailable: bool = Field(alias="is_available")  # Map database is_available to frontend isAvailable
+    is_available: bool
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True, by_alias=True)
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -513,6 +513,14 @@ class DoctorSettingsResponse(BaseModel):
 # ============================================================================
 # Payments
 # ============================================================================
+
+class AppointmentPaymentRequest(BaseModel):
+    """Appointment payment request."""
+    appointment_id: int = Field(..., gt=0)
+    amount: Decimal = Field(..., gt=0)
+    payment_method: str = Field(..., description="card, mpesa, bank_transfer")
+    phone_number: Optional[str] = Field(None, description="Phone number for M-Pesa payments")
+
 
 class PaymentRequest(BaseModel):
     """Payment request."""

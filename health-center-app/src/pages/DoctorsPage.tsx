@@ -17,24 +17,29 @@ const DoctorsPage: React.FC = () => {
   const formattedDoctors: Doctor[] = useMemo(() => {
     console.log('Raw doctor data:', doctors);
     
-    return doctors.map((doctor) => ({
-      id: doctor.id.toString(),
-      user_id: doctor.id.toString(),
-      fullName: doctor.fullName,
-      name: doctor.fullName, // Alias for compatibility
-      email: doctor.email,
-      phone: doctor.phone,
-      specialization: doctor.specialization,
-      specialty: doctor.specialization, // Alias for compatibility
-      bio: doctor.bio || 'Professional healthcare provider',
-      rating: doctor.rating || 0,
-      isAvailable: doctor.isAvailable,
-      available: doctor.isAvailable, // Alias for compatibility
-      consultationFee: doctor.consultationFee || 0,
-      patientsCount: Math.floor(Math.random() * 500) + 50, // Realistic patient count (50-550)
-      avatar: doctor.avatar && doctor.avatar !== 'null' ? getFullImageUrl(doctor.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff` : `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff`,
-      created_at: doctor.created_at
-    }));
+    return doctors.map((doctor) => {
+      const avatarUrl = doctor.avatar ? getFullImageUrl(doctor.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff` : `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.fullName)}&size=128&background=4F46E5&color=fff`;
+      console.log(`Doctor: ${doctor.fullName}, Avatar: ${doctor.avatar}, Full URL: ${avatarUrl}`);
+      
+      return {
+        id: doctor.id.toString(),
+        user_id: doctor.id.toString(),
+        fullName: doctor.fullName,
+        name: doctor.fullName, // Alias for compatibility
+        email: doctor.email,
+        phone: doctor.phone,
+        specialization: doctor.specialization,
+        specialty: doctor.specialization, // Alias for compatibility
+        bio: doctor.bio || 'Professional healthcare provider',
+        rating: doctor.rating || 0,
+        isAvailable: doctor.isAvailable,
+        available: doctor.isAvailable, // Alias for compatibility
+        consultationFee: doctor.consultationFee || 0,
+        patientsCount: Math.floor(Math.random() * 500) + 50, // Realistic patient count (50-550)
+        avatar: avatarUrl,
+        created_at: doctor.created_at
+      };
+    });
   }, [doctors]);
 
   // Convert Doctor objects to StaffMember format for the shared component
