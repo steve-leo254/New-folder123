@@ -23,10 +23,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ doctor, onClose }) =>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [appointmentCreated, setAppointmentCreated] = useState(false);
+  const [createdAppointmentId, setCreatedAppointmentId] = useState<string | number | undefined>(undefined);
 
   // Get user info and appointment service
   const { token } = useAuth();
-  const { createAppointment } = useAppointments();
+  const { createAppointment, fetchAppointments } = useAppointments();
 
   // Get current user ID from token
   const getCurrentUserId = useCallback(() => {
@@ -115,7 +116,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ doctor, onClose }) =>
         const time24Hour = timeTo24Hour(selectedTime);
         const appointmentDateTime = new Date(`${selectedDate}T${time24Hour}`);
 
-        await createAppointment({
+        const createdAppointment = await createAppointment({
           patient_id: userId,
           clinician_id: parseInt(doctor.id),
           visit_type: appointmentType === 'video' ? 'video' : 'in-person',
@@ -127,6 +128,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ doctor, onClose }) =>
         });
 
         setAppointmentCreated(true);
+        setCreatedAppointmentId(createdAppointment.id);
         // Open M-Pesa payment modal
         setShowPaymentModal(true);
       } catch (error) {
@@ -149,9 +151,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ doctor, onClose }) =>
 
   const handlePaymentSuccess = useCallback(() => {
     console.log('Payment successful! Appointment confirmed.');
+    // Refresh appointments to show updated payment status
+    fetchAppointments();
     setShowPaymentModal(false);
     onClose();
-  }, [onClose]);
+  }, [fetchAppointments, onClose]);
 
   const handlePaymentFailed = useCallback(() => {
     console.log('Payment failed or cancelled.');
@@ -430,6 +434,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ doctor, onClose }) =>
         appointmentTime={selectedTime}
         appointmentType={appointmentType}
         phoneNumber={getUserPhone()}
+        appointmentId={createdAppointmentId}
       />
     </>
   );

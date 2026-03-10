@@ -15,6 +15,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import Button from '../components/ui/Button';
+import { apiService } from '../services/api';
 
 interface MpesaPaymentModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ interface MpesaPaymentModalProps {
   appointmentTime: string;
   appointmentType: string;
   phoneNumber?: string;
+  appointmentId?: string | number;
 }
 
 type PaymentStatus =
@@ -60,6 +62,7 @@ const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
   appointmentTime,
   appointmentType,
   phoneNumber = '0712***456',
+  appointmentId,
 }) => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('phone-input');
   const [countdown, setCountdown] = useState(60);
@@ -134,12 +137,9 @@ const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
             setPaymentStatus('timeout');
             return 0;
           }
-          // Simulate random success between 5-15 seconds
+          // Process payment when countdown reaches 45 (simulating user approval)
           if (prev === 45) {
-            setPaymentStatus('processing');
-            setTimeout(() => {
-              setPaymentStatus('success');
-            }, 3000);
+            processActualPayment();
             return prev;
           }
           return prev - 1;
@@ -149,6 +149,31 @@ const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
 
     return () => clearInterval(interval);
   }, [paymentStatus, countdown]);
+
+  // Process actual payment via API
+  const processActualPayment = useCallback(async () => {
+    if (!appointmentId) {
+      console.error('No appointment ID provided for payment processing');
+      setPaymentStatus('failed');
+      return;
+    }
+
+    setPaymentStatus('processing');
+    
+    try {
+      const response = await apiService.processPayment(appointmentId, {
+        payment_method: 'mpesa',
+        payment_amount: amount,
+        transaction_id: generateTransactionId(),
+      });
+
+      console.log('Payment processed successfully:', response);
+      setPaymentStatus('success');
+    } catch (error) {
+      console.error('Payment processing failed:', error);
+      setPaymentStatus('failed');
+    }
+  }, [appointmentId, amount, generateTransactionId]);
 
   // Handle retry
   const handleRetry = useCallback(() => {
