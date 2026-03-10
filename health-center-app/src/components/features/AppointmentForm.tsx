@@ -121,6 +121,9 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ doctor, onClose }) =>
           visit_type: appointmentType === 'video' ? 'video' : 'in-person',
           scheduled_at: appointmentDateTime.toISOString(),
           triage_notes: reason,
+          payment_amount: doctor?.consultationFee || 2500,
+          payment_method: 'mpesa',
+          cost: doctor?.consultationFee || 2500,
         });
 
         setAppointmentCreated(true);

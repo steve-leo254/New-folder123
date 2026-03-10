@@ -19,6 +19,8 @@ export interface CreateAppointmentData {
   time: string;
   type: 'in-person' | 'video';
   notes?: string;
+  payment_amount?: number;
+  payment_method?: string;
 }
 
 export interface UpdateAppointmentData {

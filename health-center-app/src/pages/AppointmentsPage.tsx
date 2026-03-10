@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, User, Search } from 'lucide-react';
+import { Calendar, Clock, User, Search, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AppointmentForm from '../components/features/AppointmentForm';
 import Card from '../components/ui/Card';
@@ -10,6 +10,7 @@ import { Doctor } from '../types';
 import { formatCurrency } from '@/services/formatCurrency';
 import { useStaff } from '../services/useStaff';
 import { useAppointments } from '../services/useAppointment';
+import { useRealtimeAppointments } from '../hooks/useRealtimeAppointments';
 import { getFullImageUrl } from '../utils/imageUtils';
 
 const AppointmentsPage: React.FC = () => {
@@ -20,8 +21,21 @@ const AppointmentsPage: React.FC = () => {
   const [filterSpecialization, setFilterSpecialization] = useState('all');
 
   // Fetch real data from hooks
-  const { staff, loading: staffLoading, fetchStaff } = useStaff();
-  const { appointments, isLoading: appointmentsLoading, fetchAppointments, error: appointmentsError } = useAppointments();
+  const { staff, loading, fetchStaff } = useStaff();
+  const { appointments: dbAppointments, isLoading: appointmentsLoading, fetchAppointments, error: appointmentsError } = useAppointments();
+  
+  // Use real-time appointments hook for automatic updates
+  const { appointments: realtimeAppointments, refreshAppointments } = useRealtimeAppointments('current-user');
+  
+  // Merge appointments from both hooks for real-time updates
+  const allAppointments = useMemo(() => {
+    const combined = [...dbAppointments, ...realtimeAppointments];
+    // Remove duplicates by ID
+    const unique = combined.filter((apt, index, self) => 
+      combined.findIndex(a => a.id === apt.id) === index
+    );
+    return unique;
+  }, [dbAppointments, realtimeAppointments]);
 
   // Payment status helper functions
   const getPaymentStatusColor = (status: string) => {
@@ -109,7 +123,7 @@ const AppointmentsPage: React.FC = () => {
   // Get upcoming appointments (scheduled status AND future date) - limited to 3 most recent
   const upcomingAppointments = useMemo(
     () =>
-      appointments
+      allAppointments
         .filter(apt => {
           const aptDate = new Date(apt.date);
           const today = new Date();
@@ -118,7 +132,7 @@ const AppointmentsPage: React.FC = () => {
         })
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 3), // Show only 3 most recent appointments
-    [appointments]
+    [allAppointments]
   );
 
   return (
@@ -168,7 +182,7 @@ const AppointmentsPage: React.FC = () => {
               </select>
             </div>
 
-            {staffLoading ? (
+            {loading ? (
               <div className="flex items-center justify-center py-8">
                 <LoadingSpinner />
               </div>
@@ -300,9 +314,13 @@ const AppointmentsPage: React.FC = () => {
           <Card className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
             <div className="space-y-3">
-              <Button className="w-full justify-start">
+              <Button className="w-full justify-start" onClick={() => navigate('/appointments/book')}>
                 <Calendar className="w-5 h-5 mr-2" />
                 Schedule New Appointment
+              </Button>
+              <Button variant="outline" className="w-full justify-start" onClick={refreshAppointments}>
+                <RefreshCw className="w-5 h-5 mr-2" />
+                Refresh Appointments
               </Button>
               <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/medical-history')}>
                 <User className="w-5 h-5 mr-2" />

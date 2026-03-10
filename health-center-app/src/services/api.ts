@@ -122,7 +122,7 @@ export const apiService = {
     payment_amount: number;
     transaction_id?: string;
   }) => {
-    const { data } = await api.post(`/appointments/${appointmentId}/payment`, payload);
+    const { data } = await api.post('/appointments/payments', { ...payload, appointment_id: appointmentId });
     return data;
   },
   getBillingPayments: async (params?: {

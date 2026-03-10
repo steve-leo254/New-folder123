@@ -35,6 +35,8 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     time: '',
     type: 'video' as 'in-person' | 'video',
     notes: '',
+    payment_amount: 0,
+    payment_method: 'mpesa',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -116,7 +118,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         time: formData.time + ':00', // Add seconds for proper time format
         type: formData.type,
         notes: formData.notes || undefined,
-        payment_method: 'pending', // Will be updated after payment
+        payment_method: formData.payment_method || 'mpesa',
         payment_amount: doctor.consultationFee || 0,
       };
       
@@ -138,6 +140,8 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         time: '',
         type: 'video',
         notes: '',
+        payment_amount: 0,
+        payment_method: 'mpesa',
       });
       setSelectedUserId(patientId.toString());
       
@@ -411,6 +415,32 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Payment Method
+                </label>
+                <select
+                  name="payment_method"
+                  value={formData.payment_method}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="mpesa">M-Pesa</option>
+                  <option value="card">Credit/Debit Card</option>
+                  <option value="cash">Cash</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                </select>
+              </div>
+
+              {/* Consultation Fee Display */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-blue-700">Consultation Fee:</span>
+                  <span className="text-lg font-semibold text-blue-900">{formatCurrency(doctor.consultationFee || 0)}</span>
+                </div>
               </div>
 
               {/* Buttons */}

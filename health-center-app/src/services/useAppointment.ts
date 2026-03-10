@@ -27,6 +27,8 @@ export interface AppointmentCreateRequest {
   triage_notes?: string;
   specialization?: string;
   cost?: number;
+  payment_amount?: number;
+  payment_method?: string;
 }
 
 export interface AppointmentUpdateRequest extends Partial<AppointmentCreateRequest> {
