@@ -7,7 +7,8 @@ import logging
 from typing import Optional
 from sqlalchemy.orm import aliased, Session
 
-from models import User, Appointment, Prescription, Doctor, Role, AppointmentStatus
+from models import User, Appointment, Prescription, StaffProfile, Role, StaffRole, AppointmentStatus
+from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger(__name__)
 
@@ -110,36 +111,42 @@ def dashboard_snapshot(db: Session) -> dict:
     }
 
 
-# Doctor helper functions
+# Staff helper functions
 def get_all_doctors(db: Session, is_available: bool = True):
     """Return all doctors, optionally filtered by availability."""
-    query = db.query(Doctor)
+    query = db.query(StaffProfile).options(joinedload(StaffProfile.user)).filter(StaffProfile.role == StaffRole.DOCTOR)
     if is_available:
-        query = query.filter(Doctor.is_available == True)
+        query = query.filter(StaffProfile.is_available == True)
     return query.all()
 
 
-def get_doctor_by_id(db: Session, doctor_id: int) -> Optional[Doctor]:
+def get_doctor_by_id(db: Session, doctor_id: int) -> Optional[StaffProfile]:
     """Return a Doctor by id or None."""
-    return db.query(Doctor).filter(Doctor.id == doctor_id).first()
+    return db.query(StaffProfile).options(joinedload(StaffProfile.user)).filter(StaffProfile.id == doctor_id).first()
 
 
 def get_doctors_by_specialization(db: Session, specialization: str, is_available: bool = True):
     """Return doctors filtered by specialization and availability."""
-    query = db.query(Doctor).filter(Doctor.specialization == specialization)
+    query = db.query(StaffProfile).options(joinedload(StaffProfile.user)).filter(
+        StaffProfile.specialization == specialization,
+        StaffProfile.role == StaffRole.DOCTOR
+    )
     if is_available:
-        query = query.filter(Doctor.is_available == True)
+        query = query.filter(StaffProfile.is_available == True)
     return query.all()
 
 
-def get_doctor_by_user_id(db: Session, user_id: int) -> Optional[Doctor]:
+def get_doctor_by_user_id(db: Session, user_id: int) -> Optional[StaffProfile]:
     """Return a Doctor profile for a given user_id or None."""
-    return db.query(Doctor).filter(Doctor.user_id == user_id).first()
+    return db.query(StaffProfile).filter(
+        StaffProfile.user_id == user_id,
+        StaffProfile.role == StaffRole.DOCTOR
+    ).first()
 
 
-def create_doctor(db: Session, user_id: int, specialization: str, bio: str = None, rating: float = 0.0) -> Doctor:
+def create_doctor(db: Session, user_id: int, specialization: str, bio: str = None, rating: float = 0.0) -> StaffProfile:
     """Create and return a new Doctor profile."""
-    doctor = Doctor(user_id=user_id, specialization=specialization, bio=bio, rating=rating)
+    doctor = StaffProfile(user_id=user_id, specialization=specialization, bio=bio, rating=rating, role=StaffRole.DOCTOR)
     db.add(doctor)
     db.commit()
     db.refresh(doctor)

@@ -12,9 +12,10 @@ from datetime import datetime
 
 from database import get_db
 from models import (
-    Doctor, DoctorAvailability, DoctorSettings, User
+    StaffProfile, StaffAvailability, StaffSettings, User
 )
 from pydantic_models import (
+    # Temporarily use old models until we create new staff availability models
     DoctorAvailabilityRequest, DoctorAvailabilityResponse,
     DoctorSettingsRequest, DoctorSettingsResponse
 )
@@ -22,19 +23,19 @@ from auth_router import get_current_active_user
 
 router = APIRouter(prefix="/api/doctor/profile", tags=["doctor-profile"])
 
-# Helper function to get doctor profile for current user
-def get_doctor_profile(current_user: User, db: Session) -> Doctor:
-    """Get doctor profile for current user."""
-    doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-    if not doctor:
+# Helper function to get staff profile for current user
+def get_staff_profile(current_user: User, db: Session) -> StaffProfile:
+    """Get staff profile for current user."""
+    staff = db.query(StaffProfile).filter(StaffProfile.user_id == current_user.id).first()
+    if not staff:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Doctor profile not found. Please create your profile first."
+            detail="Staff profile not found. Please create your profile first."
         )
-    return doctor
+    return staff
 
 # Helper function to create doctor profile for current user
-def create_doctor_profile_for_user(current_user: User, db: Session) -> Doctor:
+def create_doctor_profile_for_user(current_user: User, db: Session) -> StaffProfile:
     """Create doctor profile for current user if it doesn't exist."""
     # Check if user is actually a doctor
     if current_user.role.value != 'DOCTOR':
@@ -44,13 +45,14 @@ def create_doctor_profile_for_user(current_user: User, db: Session) -> Doctor:
         )
     
     # Check if profile already exists
-    existing_doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-    if existing_doctor:
-        return existing_doctor
+    existing_staff = db.query(StaffProfile).filter(StaffProfile.user_id == current_user.id).first()
+    if existing_staff:
+        return existing_staff
     
-    # Create new doctor profile
-    doctor = Doctor(
+    # Create new staff profile
+    staff = StaffProfile(
         user_id=current_user.id,
+        role=StaffRole.DOCTOR,
         specialization="General Practice",  # Default specialization
         bio="Doctor profile",  # Default bio
         rating=0.0,
@@ -58,11 +60,11 @@ def create_doctor_profile_for_user(current_user: User, db: Session) -> Doctor:
         consultation_fee=50.0  # Default consultation fee
     )
     
-    db.add(doctor)
+    db.add(staff)
     db.commit()
-    db.refresh(doctor)
+    db.refresh(staff)
     
-    return doctor
+    return staff
 
 # ============================================================================
 # AVAILABILITY SCHEDULE
@@ -74,18 +76,18 @@ async def get_availability(
     db: Session = Depends(get_db)
 ):
     """Get doctor's weekly availability."""
-    doctor = get_doctor_profile(current_user, db)
+    staff = get_staff_profile(current_user, db)
     
-    availability = db.query(DoctorAvailability).filter(
-        DoctorAvailability.doctor_id == doctor.id
-    ).order_by(DoctorAvailability.day).all()
+    availability = db.query(StaffAvailability).filter(
+        StaffAvailability.staff_id == staff.id
+    ).order_by(StaffAvailability.day).all()
     
     # Create default availability if none exists
     if not availability:
         days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         for day in days:
-            avail = DoctorAvailability(
-                doctor_id=doctor.id,
+            avail = StaffAvailability(
+                staff_id=staff.id,
                 day=day,
                 is_open=(day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
                 start_time='09:00',
@@ -96,9 +98,9 @@ async def get_availability(
             db.add(avail)
         db.commit()
         db.refresh(avail)
-        availability = db.query(DoctorAvailability).filter(
-            DoctorAvailability.doctor_id == doctor.id
-        ).order_by(DoctorAvailability.day).all()
+        availability = db.query(StaffAvailability).filter(
+            StaffAvailability.staff_id == staff.id
+        ).order_by(StaffAvailability.day).all()
     
     return availability
 
@@ -110,11 +112,11 @@ async def update_availability(
     db: Session = Depends(get_db)
 ):
     """Update doctor's availability for a specific day."""
-    doctor = get_doctor_profile(current_user, db)
+    staff = get_staff_profile(current_user, db)
     
-    availability = db.query(DoctorAvailability).filter(
-        DoctorAvailability.id == availability_id,
-        DoctorAvailability.doctor_id == doctor.id
+    availability = db.query(StaffAvailability).filter(
+        StaffAvailability.id == availability_id,
+        StaffAvailability.staff_id == staff.id
     ).first()
     
     if not availability:
@@ -147,18 +149,18 @@ async def update_bulk_availability(
     db: Session = Depends(get_db)
 ):
     """Update doctor's availability for multiple days."""
-    doctor = get_doctor_profile(current_user, db)
+    staff = get_staff_profile(current_user, db)
     
     updated_availability = []
     
     for avail_data in availability_list:
-        availability = db.query(DoctorAvailability).filter(
-            DoctorAvailability.doctor_id == doctor.id,
-            DoctorAvailability.day == avail_data.day
+        availability = db.query(StaffAvailability).filter(
+            StaffAvailability.staff_id == staff.id,
+            StaffAvailability.day == avail_data.day
         ).first()
         
         if not availability:
-            availability = DoctorAvailability(doctor_id=doctor.id, day=avail_data.day)
+            availability = StaffAvailability(staff_id=staff.id, day=avail_data.day)
             db.add(availability)
         
         for field, value in avail_data.dict().items():
@@ -189,15 +191,15 @@ async def get_settings(
     db: Session = Depends(get_db)
 ):
     """Get doctor's settings and preferences."""
-    doctor = get_doctor_profile(current_user, db)
+    staff = get_staff_profile(current_user, db)
     
-    settings = db.query(DoctorSettings).filter(
-        DoctorSettings.doctor_id == doctor.id
+    settings = db.query(StaffSettings).filter(
+        StaffSettings.staff_id == staff.id
     ).first()
     
     if not settings:
         # Create default settings
-        settings = DoctorSettings(doctor_id=doctor.id)
+        settings = StaffSettings(staff_id=staff.id)
         db.add(settings)
         db.commit()
         db.refresh(settings)
@@ -211,14 +213,14 @@ async def update_settings(
     db: Session = Depends(get_db)
 ):
     """Update doctor's settings and preferences."""
-    doctor = get_doctor_profile(current_user, db)
+    staff = get_staff_profile(current_user, db)
     
-    settings = db.query(DoctorSettings).filter(
-        DoctorSettings.doctor_id == doctor.id
+    settings = db.query(StaffSettings).filter(
+        StaffSettings.staff_id == staff.id
     ).first()
     
     if not settings:
-        settings = DoctorSettings(doctor_id=doctor.id)
+        settings = StaffSettings(staff_id=staff.id)
         db.add(settings)
     
     for field, value in settings_data.dict().items():
@@ -283,20 +285,20 @@ async def get_complete_profile(
     db: Session = Depends(get_db)
 ):
     """Get complete doctor profile with all sections."""
-    # Get doctor profile - create if doesn't exist
-    doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+    # Get staff profile - create if doesn't exist
+    staff = db.query(StaffProfile).filter(StaffProfile.user_id == current_user.id).first()
     
-    if not doctor:
-        # Auto-create doctor profile for doctors who don't have one
+    if not staff:
+        # Auto-create staff profile for doctors who don't have one
         if current_user.role.value == 'DOCTOR':
-            doctor = create_doctor_profile_for_user(current_user, db)
+            staff = create_doctor_profile_for_user(current_user, db)
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Doctor profile not found. Please create your profile first."
+                detail="Staff profile not found. Please create your profile first."
             )
     
-    return build_complete_profile_response(doctor, db)
+    return build_complete_profile_response(staff, db)
 
 @router.get("/complete/{doctor_id}", response_model=dict)
 async def get_doctor_profile_by_id(
@@ -304,43 +306,43 @@ async def get_doctor_profile_by_id(
     db: Session = Depends(get_db)
 ):
     """Get complete doctor profile by doctor ID (for public viewing)."""
-    doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+    staff = db.query(StaffProfile).filter(StaffProfile.id == doctor_id).first()
     
-    if not doctor:
+    if not staff:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Doctor not found"
+            detail="Staff member not found"
         )
     
-    return build_complete_profile_response(doctor, db)
+    return build_complete_profile_response(staff, db)
 
-def build_complete_profile_response(doctor: Doctor, db: Session) -> dict:
-    """Build complete profile response for a doctor."""
+def build_complete_profile_response(staff: StaffProfile, db: Session) -> dict:
+    """Build complete profile response for a staff member."""
     
     # Get all sections
     education = db.query(DoctorEducation).filter(
-        DoctorEducation.doctor_id == doctor.id
+        DoctorEducation.doctor_id == staff.id
     ).order_by(DoctorEducation.year.desc()).all()
     
     contact_info = db.query(DoctorContactInfo).filter(
-        DoctorContactInfo.doctor_id == doctor.id
+        DoctorContactInfo.doctor_id == staff.id
     ).first()
     
     if not contact_info:
-        contact_info = DoctorContactInfo(doctor_id=doctor.id)
+        contact_info = DoctorContactInfo(doctor_id=staff.id)
         db.add(contact_info)
         db.commit()
         db.refresh(contact_info)
     
-    availability = db.query(DoctorAvailability).filter(
-        DoctorAvailability.doctor_id == doctor.id
-    ).order_by(DoctorAvailability.day).all()
+    availability = db.query(StaffAvailability).filter(
+        StaffAvailability.staff_id == staff.id
+    ).order_by(StaffAvailability.day).all()
     
     if not availability:
         days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         for day in days:
-            avail = DoctorAvailability(
-                doctor_id=doctor.id,
+            avail = StaffAvailability(
+                staff_id=staff.id,
                 day=day,
                 is_open=(day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
                 start_time='09:00',
@@ -350,30 +352,30 @@ def build_complete_profile_response(doctor: Doctor, db: Session) -> dict:
             )
             db.add(avail)
         db.commit()
-        availability = db.query(DoctorAvailability).filter(
-            DoctorAvailability.doctor_id == doctor.id
-        ).order_by(DoctorAvailability.day).all()
+        availability = db.query(StaffAvailability).filter(
+            StaffAvailability.staff_id == staff.id
+        ).order_by(StaffAvailability.day).all()
     
-    settings = db.query(DoctorSettings).filter(
-        DoctorSettings.doctor_id == doctor.id
+    settings = db.query(StaffSettings).filter(
+        StaffSettings.staff_id == staff.id
     ).first()
     
     if not settings:
-        settings = DoctorSettings(doctor_id=doctor.id)
+        settings = StaffSettings(staff_id=staff.id)
         db.add(settings)
         db.commit()
         db.refresh(settings)
     
     return {
-        "doctor": {
-            "id": doctor.id,
-            "user_id": doctor.user_id,
-            "specialization": doctor.specialization,
-            "bio": doctor.bio,
-            "rating": float(doctor.rating) if doctor.rating else 0.0,
-            "is_available": doctor.is_available,
-            "consultation_fee": float(doctor.consultation_fee) if doctor.consultation_fee else None,
-            "license_number": doctor.license_number
+        "staff": {
+            "id": staff.id,
+            "user_id": staff.user_id,
+            "specialization": staff.specialization,
+            "bio": staff.bio,
+            "rating": float(staff.rating) if staff.rating else 0.0,
+            "is_available": staff.is_available,
+            "consultation_fee": float(staff.consultation_fee) if staff.consultation_fee else None,
+            "license_number": staff.license_number
         },
         "education": [{
             "id": edu.id,

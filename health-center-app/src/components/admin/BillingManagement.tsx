@@ -63,7 +63,7 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
     has_next: false,
     has_prev: false
   });
-  const { updateBillingStatus } = useBilling();
+  const { updateBillingStatus, exportBillingPDF } = useBilling();
 
   // Fetch real billing data from API
   const fetchBillingData = async (page = 1, limit = 10) => {
@@ -318,13 +318,63 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
 
   // Format date
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-KE', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Handle PDF export
+  const handleExportPDF = async () => {
+    try {
+      setUpdatingStatus('exporting');
+      setStatusMessage({
+        type: 'success',
+        message: 'Generating PDF report...'
+      });
+
+      // Prepare filter information for the report
+      const filterInfo = [];
+      if (statusFilter && statusFilter !== 'all') {
+        filterInfo.push(`Status: ${statusFilter}`);
+      }
+      if (searchTerm) {
+        filterInfo.push(`Search: ${searchTerm}`);
+      }
+      const filterString = filterInfo.length > 0 ? filterInfo.join(', ') : 'All records';
+
+      // Get all data for export (not just paginated)
+      const allParams: any = { page: 1, limit: 1000 }; // Get more records for export
+      if (statusFilter && statusFilter !== 'all') {
+        allParams.payment_status = mapFrontendToBackendStatus(statusFilter);
+      }
+      
+      const response = await apiService.getBillingPayments(allParams);
+      const allPayments = response.payments || response;
+
+      // Export to PDF
+      await exportBillingPDF(allPayments, filterString);
+
+      setStatusMessage({
+        type: 'success',
+        message: 'PDF report downloaded successfully!'
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      setStatusMessage({
+        type: 'error',
+        message: 'Failed to generate PDF report. Please try again.'
+      });
+    } finally {
+      setUpdatingStatus(null);
+      // Clear message after 3 seconds
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
   };
 
   // Calculate statistics
@@ -487,9 +537,21 @@ const BillingManagement: React.FC<BillingManagementProps> = ({ onPaymentUpdate }
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            <Button variant="outline" className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              className="flex items-center gap-2"
+              onClick={handleExportPDF}
+              disabled={updatingStatus === 'exporting'}
+            >
               <Download className="w-4 h-4" />
-              Export
+              {updatingStatus === 'exporting' ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                'Export PDF'
+              )}
             </Button>
           </div>
         </div>

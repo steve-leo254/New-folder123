@@ -23,10 +23,11 @@ from dotenv import load_dotenv
 import models
 from database import engine, get_db
 from models import (
-    User, Appointment, Prescription, Doctor, Medication,
-    Role, AppointmentStatus,
-    MedicalInfo, EmergencyContact, Insurance, NotificationSettings,
-    SecuritySettings, ActivityLog, Wishlist
+    User, Appointment, Prescription, Medication,
+    Role, AppointmentStatus, StaffRole,
+    MedicalInfo, EmergencyContact, Insurance, UserSettings,
+    StaffProfile, StaffAvailability, StaffSettings,
+    ActivityLog, Wishlist, PaymentStatus, PaymentMethod
 )
 from auth_router import (
     router as auth_router, 
@@ -54,8 +55,6 @@ from pydantic_models import (
     MedicationResponse,
     StaffCreateRequest,
     StaffResponse,
-    DoctorCreateRequest,
-    DoctorResponse,
     ImageResponse,
     PaymentProcessRequest,
     PaymentResponse,
@@ -1297,8 +1296,8 @@ def create_prescription(
     logger.info(f"Prescription creation request from user {current_user.id}")
     logger.info(f"Payload: {payload}")
     
-    # Check permissions - only doctors, nurses, and admins can create prescriptions
-    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+    # Check permissions - only doctors and admins can create prescriptions
+    if current_user.role not in [Role.DOCTOR, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
         logger.warning(f"Unauthorized prescription creation attempt by user {current_user.id} with role {current_user.role}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1451,8 +1450,8 @@ def delete_prescription(
     current_user: User = Depends(get_current_active_user),
 ):
     """Delete prescription (admin/clinician only)."""
-    # Check permissions - only doctors, nurses, and admins can delete prescriptions
-    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+    # Check permissions - only doctors and admins can delete prescriptions
+    if current_user.role not in [Role.DOCTOR, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete prescriptions"
@@ -1490,7 +1489,7 @@ def list_patients(
 ):
     """List all patients (staff/admin only)."""
     # Check permissions - only staff and admins can view patient list
-    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST, Role.PHARMACIST, Role.LAB_TECHNICIAN, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+    if current_user.role not in [Role.DOCTOR, Role.PHARMACIST, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view patient list"
@@ -1568,7 +1567,7 @@ def get_patient_details(
 ):
     """Get detailed patient information including medical data."""
     # Check permissions - only staff and admins can view patient details
-    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST, Role.PHARMACIST, Role.LAB_TECHNICIAN, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+    if current_user.role not in [Role.DOCTOR, Role.PHARMACIST, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view patient details"
@@ -1648,7 +1647,7 @@ def create_medical_info(
 ):
     """Create or update medical information for a patient."""
     # Check permissions - only staff and admins can update medical info
-    if current_user.role not in [Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST, Role.PHARMACIST, Role.LAB_TECHNICIAN, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
+    if current_user.role not in [Role.DOCTOR, Role.PHARMACIST, Role.SUPER_ADMIN, Role.CLINICIAN_ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update medical information"
@@ -1753,7 +1752,7 @@ def add_sample_medical_data(db: Session = Depends(get_db)):
 # Doctor Routes
 # ============================================================================
 
-@app.get("/doctors", response_model=List[DoctorResponse])
+@app.get("/doctors")
 def list_doctors(
     specialization: Optional[str] = None,
     is_available: Optional[bool] = True,
@@ -1777,24 +1776,18 @@ def list_doctors(
                 user = doctor.user
                 logger.info(f"Processing doctor {doctor.id} with user {user.id if user else 'None'}")
                 
-                doctor_response = DoctorResponse(
-                    id=doctor.id,
-                    user_id=doctor.user_id,
-                    fullName=user.full_name if user else "Unknown",
-                    email=user.email if user else "unknown@example.com",
-                    phone=user.phone if user else None,
-                    specialization=doctor.specialization,
-                    bio=doctor.bio,
-                    isAvailable=doctor.is_available,
-                    rating=doctor.rating,
-                    consultationFee=doctor.consultation_fee,
-                    video_consultation_fee=doctor.video_consultation_fee,
-                    phone_consultation_fee=doctor.phone_consultation_fee,
-                    chat_consultation_fee=doctor.chat_consultation_fee,
-                    patientsCount=0,  # Would need to calculate from appointments
-                    avatar=user.profile_picture if user else None
-                )
-                result.append(doctor_response)
+                doctor_dict = {
+                    "id": doctor.id,
+                    "fullName": user.full_name if user else "Unknown",
+                    "email": user.email if user else "unknown@example.com",
+                    "phone": user.phone if user else None,
+                    "role": user.role.value if user else "unknown",
+                    "specialization": doctor.specialization,
+                    "isAvailable": doctor.is_available,
+                    "avatar": user.profile_picture if user and user.profile_picture else None,
+                    "created_at": (user.created_at if user else datetime.now()).isoformat()
+                }
+                result.append(doctor_dict)
                 
             except Exception as e:
                 logger.error(f"Error processing doctor {doctor.id}: {str(e)}")
@@ -1808,7 +1801,7 @@ def list_doctors(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@app.get("/doctors/{doctor_id}", response_model=DoctorResponse)
+@app.get("/doctors/{doctor_id}")
 def get_doctor(
     doctor_id: int,
     db: Session = Depends(get_db),
@@ -1830,12 +1823,13 @@ def get_doctor(
         "email": user.email,
         "phone": user.phone,
         "specialization": doctor.specialization,
-        "bio": doctor.bio,
+        "bio": doctor.bio or "Professional healthcare provider",
         "isAvailable": doctor.is_available,
         "rating": float(doctor.rating) if doctor.rating else 0.0,
         "consultationFee": float(doctor.consultation_fee) if doctor.consultation_fee else 0.0,
         "patientsCount": 0,  # TODO: Calculate from appointments
-        "avatar": user.profile_picture,
+        "avatar": user.profile_picture if user.profile_picture else None,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
     }
 
 
@@ -1974,7 +1968,7 @@ def add_doctor_profile_pictures(db: Session = Depends(get_db)):
 @app.get("/staff")
 def list_staff(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """List all staff members (doctors, nurses, receptionists, etc.)."""
-    staff_roles = [Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST, Role.LAB_TECHNICIAN, Role.PHARMACIST]
+    staff_roles = [Role.DOCTOR, Role.PHARMACIST, Role.CLINICIAN_ADMIN]
     staff_users = db.query(User).filter(User.role.in_(staff_roles)).all()
     
     logger.info(f"Found {len(staff_users)} staff users")
@@ -1983,43 +1977,16 @@ def list_staff(current_user: User = Depends(get_current_active_user), db: Sessio
     
     result = []
     for user in staff_users:
-        # Get role-specific profile data
+        # Get staff profile data
         profile_data = None
-        if user.role == Role.DOCTOR and user.doctor_profile:
+        if user.staff_profile:
             profile_data = {
-                "id": user.doctor_profile.id,
-                "specialization": user.doctor_profile.specialization,
-                "bio": user.doctor_profile.bio,
-                "isAvailable": user.doctor_profile.is_available,
-                "rating": float(user.doctor_profile.rating) if user.doctor_profile.rating else 0.0,
-                "consultationFee": float(user.doctor_profile.consultation_fee) if user.doctor_profile.consultation_fee else 0.0,
-            }
-        elif user.role == Role.NURSE and user.nurse_profile:
-            profile_data = {
-                "id": user.nurse_profile.id,
-                "specialization": user.nurse_profile.specialization,
-                "bio": user.nurse_profile.bio,
-                "isAvailable": user.nurse_profile.is_available,
-            }
-        elif user.role == Role.RECEPTIONIST and user.receptionist_profile:
-            profile_data = {
-                "id": user.receptionist_profile.id,
-                "bio": user.receptionist_profile.bio,
-                "isAvailable": user.receptionist_profile.is_available,
-            }
-        elif user.role == Role.LAB_TECHNICIAN and user.lab_technician_profile:
-            profile_data = {
-                "id": user.lab_technician_profile.id,
-                "specialization": user.lab_technician_profile.specialization,
-                "bio": user.lab_technician_profile.bio,
-                "isAvailable": user.lab_technician_profile.is_available,
-            }
-        elif user.role == Role.PHARMACIST and user.pharmacist_profile:
-            profile_data = {
-                "id": user.pharmacist_profile.id,
-                "specialization": user.pharmacist_profile.specialization,
-                "bio": user.pharmacist_profile.bio,
-                "isAvailable": user.pharmacist_profile.is_available,
+                "id": user.staff_profile.id,
+                "specialization": user.staff_profile.specialization,
+                "bio": user.staff_profile.bio,
+                "isAvailable": user.staff_profile.is_available,
+                "rating": float(user.staff_profile.rating) if user.staff_profile.rating else 0.0,
+                "consultationFee": float(user.staff_profile.consultation_fee) if user.staff_profile.consultation_fee else 0.0,
             }
         
         result.append({
@@ -2207,14 +2174,14 @@ def delete_staff_role(
 
 @app.post(
     "/doctors",
-    response_model=DoctorResponse,
+    response_model=StaffResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_admin(Role.SUPER_ADMIN))],
 )
 def create_doctor_endpoint(
-    payload: DoctorCreateRequest,
+    payload: StaffCreateRequest,
     db: Session = Depends(get_db)
-) -> Doctor:
+) -> StaffProfile:
     """Create a new doctor profile (admin only)."""
     # Verify user exists
     user = db.query(User).filter(User.id == payload.user_id).first()
@@ -2224,16 +2191,17 @@ def create_doctor_endpoint(
             detail="User not found."
         )
 
-    # Check if doctor profile already exists for this user
-    existing = db.query(Doctor).filter(Doctor.user_id == payload.user_id).first()
+    # Check if staff profile already exists for this user
+    existing = db.query(StaffProfile).filter(StaffProfile.user_id == payload.user_id).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Doctor profile already exists for this user."
+            detail="Staff profile already exists for this user."
         )
 
-    doctor = Doctor(
+    staff = StaffProfile(
         user_id=payload.user_id,
+        role=StaffRole.DOCTOR,
         specialization=payload.specialization,
         bio=payload.bio,
         license_number=payload.license_number,
@@ -2243,16 +2211,16 @@ def create_doctor_endpoint(
     )
 
     try:
-        db.add(doctor)
+        db.add(staff)
         
         # Update user's profile picture if provided
         if payload.profile_picture:
             user.profile_picture = payload.profile_picture
         
         db.commit()
-        db.refresh(doctor)
-        logger.info(f"Doctor profile created: ID {doctor.id}")
-        return doctor
+        db.refresh(staff)
+        logger.info(f"Staff profile created: ID {staff.id}")
+        return staff
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error creating doctor: {str(e)}")
@@ -2581,11 +2549,9 @@ def create_staff_member(
     
     # Map role name to enum
     role_mapping = {
-        "doctor": Role.DOCTOR,
-        "nurse": Role.NURSE,
-        "receptionist": Role.RECEPTIONIST,
-        "lab_technician": Role.LAB_TECHNICIAN,
-        "pharmacist": Role.PHARMACIST,
+        "doctor": (Role.DOCTOR, StaffRole.DOCTOR),
+        "pharmacist": (Role.PHARMACIST, StaffRole.PHARMACIST),
+        "clinician_admin": (Role.CLINICIAN_ADMIN, None),  # No staff profile needed for admin
     }
     
     if payload.account.role not in role_mapping:
@@ -2594,7 +2560,7 @@ def create_staff_member(
             detail=f"Invalid role: {payload.account.role}"
         )
     
-    user_role = role_mapping[payload.account.role]
+    user_role, staff_role = role_mapping[payload.account.role]
     
     # Create user
     new_user = User(
@@ -2602,6 +2568,7 @@ def create_staff_member(
         email=payload.account.email,
         password_hash=bcrypt_context.hash(payload.account.password),
         phone=payload.account.phone,
+        profile_picture=payload.account.profile_image.replace('/uploads/', '') if payload.account.profile_image and payload.account.profile_image.startswith('/uploads/') else payload.account.profile_image,
         role=user_role,
         is_verified=True,
         is_active=True
@@ -2613,45 +2580,25 @@ def create_staff_member(
         db.refresh(new_user)
         
         # Create role-specific profile
-        if user_role == Role.DOCTOR:
-            doctor = Doctor(
+        if staff_role and user_role == Role.DOCTOR:
+            staff = StaffProfile(
                 user_id=new_user.id,
+                role=staff_role,
                 specialization=payload.profile.specialization,
                 bio=payload.profile.bio,
                 license_number=payload.profile.license_number,
                 consultation_fee=payload.profile.consultation_fee
             )
-            db.add(doctor)
-        elif user_role == Role.NURSE:
-            nurse = Nurse(
+            db.add(staff)
+        elif staff_role and user_role == Role.PHARMACIST:
+            staff = StaffProfile(
                 user_id=new_user.id,
+                role=staff_role,
                 specialization=payload.profile.specialization,
                 bio=payload.profile.bio,
                 license_number=payload.profile.license_number
             )
-            db.add(nurse)
-        elif user_role == Role.LAB_TECHNICIAN:
-            lab_tech = LabTechnician(
-                user_id=new_user.id,
-                specialization=payload.profile.specialization,
-                bio=payload.profile.bio,
-                license_number=payload.profile.license_number
-            )
-            db.add(lab_tech)
-        elif user_role == Role.PHARMACIST:
-            pharmacist = Pharmacist(
-                user_id=new_user.id,
-                specialization=payload.profile.specialization,
-                bio=payload.profile.bio,
-                license_number=payload.profile.license_number
-            )
-            db.add(pharmacist)
-        elif user_role == Role.RECEPTIONIST:
-            receptionist = Receptionist(
-                user_id=new_user.id,
-                bio=payload.profile.bio
-            )
-            db.add(receptionist)
+            db.add(staff)
         
         db.commit()
         

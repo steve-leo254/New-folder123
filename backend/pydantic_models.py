@@ -19,11 +19,14 @@ class Role(str, Enum):
     SUPER_ADMIN = "super_admin"
     CLINICIAN_ADMIN = "clinician_admin"
     DOCTOR = "doctor"
-    NURSE = "nurse"
-    RECEPTIONIST = "receptionist"
-    LAB_TECHNICIAN = "lab_technician"
     PHARMACIST = "pharmacist"
     PATIENT = "patient"
+
+
+class StaffRole(str, Enum):
+    """Staff profile roles."""
+    DOCTOR = "doctor"
+    PHARMACIST = "pharmacist"
 
 
 class AppointmentStatus(str, Enum):
@@ -41,6 +44,14 @@ class PaymentStatus(str, Enum):
     PAID = "paid"
     REFUNDED = "refunded"
     FAILED = "failed"
+
+
+class PaymentMethod(str, Enum):
+    """Payment methods."""
+    MPESA = "mpesa"
+    CARD = "card"
+    CASH = "cash"
+    INSURANCE = "insurance"
 
 
 class PrescriptionStatus(str, Enum):
@@ -63,7 +74,7 @@ class StaffAccountCreate(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     gender: Optional[str] = Field(None, max_length=20)
     date_of_birth: Optional[datetime] = None
-    role: str  # This will be the role name (doctor, nurse, etc.)
+    role: str  # Accept string from frontend, will be validated in endpoint
     profile_image: Optional[str] = None  # URL to profile image
 
 
@@ -72,6 +83,9 @@ class StaffProfileCreate(BaseModel):
     specialization: Optional[str] = Field(None, max_length=120)
     bio: Optional[str] = Field(None, max_length=1000)
     consultation_fee: Optional[Decimal] = Field(None, ge=0)
+    video_consultation_fee: Optional[Decimal] = Field(None, ge=0)
+    phone_consultation_fee: Optional[Decimal] = Field(None, ge=0)
+    chat_consultation_fee: Optional[Decimal] = Field(None, ge=0)
     license_number: Optional[str] = Field(None, max_length=50)
     is_available: bool = True
 
@@ -85,15 +99,15 @@ class StaffCreateRequest(BaseModel):
 class StaffResponse(BaseModel):
     """Staff member response."""
     id: int
-    full_name: str
+    fullName: str = Field(alias="full_name")  # Map database full_name to frontend fullName
     email: str
     phone: Optional[str]
     role: str
     specialization: Optional[str]
-    is_available: bool
+    isAvailable: bool = Field(alias="is_available")  # Map database is_available to frontend isAvailable
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True, by_alias=True)
 
 
 # ============================================================================
@@ -118,7 +132,7 @@ class CreateStaffRequest(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     gender: Optional[str] = Field(None, description="Gender: male, female, other, prefer_not_to_say")
     date_of_birth: Optional[str] = Field(None, description="Date of birth in ISO format (YYYY-MM-DD)")
-    role: str = Field(..., description="Staff role: doctor, nurse, receptionist, lab_technician, pharmacist")
+    role: StaffRole = Field(..., description="Staff role: doctor, pharmacist")
     specialization: Optional[str] = Field(None, max_length=120)
     bio: Optional[str] = None
     license_number: Optional[str] = None
@@ -236,7 +250,7 @@ class AppointmentCreateRequest(BaseModel):
     triage_notes: Optional[str] = None
     specialization: Optional[str] = None
     cost: Decimal = Decimal("0.0")
-    payment_method: Optional[str] = None  # 'mpesa', 'card', 'cash', 'insurance'
+    payment_method: Optional[PaymentMethod] = None
     payment_amount: Optional[Decimal] = None
 
 
@@ -251,7 +265,7 @@ class AppointmentUpdateRequest(BaseModel):
     triage_notes: Optional[str] = None
     cost: Optional[Decimal] = None
     payment_status: Optional[PaymentStatus] = None
-    payment_method: Optional[str] = None
+    payment_method: Optional[PaymentMethod] = None
     payment_amount: Optional[Decimal] = None
     transaction_id: Optional[str] = None
     payment_date: Optional[datetime] = None
@@ -270,8 +284,8 @@ class AppointmentResponse(BaseModel):
     triage_notes: Optional[str] = None
     cost: Decimal
     cancellation_reason: Optional[str] = None
-    payment_status: str
-    payment_method: Optional[str] = None
+    payment_status: PaymentStatus
+    payment_method: Optional[PaymentMethod] = None
     payment_amount: Decimal
     transaction_id: Optional[str] = None
     payment_date: Optional[datetime] = None
@@ -290,7 +304,7 @@ class AppointmentCancelRequest(BaseModel):
 class PaymentProcessRequest(BaseModel):
     """Process payment request."""
     appointment_id: int
-    payment_method: str  # 'mpesa', 'card', 'cash', 'insurance'
+    payment_method: PaymentMethod
     payment_amount: Decimal
     transaction_id: Optional[str] = None
 
@@ -299,7 +313,7 @@ class PaymentResponse(BaseModel):
     """Payment response model."""
     appointment_id: int
     payment_status: PaymentStatus
-    payment_method: str
+    payment_method: PaymentMethod
     payment_amount: Decimal
     transaction_id: Optional[str] = None
     payment_date: Optional[datetime] = None
@@ -351,45 +365,6 @@ class PrescriptionUpdateRequest(BaseModel):
 
 
 # ============================================================================
-# Doctors
-# ============================================================================
-
-class DoctorCreateRequest(BaseModel):
-    """Create doctor profile request."""
-    user_id: int
-    specialization: Optional[str] = Field(None, max_length=120)
-    bio: Optional[str] = None
-    license_number: Optional[str] = None
-    consultation_fee: Optional[Decimal] = None
-    rating: Optional[Decimal] = None
-    is_available: bool = True
-    profile_picture: Optional[str] = None
-
-
-class DoctorUpdateRequest(BaseModel):
-    """Update doctor profile request."""
-    specialization: Optional[str] = None
-    bio: Optional[str] = None
-    license_number: Optional[str] = None
-    consultation_fee: Optional[Decimal] = None
-    is_available: Optional[bool] = None
-    rating: Optional[Decimal] = None
-
-
-class DoctorResponse(BaseModel):
-    """Doctor profile response."""
-    id: int
-    user_id: int
-    fullName: str
-    email: str
-    phone: Optional[str] = None
-    specialization: Optional[str] = None
-    bio: Optional[str] = None
-    isAvailable: bool
-    rating: Decimal
-    consultationFee: Optional[Decimal] = None
-    video_consultation_fee: Optional[Decimal] = None
-    phone_consultation_fee: Optional[Decimal] = None
     chat_consultation_fee: Optional[Decimal] = None
     patientsCount: int
     avatar: Optional[str] = None

@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import type { AxiosError } from 'axios';
 import { apiService } from './api';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export interface BillingRecord {
   id: string | number;
@@ -198,6 +200,166 @@ export const useBilling = () => {
     [billings, stats]
   );
 
+  // Export billing data to PDF
+  const exportBillingPDF = useCallback(async (billingData: any[], filters?: any) => {
+    try {
+      const doc = new jsPDF();
+      
+      // Add custom font for better text rendering
+      doc.setFont('helvetica');
+      
+      // Title
+      doc.setFontSize(20);
+      doc.setTextColor(41, 98, 255);
+      doc.text('Kiangombe Health Center', 105, 20, { align: 'center' });
+      
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Billing Report', 105, 30, { align: 'center' });
+      
+      // Report date and filters
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      const reportDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      doc.text(`Generated: ${reportDate}`, 105, 40, { align: 'center' });
+      
+      if (filters) {
+        doc.text(`Filters: ${filters}`, 105, 47, { align: 'center' });
+      }
+      
+      // Calculate summary statistics
+      const totalRevenue = billingData.reduce((sum, item) => sum + (item.amount || 0), 0);
+      const paidCount = billingData.filter(item => item.payment_status === 'paid').length;
+      const pendingCount = billingData.filter(item => item.payment_status === 'pending').length;
+      const refundedCount = billingData.filter(item => item.payment_status === 'refunded').length;
+      
+      // Summary section
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Summary', 14, 60);
+      
+      doc.setFontSize(10);
+      doc.text(`Total Records: ${billingData.length}`, 14, 70);
+      doc.text(`Total Revenue: KES ${totalRevenue.toLocaleString()}`, 14, 77);
+      doc.text(`Paid: ${paidCount}`, 14, 84);
+      doc.text(`Pending: ${pendingCount}`, 14, 91);
+      doc.text(`Refunded: ${refundedCount}`, 14, 98);
+      
+      // Prepare table data
+      const tableData = billingData.map((item, index) => [
+        index + 1,
+        item.invoice_number || `INV-${item.id}`,
+        item.patient_name || 'Unknown',
+        item.clinician_name || 'Unknown',
+        item.visit_type === 'medication_purchase' ? 'Medication' : 'Appointment',
+        new Date(item.scheduled_at || item.created_at).toLocaleDateString(),
+        `KES ${(item.amount || 0).toLocaleString()}`,
+        item.payment_status || 'pending',
+        item.payment_method || 'N/A'
+      ]);
+      
+      // Table headers
+      const headers = [
+        '#',
+        'Invoice',
+        'Patient',
+        'Doctor',
+        'Type',
+        'Date',
+        'Amount',
+        'Status',
+        'Method'
+      ];
+      
+      // Add table
+      autoTable(doc, {
+        head: [headers],
+        body: tableData,
+        startY: 110,
+        theme: 'grid',
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+          lineColor: [200, 200, 200],
+          textColor: [0, 0, 0]
+        },
+        headStyles: {
+          fillColor: [41, 98, 255],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          lineColor: [41, 98, 255]
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        columnStyles: {
+          0: { cellWidth: 10 }, // #
+          1: { cellWidth: 25 }, // Invoice
+          2: { cellWidth: 30 }, // Patient
+          3: { cellWidth: 30 }, // Doctor
+          4: { cellWidth: 20 }, // Type
+          5: { cellWidth: 20 }, // Date
+          6: { cellWidth: 25 }, // Amount
+          7: { cellWidth: 20 }, // Status
+          8: { cellWidth: 20 }, // Method
+        },
+        didDrawCell: (data) => {
+          // Color code status cells
+          if (data.column.index === 7) { // Status column
+            const status = data.cell.raw as string;
+            if (status === 'paid') {
+              doc.setFillColor(220, 252, 231);
+              doc.setTextColor(22, 101, 52);
+            } else if (status === 'pending') {
+              doc.setFillColor(255, 251, 235);
+              doc.setTextColor(217, 119, 6);
+            } else if (status === 'refunded') {
+              doc.setFillColor(239, 246, 255);
+              doc.setTextColor(59, 130, 246);
+            }
+            doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
+            doc.text(status, data.cell.x + 2, data.cell.y + 5);
+          }
+        }
+      });
+      
+      // Footer
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(
+          `Page ${i} of ${pageCount}`,
+          (doc as any).internal.pageSize.width / 2,
+          (doc as any).internal.pageSize.height - 10,
+          { align: 'center' }
+        );
+        doc.text(
+          '© 2026 Kiangombe Health Center - Confidential',
+          (doc as any).internal.pageSize.width / 2,
+          (doc as any).internal.pageSize.height - 5,
+          { align: 'center' }
+        );
+      }
+      
+      // Save the PDF
+      const fileName = `billing-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      
+      return true;
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      throw error;
+    }
+  }, []);
+
   return {
     isLoading,
     billings,
@@ -207,5 +369,6 @@ export const useBilling = () => {
     calculateStats,
     updateBillingStatus,
     createBilling,
+    exportBillingPDF,
   };
 };

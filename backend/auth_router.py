@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from starlette import status
 from database import get_db
-from models import User, Role, Nurse, Receptionist, LabTechnician, Pharmacist, Doctor
+from models import User, Role, StaffProfile, StaffRole
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from pydantic_models import (
